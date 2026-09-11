@@ -2,9 +2,11 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/authMiddleware');
+const { sendOtpSms } = require('../services/smsService');
+const { query } = require('../config/db');
 
 // 1. Send OTP API
-router.post('/send-otp', (req, res) => {
+router.post('/send-otp', async (req, res) => {
   const { country_code = '+91', phone_number } = req.body;
 
   if (!phone_number) {
@@ -14,20 +16,39 @@ router.post('/send-otp', (req, res) => {
     });
   }
 
+  const fullPhone = `${country_code}${phone_number}`;
+  const otpCode = '123456'; // Demo 6-digit OTP
+  const otpId = `otp_${Date.now()}`;
+
+  // Trigger DLT SMS gateway
+  await sendOtpSms(fullPhone, otpCode);
+
+  // Attempt MySQL persistence if DB is connected
+  try {
+    await query(
+      `INSERT INTO otp_logs (phone_number, otp_code, otp_id, status) VALUES (?, ?, ?, 'PENDING')`,
+      [fullPhone, otpCode, otpId]
+    );
+  } catch (err) {
+    console.warn('Database OTP log notice:', err.message);
+  }
+
   return res.status(200).json({
     success: true,
-    message: 'OTP sent successfully',
+    message: 'OTP sent successfully via DLT SMS',
     data: {
-      phone_number: `${country_code}${phone_number}`,
-      otp_id: `otp_${Date.now()}`,
-      otp_code_for_demo: '123456',
-      expires_in_seconds: 300
+      phone_number: fullPhone,
+      otp_id: otpId,
+      otp_code_for_demo: otpCode,
+      dlt_sender_id: process.env.SMS_SENDER_ID || 'HMFCLI',
+      dlt_template_id: process.env.SMS_DLT_TEMPLATE_ID || '1207173589889308632',
+      expires_in_seconds: 600
     }
   });
 });
 
 // 2. Verify OTP API
-router.post('/verify-otp', (req, res) => {
+router.post('/verify-otp', async (req, res) => {
   const { phone_number, otp_code } = req.body;
 
   if (!phone_number || !otp_code) {
@@ -37,12 +58,32 @@ router.post('/verify-otp', (req, res) => {
     });
   }
 
-  // Demo validation: any 6 digit OTP or '123456'
-  const userPayload = {
+  const userId = `usr_${Date.now()}`;
+  let userPayload = {
     user_id: 'usr_998877',
     phone_number,
     name: 'Alex Sharma'
   };
+
+  // Try checking or inserting user in MySQL
+  try {
+    const existingUsers = await query(`SELECT * FROM users WHERE phone_number = ?`, [phone_number]);
+    if (existingUsers && existingUsers.length > 0) {
+      userPayload = {
+        user_id: existingUsers[0].id,
+        phone_number: existingUsers[0].phone_number,
+        name: existingUsers[0].name
+      };
+    } else {
+      await query(
+        `INSERT INTO users (id, phone_number, name) VALUES (?, ?, 'User')`,
+        [userId, phone_number]
+      );
+      userPayload.user_id = userId;
+    }
+  } catch (err) {
+    console.warn('MySQL User Query notice:', err.message);
+  }
 
   const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '7d' });
 
@@ -59,7 +100,7 @@ router.post('/verify-otp', (req, res) => {
 });
 
 // 3. Resend OTP API
-router.post('/resend-otp', (req, res) => {
+router.post('/resend-otp', async (req, res) => {
   const { phone_number } = req.body;
 
   if (!phone_number) {
@@ -69,12 +110,15 @@ router.post('/resend-otp', (req, res) => {
     });
   }
 
+  const otpCode = '123456';
+  await sendOtpSms(phone_number, otpCode);
+
   return res.status(200).json({
     success: true,
-    message: 'OTP resent successfully',
+    message: 'OTP resent successfully via DLT SMS',
     data: {
       phone_number,
-      otp_code_for_demo: '123456'
+      otp_code_for_demo: otpCode
     }
   });
 });

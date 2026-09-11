@@ -5,6 +5,8 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
+const { initializeDatabaseTables } = require('./src/config/db');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -42,6 +44,8 @@ app.get('/', (req, res) => {
     status: 'ONLINE',
     app: 'WitMe User App REST API Server',
     version: '1.0.0',
+    database: process.env.MYSQL_DATABASE || 'homef4fw_homefaci',
+    sms_sender_id: process.env.SMS_SENDER_ID || 'HMFCLI',
     documentation: 'See API_DOCUMENTATION.txt in root folder',
     timestamp: new Date().toISOString()
   });
@@ -55,14 +59,19 @@ app.use((req, res) => {
   });
 });
 
-// Start Server with Port Fallback
+// Start Server with Port Fallback and DB Init
 const startServer = (portToTry) => {
-  const server = app.listen(portToTry, () => {
+  const server = app.listen(portToTry, async () => {
     console.log(`=======================================================`);
     console.log(`🚀 WitMe User App API Server running on port ${portToTry}`);
     console.log(`📍 Base URL: http://localhost:${portToTry}/api/v1`);
+    console.log(`🗄️ MySQL Database: ${process.env.MYSQL_DATABASE || 'homef4fw_homefaci'}`);
+    console.log(`📱 SMS Sender ID: ${process.env.SMS_SENDER_ID || 'HMFCLI'}`);
     console.log(`📄 Documentation: http://localhost:${portToTry}/API_DOCUMENTATION.txt`);
     console.log(`=======================================================`);
+
+    // Initialize DB tables
+    await initializeDatabaseTables();
   });
 
   server.on('error', (err) => {
@@ -76,4 +85,3 @@ const startServer = (portToTry) => {
 };
 
 startServer(PORT);
-
