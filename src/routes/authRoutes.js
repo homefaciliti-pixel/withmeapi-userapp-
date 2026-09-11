@@ -5,35 +5,50 @@ const { JWT_SECRET } = require('../middleware/authMiddleware');
 const { sendOtpSms } = require('../services/smsService');
 const { query } = require('../config/db');
 
-// Helper to generate a 4-digit OTP
-const generate4DigitOTP = () => {
-  return Math.floor(1000 + Math.random() * 9000).toString();
+// Helper to normalize phone and country code
+const parsePhoneAndCountry = (countryCodeInput = '+91', phoneInput = '') => {
+  let country_code = countryCodeInput.startsWith('+') ? countryCodeInput : `+${countryCodeInput.trim()}`;
+  let phone_number = phoneInput.trim();
+
+  // If phone_number was provided with a leading +, extract country code
+  if (phone_number.startsWith('+')) {
+    if (phone_number.startsWith('+91')) {
+      country_code = '+91';
+      phone_number = phone_number.replace('+91', '');
+    } else if (phone_number.startsWith('+1')) {
+      country_code = '+1';
+      phone_number = phone_number.replace('+1', '');
+    }
+  }
+
+  const full_phone_number = `${country_code}${phone_number}`;
+
+  return { country_code, phone_number, full_phone_number };
 };
 
 // 1. Send OTP API
 router.post('/send-otp', async (req, res) => {
-  const { country_code = '+91', phone_number } = req.body;
+  const { country_code: rawCountryCode = '+91', phone_number: rawPhone } = req.body;
 
-  if (!phone_number) {
+  if (!rawPhone) {
     return res.status(400).json({
       success: false,
       message: 'phone_number is required'
     });
   }
 
-  const fullPhone = `${country_code}${phone_number}`;
-  // 4-digit OTP code (e.g. '1234' for demo or dynamic 4-digit)
-  const otpCode = '1234'; 
+  const { country_code, phone_number, full_phone_number } = parsePhoneAndCountry(rawCountryCode, rawPhone);
+  const otpCode = '1234'; // 4-digit OTP
   const otpId = `otp_${Date.now()}`;
 
-  // Trigger DLT SMS gateway with 4-digit OTP
-  await sendOtpSms(fullPhone, otpCode);
+  // Trigger DLT SMS gateway
+  await sendOtpSms(full_phone_number, otpCode);
 
-  // Attempt MySQL persistence if DB is connected
+  // MySQL persistence
   try {
     await query(
       `INSERT INTO otp_logs (phone_number, otp_code, otp_id, status) VALUES (?, ?, ?, 'PENDING')`,
-      [fullPhone, otpCode, otpId]
+      [full_phone_number, otpCode, otpId]
     );
   } catch (err) {
     console.warn('Database OTP log notice:', err.message);
@@ -43,7 +58,9 @@ router.post('/send-otp', async (req, res) => {
     success: true,
     message: '4-digit OTP sent successfully via DLT SMS',
     data: {
-      phone_number: fullPhone,
+      country_code,
+      phone_number,
+      full_phone_number,
       otp_id: otpId,
       otp_code_for_demo: otpCode,
       dlt_sender_id: process.env.SMS_SENDER_ID || 'HMFCLI',
@@ -55,16 +72,16 @@ router.post('/send-otp', async (req, res) => {
 
 // 2. Verify OTP API
 router.post('/verify-otp', async (req, res) => {
-  const { phone_number, otp_code } = req.body;
+  const { country_code: rawCountryCode = '+91', phone_number: rawPhone, otp_code } = req.body;
 
-  if (!phone_number || !otp_code) {
+  if (!rawPhone || !otp_code) {
     return res.status(400).json({
       success: false,
       message: 'phone_number and otp_code are required'
     });
   }
 
-  // Validate 4-digit OTP format or demo OTP '1234'
+  // Validate 4-digit OTP
   if (otp_code.length !== 4 && otp_code !== '1234') {
     return res.status(400).json({
       success: false,
@@ -72,26 +89,31 @@ router.post('/verify-otp', async (req, res) => {
     });
   }
 
+  const { country_code, phone_number, full_phone_number } = parsePhoneAndCountry(rawCountryCode, rawPhone);
   const userId = `usr_${Date.now()}`;
   let userPayload = {
     user_id: 'usr_998877',
+    country_code,
     phone_number,
+    full_phone_number,
     name: 'Alex Sharma'
   };
 
-  // Try checking or inserting user in MySQL
+  // MySQL User Record
   try {
-    const existingUsers = await query(`SELECT * FROM users WHERE phone_number = ?`, [phone_number]);
+    const existingUsers = await query(`SELECT * FROM users WHERE phone_number = ? OR phone_number = ?`, [phone_number, full_phone_number]);
     if (existingUsers && existingUsers.length > 0) {
       userPayload = {
         user_id: existingUsers[0].id,
+        country_code,
         phone_number: existingUsers[0].phone_number,
+        full_phone_number,
         name: existingUsers[0].name
       };
     } else {
       await query(
         `INSERT INTO users (id, phone_number, name) VALUES (?, ?, 'User')`,
-        [userId, phone_number]
+        [userId, full_phone_number]
       );
       userPayload.user_id = userId;
     }
@@ -115,29 +137,32 @@ router.post('/verify-otp', async (req, res) => {
 
 // 3. Resend OTP API
 router.post('/resend-otp', async (req, res) => {
-  const { phone_number } = req.body;
+  const { country_code: rawCountryCode = '+91', phone_number: rawPhone } = req.body;
 
-  if (!phone_number) {
+  if (!rawPhone) {
     return res.status(400).json({
       success: false,
       message: 'phone_number is required'
     });
   }
 
-  const otpCode = '1234'; // 4-digit OTP
-  await sendOtpSms(phone_number, otpCode);
+  const { country_code, phone_number, full_phone_number } = parsePhoneAndCountry(rawCountryCode, rawPhone);
+  const otpCode = '1234';
+  await sendOtpSms(full_phone_number, otpCode);
 
   return res.status(200).json({
     success: true,
     message: '4-digit OTP resent successfully via DLT SMS',
     data: {
+      country_code,
       phone_number,
+      full_phone_number,
       otp_code_for_demo: otpCode
     }
   });
 });
 
-// 4. Country Code List API
+// 4. Country Code List API — GET
 router.get('/country-codes', (req, res) => {
   return res.status(200).json({
     success: true,
