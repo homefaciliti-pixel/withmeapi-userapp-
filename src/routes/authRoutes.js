@@ -5,6 +5,11 @@ const { JWT_SECRET } = require('../middleware/authMiddleware');
 const { sendOtpSms } = require('../services/smsService');
 const { query } = require('../config/db');
 
+// Helper to generate a 4-digit OTP
+const generate4DigitOTP = () => {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+};
+
 // 1. Send OTP API
 router.post('/send-otp', async (req, res) => {
   const { country_code = '+91', phone_number } = req.body;
@@ -17,10 +22,11 @@ router.post('/send-otp', async (req, res) => {
   }
 
   const fullPhone = `${country_code}${phone_number}`;
-  const otpCode = '123456'; // Demo 6-digit OTP
+  // 4-digit OTP code (e.g. '1234' for demo or dynamic 4-digit)
+  const otpCode = '1234'; 
   const otpId = `otp_${Date.now()}`;
 
-  // Trigger DLT SMS gateway
+  // Trigger DLT SMS gateway with 4-digit OTP
   await sendOtpSms(fullPhone, otpCode);
 
   // Attempt MySQL persistence if DB is connected
@@ -35,7 +41,7 @@ router.post('/send-otp', async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: 'OTP sent successfully via DLT SMS',
+    message: '4-digit OTP sent successfully via DLT SMS',
     data: {
       phone_number: fullPhone,
       otp_id: otpId,
@@ -55,6 +61,14 @@ router.post('/verify-otp', async (req, res) => {
     return res.status(400).json({
       success: false,
       message: 'phone_number and otp_code are required'
+    });
+  }
+
+  // Validate 4-digit OTP format or demo OTP '1234'
+  if (otp_code.length !== 4 && otp_code !== '1234') {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid OTP code. Please enter a valid 4-digit OTP.'
     });
   }
 
@@ -89,7 +103,7 @@ router.post('/verify-otp', async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: 'OTP verified successfully',
+    message: '4-digit OTP verified successfully',
     token,
     user: {
       ...userPayload,
@@ -110,12 +124,12 @@ router.post('/resend-otp', async (req, res) => {
     });
   }
 
-  const otpCode = '123456';
+  const otpCode = '1234'; // 4-digit OTP
   await sendOtpSms(phone_number, otpCode);
 
   return res.status(200).json({
     success: true,
-    message: 'OTP resent successfully via DLT SMS',
+    message: '4-digit OTP resent successfully via DLT SMS',
     data: {
       phone_number,
       otp_code_for_demo: otpCode

@@ -15,12 +15,13 @@ router.post('/send-otp', authenticateToken, (req, res) => {
   }
 
   const refId = `adh_ref_${Date.now()}`;
+  const otpCode = '4321'; // 4-digit OTP
 
   return res.status(200).json({
     success: true,
-    message: 'OTP sent to mobile number registered with Aadhaar',
+    message: '4-digit OTP sent to mobile number registered with Aadhaar',
     ref_id: refId,
-    otp_code_for_demo: '654321',
+    otp_code_for_demo: otpCode,
     expires_in_seconds: 300
   });
 });
@@ -38,7 +39,7 @@ router.post('/otp-verify', authenticateToken, (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: 'Aadhaar verification completed successfully',
+    message: 'Aadhaar 4-digit OTP verification completed successfully',
     aadhaar_status: 'VERIFIED',
     details: {
       ref_id,

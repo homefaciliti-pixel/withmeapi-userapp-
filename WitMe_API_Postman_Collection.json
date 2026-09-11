@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "WitMe User App REST APIs (Render Live)",
-    "description": "Postman Collection for WitMe User App APIs deployed on Render",
+    "description": "Postman Collection for WitMe User App APIs deployed on Render with 4-digit OTP support",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -21,7 +21,7 @@
       "name": "1. Authentication",
       "item": [
         {
-          "name": "Send OTP",
+          "name": "Send OTP (4-digit)",
           "request": {
             "method": "POST",
             "header": [
@@ -39,7 +39,7 @@
           }
         },
         {
-          "name": "Verify OTP",
+          "name": "Verify OTP (4-digit: 1234)",
           "request": {
             "method": "POST",
             "header": [
@@ -47,7 +47,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone_number\": \"+919876543210\",\n  \"otp_code\": \"123456\"\n}"
+              "raw": "{\n  \"phone_number\": \"+919876543210\",\n  \"otp_code\": \"1234\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/verify-otp",
@@ -189,7 +189,7 @@
           }
         },
         {
-          "name": "Verify Aadhaar OTP",
+          "name": "Verify Aadhaar OTP (4-digit: 4321)",
           "request": {
             "method": "POST",
             "header": [
@@ -198,7 +198,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"ref_id\": \"adh_ref_123\",\n  \"otp\": \"654321\"\n}"
+              "raw": "{\n  \"ref_id\": \"adh_ref_123\",\n  \"otp\": \"4321\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/aadhaar/otp-verify",
