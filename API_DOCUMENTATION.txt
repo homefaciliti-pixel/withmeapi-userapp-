@@ -1,0 +1,508 @@
+================================================================================
+                       WITME USER APP - API DOCUMENTATION
+================================================================================
+
+Base URL: http://localhost:5000/api/v1
+
+--------------------------------------------------------------------------------
+1. AUTHENTICATION APIs (/api/v1/auth)
+--------------------------------------------------------------------------------
+
+1.1 Send OTP API
+- Endpoint: POST /api/v1/auth/send-otp
+- Description: Send OTP to specified phone number for login/signup.
+- Request Body:
+  {
+    "country_code": "+91",
+    "phone_number": "9876543210"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "OTP sent successfully",
+    "data": {
+      "phone_number": "+919876543210",
+      "otp_id": "otp_123456",
+      "expires_in_seconds": 300
+    }
+  }
+
+1.2 Verify OTP API
+- Endpoint: POST /api/v1/auth/verify-otp
+- Description: Verify OTP and return JWT authentication token.
+- Request Body:
+  {
+    "phone_number": "+919876543210",
+    "otp_code": "123456"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "OTP verified successfully",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "user_id": "usr_998877",
+      "phone_number": "+919876543210",
+      "is_profile_complete": false
+    }
+  }
+
+1.3 Resend OTP API
+- Endpoint: POST /api/v1/auth/resend-otp
+- Description: Resend OTP code to the phone number.
+- Request Body:
+  {
+    "phone_number": "+919876543210"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "OTP resent successfully"
+  }
+
+1.4 Country Code List API
+- Endpoint: GET /api/v1/auth/country-codes
+- Description: Retrieve supported country codes with flag icons and calling codes.
+- Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      { "name": "India", "code": "IN", "dial_code": "+91" },
+      { "name": "United States", "code": "US", "dial_code": "+1" },
+      { "name": "United Arab Emirates", "code": "AE", "dial_code": "+971" }
+    ]
+  }
+
+1.5 Terms of Service API
+- Endpoint: GET /api/v1/auth/terms-of-service
+- Description: Fetch Terms of Service document for authentication flow.
+- Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "title": "Terms of Service",
+      "content": "Full terms content...",
+      "last_updated": "2026-01-01"
+    }
+  }
+
+1.6 Privacy Policy API
+- Endpoint: GET /api/v1/auth/privacy-policy
+- Description: Fetch Privacy Policy document.
+- Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "title": "Privacy Policy",
+      "content": "Full privacy policy content...",
+      "last_updated": "2026-01-01"
+    }
+  }
+
+--------------------------------------------------------------------------------
+2. PROFILE & KYC APIs (/api/v1/profile & /api/v1/kyc)
+--------------------------------------------------------------------------------
+
+2.1 Get Profile API
+- Endpoint: GET /api/v1/profile
+- Headers: Authorization: Bearer <token>
+- Description: Retrieve logged-in user profile details.
+- Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "id": "usr_998877",
+      "name": "Alex Sharma",
+      "phone": "+919876543210",
+      "email": "alex@example.com",
+      "gender": "Male",
+      "dob": "1998-05-15",
+      "kyc_status": "VERIFIED",
+      "profile_image": "http://localhost:5000/uploads/profile.jpg"
+    }
+  }
+
+2.2 Profile Edit API
+- Endpoint: POST / PUT /api/v1/profile/edit
+- Headers: Authorization: Bearer <token>
+- Description: Update user profile information.
+- Request Body:
+  {
+    "name": "Alex Sharma",
+    "email": "alex.new@example.com",
+    "bio": "Enthusiastic explorer and tech lover",
+    "interests": ["Travel", "Music", "Fitness"],
+    "city": "Mumbai"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Profile updated successfully",
+    "data": { ...updated profile }
+  }
+
+2.3 KYC Verification Status & Submission API
+- Endpoint: POST /api/v1/kyc/verify
+- Headers: Authorization: Bearer <token>
+- Description: Submit KYC document details for identity verification.
+- Request Body:
+  {
+    "document_type": "PAN_CARD",
+    "document_number": "ABCDE1234F",
+    "full_name": "Alex Sharma",
+    "dob": "1998-05-15"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "KYC submitted successfully",
+    "status": "PENDING_VERIFICATION",
+    "kyc_id": "kyc_883311"
+  }
+
+--------------------------------------------------------------------------------
+3. AADHAAR APIs (/api/v1/aadhaar)
+--------------------------------------------------------------------------------
+
+3.1 Send Aadhaar OTP API
+- Endpoint: POST /api/v1/aadhaar/send-otp
+- Headers: Authorization: Bearer <token>
+- Description: Initiate Aadhaar authentication by sending OTP to registered mobile number.
+- Request Body:
+  {
+    "aadhaar_number": "123456789012"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "OTP sent to registered mobile number linked with Aadhaar",
+    "ref_id": "adh_ref_992211"
+  }
+
+3.2 Verify Aadhaar OTP API
+- Endpoint: POST /api/v1/aadhaar/otp-verify
+- Headers: Authorization: Bearer <token>
+- Description: Verify Aadhaar OTP and complete verification.
+- Request Body:
+  {
+    "ref_id": "adh_ref_992211",
+    "otp": "654321"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Aadhaar verification completed successfully",
+    "aadhaar_status": "VERIFIED",
+    "details": {
+      "name": "Alex Sharma",
+      "masked_aadhaar": "XXXXXXXX9012",
+      "address": "Mumbai, Maharashtra"
+    }
+  }
+
+3.3 Upload Aadhaar Card Document API
+- Endpoint: POST /api/v1/aadhaar/upload
+- Headers: Authorization: Bearer <token> (multipart/form-data)
+- Description: Upload front and back photos of Aadhaar card.
+- Form Data:
+  - front_image: (file)
+  - back_image: (file)
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Aadhaar document images uploaded successfully",
+    "front_url": "/uploads/aadhaar_front_123.jpg",
+    "back_url": "/uploads/aadhaar_back_123.jpg"
+  }
+
+--------------------------------------------------------------------------------
+4. PROFILE / LIVE APIs (/api/v1/profile-live)
+--------------------------------------------------------------------------------
+
+4.1 Who Viewed Your Live / Interest API
+- Endpoint: GET / POST /api/v1/profile-live/viewed-interest
+- Headers: Authorization: Bearer <token>
+- Description: Fetch list of users who viewed live stream or expressed interest, or register an interest.
+- Request (GET): /api/v1/profile-live/viewed-interest?type=viewers
+- Response (GET - 200 OK):
+  {
+    "success": true,
+    "data": [
+      { "user_id": "usr_101", "name": "Sara Khan", "profile_pic": "...", "viewed_at": "2026-09-11T10:00:00Z" }
+    ]
+  }
+- Request (POST Body):
+  {
+    "target_user_id": "usr_101",
+    "action": "EXPRESS_INTEREST"
+  }
+- Response (POST - 200 OK):
+  {
+    "success": true,
+    "message": "Interest expressed successfully"
+  }
+
+4.2 Profile Photo Upload API
+- Endpoint: POST /api/v1/profile-live/photo-upload
+- Headers: Authorization: Bearer <token> (multipart/form-data)
+- Description: Upload profile photo.
+- Form Data:
+  - photo: (file)
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Profile photo uploaded successfully",
+    "photo_url": "http://localhost:5000/uploads/profiles/photo_123.jpg"
+  }
+
+4.3 Face Scan Recognition API
+- Endpoint: POST /api/v1/profile-live/face-scan
+- Headers: Authorization: Bearer <token> (multipart/form-data or base64)
+- Description: Process face scan biometric photo for liveness & identity verification.
+- Request Body:
+  {
+    "face_image_base64": "data:image/jpeg;base64,..."
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Face scan verified successfully",
+    "match_confidence": 0.98,
+    "is_live_person": true
+  }
+
+--------------------------------------------------------------------------------
+5. ACTIVITIES & SEARCH APIs (/api/v1/activities)
+--------------------------------------------------------------------------------
+
+5.1 Planning Today List / Selection API
+- Endpoint: GET /api/v1/activities/planning-today
+- Headers: Authorization: Bearer <token>
+- Description: Get or select planning activities for today.
+- Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      { "id": "act_1", "title": "Coffee & Networking", "time": "16:00", "status": "AVAILABLE" },
+      { "id": "act_2", "title": "Evening Gym Partner", "time": "18:30", "status": "SELECTED" }
+    ]
+  }
+
+5.2 Search API
+- Endpoint: GET /api/v1/activities/search?q=fitness&location=Mumbai&category=sports
+- Headers: Authorization: Bearer <token>
+- Description: Search users, activities, products, or locations.
+- Response (200 OK):
+  {
+    "success": true,
+    "results": [
+      { "type": "activity", "id": "act_10", "title": "Outdoor Fitness Club", "city": "Mumbai" }
+    ]
+  }
+
+5.3 Popular Activities List API
+- Endpoint: GET /api/v1/activities/popular-activities
+- Headers: Authorization: Bearer <token>
+- Description: List trending and popular activities.
+- Response (200 OK):
+  {
+    "success": true,
+    "activities": [
+      { "id": "act_top1", "name": "Weekend Trekking", "participants_count": 1420 },
+      { "id": "act_top2", "name": "Board Game Night", "participants_count": 890 }
+    ]
+  }
+
+5.4 Recommended Partner List API
+- Endpoint: GET /api/v1/activities/recommended-partners
+- Headers: Authorization: Bearer <token>
+- Description: Get AI-recommended partner matches based on interests.
+- Response (200 OK):
+  {
+    "success": true,
+    "partners": [
+      { "user_id": "usr_404", "name": "Rohan Mehta", "match_score": "94%", "interests": ["Trekking", "Coding"] }
+    ]
+  }
+
+5.5 Product Details API
+- Endpoint: GET /api/v1/activities/product-details/:id
+- Headers: Authorization: Bearer <token>
+- Description: Fetch detailed info of activity pass, subscription plan, or product.
+- Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "product_id": "prod_101",
+      "name": "VIP Premium Activity Pass",
+      "price": 499,
+      "currency": "INR",
+      "features": ["Unlimited Partner Requests", "Priority Live Viewers Badge"]
+    }
+  }
+
+--------------------------------------------------------------------------------
+6. PARTNER REQUEST APIs (/api/v1/partner-request)
+--------------------------------------------------------------------------------
+
+6.1 Send Request API
+- Endpoint: POST /api/v1/partner-request/send
+- Headers: Authorization: Bearer <token>
+- Description: Send partner request to another user.
+- Request Body:
+  {
+    "receiver_id": "usr_404",
+    "activity_id": "act_top1",
+    "message": "Hey! Would love to join you for the trek!"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Partner request sent successfully",
+    "request_id": "req_5544"
+  }
+
+6.2 Request Partner List API
+- Endpoint: GET /api/v1/partner-request/list?type=received
+- Headers: Authorization: Bearer <token>
+- Description: Fetch incoming or outgoing partner requests (type: sent/received).
+- Response (200 OK):
+  {
+    "success": true,
+    "requests": [
+      {
+        "request_id": "req_5544",
+        "sender": { "user_id": "usr_202", "name": "Priya Sharma", "avatar": "..." },
+        "status": "PENDING",
+        "created_at": "2026-09-11T11:00:00Z"
+      }
+    ]
+  }
+
+6.3 Request Action API (Accept/Reject/Cancel)
+- Endpoint: POST /api/v1/partner-request/action
+- Headers: Authorization: Bearer <token>
+- Description: Accept, reject, or cancel a partner request.
+- Request Body:
+  {
+    "request_id": "req_5544",
+    "action": "ACCEPT"  // Options: ACCEPT, REJECT, CANCEL
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Partner request accepted successfully"
+  }
+
+--------------------------------------------------------------------------------
+7. EXPLORE APIs (/api/v1/explore)
+--------------------------------------------------------------------------------
+
+7.1 Explore API
+- Endpoint: GET /api/v1/explore?page=1&limit=10
+- Headers: Authorization: Bearer <token>
+- Description: Get feed of explore items, live streams, and recommended profiles.
+- Response (200 OK):
+  {
+    "success": true,
+    "page": 1,
+    "items": [
+      { "id": "exp_1", "type": "LIVE", "title": "Acoustic Music Session", "host": "Rohan" },
+      { "id": "exp_2", "type": "PROFILE", "name": "Ananya", "distance": "2.4 km away" }
+    ]
+  }
+
+7.2 Filter API
+- Endpoint: POST /api/v1/explore/filter
+- Headers: Authorization: Bearer <token>
+- Description: Filter explore feeds by age, distance, gender, interests, and activity type.
+- Request Body:
+  {
+    "gender": "Female",
+    "min_age": 20,
+    "max_age": 30,
+    "max_distance_km": 15,
+    "interests": ["Music", "Trekking"]
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "count": 12,
+    "filtered_results": [ ... ]
+  }
+
+--------------------------------------------------------------------------------
+8. GENERAL APIs (/api/v1/general)
+--------------------------------------------------------------------------------
+
+8.1 Help & Support API
+- Endpoint: GET / POST /api/v1/general/help-support
+- Headers: Authorization: Bearer <token>
+- Description: GET help topics / FAQs or POST a support ticket query.
+- Request (POST Body):
+  {
+    "subject": "Payment issue",
+    "message": "Amount deducted but pass not activated."
+  }
+- Response (POST - 200 OK):
+  {
+    "success": true,
+    "message": "Ticket raised successfully. Ticket ID: #TK9921",
+    "ticket_id": "TK9921"
+  }
+
+8.2 Terms & Conditions API
+- Endpoint: GET /api/v1/general/terms-and-conditions
+- Description: General app terms and conditions content.
+- Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "title": "General Terms & Conditions",
+      "content": "Detailed terms content..."
+    }
+  }
+
+8.3 Logout API
+- Endpoint: POST /api/v1/general/logout
+- Headers: Authorization: Bearer <token>
+- Description: Invalidate session / log out user.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Logged out successfully"
+  }
+
+8.4 Chat API
+- Endpoint: GET /api/v1/general/chat
+- Headers: Authorization: Bearer <token>
+- Description: Fetch chat conversations or message history.
+- Query Params: ?conversation_id=conv_123
+- Response (200 OK):
+  {
+    "success": true,
+    "messages": [
+      { "id": "m1", "sender_id": "usr_101", "text": "Hi there!", "timestamp": "2026-09-11T10:15:00Z" }
+    ]
+  }
+
+8.5 Call API
+- Endpoint: GET / POST /api/v1/general/call
+- Headers: Authorization: Bearer <token>
+- Description: Initiate audio/video call token or fetch call history.
+- Request (POST Body):
+  {
+    "receiver_id": "usr_404",
+    "call_type": "VIDEO"  // AUDIO or VIDEO
+  }
+- Response (POST - 200 OK):
+  {
+    "success": true,
+    "call_id": "call_778899",
+    "agora_rtc_token": "mock_agora_rtc_token_string",
+    "channel_name": "channel_778899"
+  }
+
+================================================================================
+                              END OF DOCUMENTATION
+================================================================================
