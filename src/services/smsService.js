@@ -2,26 +2,36 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
+const DEFAULT_SMS_TEMPLATE = 'Your OTP for registering on Superhome is: {#var#}. This code is valid for the next 10 minutes. Thank You, Super Home';
+
 const smsConfig = {
   entityId: process.env.SMS_ENTITY_ID || '1201173444411453897',
   templateId: process.env.SMS_DLT_TEMPLATE_ID || '1207173589889308632',
   senderId: process.env.SMS_SENDER_ID || 'HMFCLI',
-  templateText: process.env.SMS_TEMPLATE_TEXT || 'Your OTP for registering on Superhome is: {#var#}. This code is valid for the next 10 minutes. Thank You, Super Home',
+  templateText: process.env.SMS_TEMPLATE_TEXT || DEFAULT_SMS_TEMPLATE,
   provider: process.env.SMSProvider || process.env.SMS_PROVIDER || process.env.SMS_VENDOR || 'SMSGATEWAYHUB',
   apiKey: process.env.SMS_API_KEY || process.env.APIKey || process.env.API_KEY || process.env.SMS_KEY || process.env.AUTHKEY || process.env.AUTH_KEY || 'b395HRZTRUGZThPOeRSnVg'
 };
 
 /**
  * Format SMS message using DLT Template
+ * Produces exact format: "Your OTP for registering on Superhome is: 8675. This code is valid for the next 10 minutes. Thank You, Super Home"
  * @param {string} otp 
  * @returns {string} Formatted SMS content
  */
 const formatSmsTemplate = (otp) => {
-  return smsConfig.templateText.split('{#var#}').join(otp);
+  let template = smsConfig.templateText;
+  
+  // Guard against unquoted dotenv truncation where '#' acted as comment character
+  if (!template || !template.includes('{#var#}')) {
+    template = DEFAULT_SMS_TEMPLATE;
+  }
+  
+  return template.split('{#var#}').join(otp);
 };
 
 /**
- * Send OTP SMS using configured DLT parameters via SMSGATEWAYHUB or other gateway
+ * Send OTP SMS using configured DLT parameters via SMSGATEWAYHUB
  * @param {string} phoneNumber 
  * @param {string} otp 
  * @returns {Promise<Object>} Status response
@@ -36,7 +46,7 @@ const sendOtpSms = async (phoneNumber, otp) => {
   console.log(`  - Entity ID: ${smsConfig.entityId}`);
   console.log(`  - DLT Template ID: ${smsConfig.templateId}`);
   console.log(`  - OTP Code: ${otp}`);
-  console.log(`  - Message Body: "${formattedMessage}"`);
+  console.log(`  - Exact Message Body: "${formattedMessage}"`);
 
   // SMSGATEWAYHUB Live Integration
   try {
