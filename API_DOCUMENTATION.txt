@@ -26,51 +26,17 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     "country_code": "+91",
     "phone_number": "7250642635"
   }
-- Response (200 OK):
-  {
-    "success": true,
-    "message": "OTP sent successfully to your mobile number via SMS",
-    "data": {
-      "country_code": "+91",
-      "phone_number": "7250642635",
-      "full_phone_number": "+917250642635",
-      "otp_id": "otp_123456",
-      "expires_in_seconds": 600
-    }
-  }
 
 1.2 Verify OTP API
 - Endpoint: POST /api/v1/auth/verify-otp
-- Description: Verify 4-digit OTP code and issue JWT token.
 - Request Body:
   {
     "country_code": "+91",
     "phone_number": "7250642635",
     "otp_code": "8675"
   }
-- Response (200 OK):
-  {
-    "success": true,
-    "message": "OTP verified successfully",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": {
-      "user_id": "usr_998877",
-      "country_code": "+91",
-      "phone_number": "7250642635",
-      "full_phone_number": "+917250642635",
-      "is_profile_complete": false,
-      "kyc_status": "NOT_STARTED"
-    }
-  }
 
-1.3 Resend OTP API
-- Endpoint: POST /api/v1/auth/resend-otp
-- Request Body:
-  {
-    "country_code": "+91",
-    "phone_number": "7250642635"
-  }
-
+1.3 Resend OTP API: POST /api/v1/auth/resend-otp
 1.4 Country Code List API: GET /api/v1/auth/country-codes
 1.5 Terms of Service API: GET /api/v1/auth/terms-of-service
 1.6 Privacy Policy API: GET /api/v1/auth/privacy-policy
@@ -82,70 +48,67 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 2.1 getProfile API
 - Endpoint: GET /api/v1/getProfile (or GET /api/v1/profile)
 - Headers: Authorization: Bearer <token>
-- Description: Retrieve logged-in user profile details including token status, gender interest preference, photo verification status, and KYC status.
-- Response (200 OK):
-  {
-    "success": true,
-    "api_name": "getProfile",
-    "message": "User profile fetched successfully",
-    "data": {
-      "user_id": "usr_998877",
-      "name": "Alex Sharma",
-      "country_code": "+91",
-      "phone_number": "7250642635",
-      "full_phone_number": "+917250642635",
-      "email": "alex.sharma@example.com",
-      "gender": "Male",
-      "interested_in_gender": "Female",
-      "dob": "1998-05-15",
-      "bio": "Enthusiastic explorer and tech lover",
-      "city": "Mumbai",
-      "profile_image": "http://localhost:5000/uploads/default_avatar.jpg",
-      "is_logged_in": true,
-      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-      "is_photo_verified": true,
-      "photo_verification_status": "VERIFIED",
-      "is_kyc_completed": false,
-      "kyc_status": "NOT_VERIFIED"
-    }
-  }
 
 2.2 Interest Selection API (POST)
 - Endpoint: POST /api/v1/profile/interest-selection (or POST /api/v1/interest-selection)
 - Headers: Authorization: Bearer <token>
-- Description: Set or update user's gender interest preference (Male, Female, Other, Both).
 - Request Body:
   {
     "interested_in_gender": "Female"   // Options: "Male", "Female", "Other", "Both"
   }
+
+2.3 Profile Edit API: POST / PUT /api/v1/profile/edit
+2.4 KYC Verification API: POST /api/v1/kyc/verify
+
+--------------------------------------------------------------------------------
+3. AADHAAR KYC APIs (/api/v1/aadhaar)
+--------------------------------------------------------------------------------
+
+3.1 Aadhaar KYC Submit & Send OTP API
+- Endpoint: POST /api/v1/aadhaar/kyc-submit (also POST /api/v1/aadhaar/send-otp)
+- Headers: Authorization: Bearer <token> (multipart/form-data)
+- Description: Submit Aadhaar KYC details (Name, Nickname, Aadhaar Number, Age) and upload front & back document images to trigger OTP.
+- Form Data / Body Params:
+  - full_name: "Alex Sharma"
+  - nick_name: "Alex"
+  - aadhaar_number: "123456789012"
+  - age: "25"
+  - front_image: (file upload - Aadhaar Front side)
+  - back_image: (file upload - Aadhaar Back side)
 - Response (200 OK):
   {
     "success": true,
-    "api_name": "interestSelection",
-    "message": "Gender interest preference updated to 'Female' successfully",
+    "api_name": "aadhaarKycSubmit",
+    "message": "Aadhaar details and documents uploaded. OTP sent to Aadhaar-linked mobile number.",
+    "ref_id": "adh_ref_1789380000000",
+    "expires_in_seconds": 300,
     "data": {
-      "user_id": "usr_998877",
-      "interested_in_gender": "Female",
-      "updated_at": "2026-09-14T15:36:44.000Z"
+      "full_name": "Alex Sharma",
+      "nick_name": "Alex",
+      "aadhaar_number": "XXXXXXXX9012",
+      "age": 25,
+      "front_url": "http://localhost:5000/uploads/front_image-123.jpg",
+      "back_url": "http://localhost:5000/uploads/back_image-123.jpg",
+      "kyc_status": "PENDING_OTP_VERIFICATION"
     }
   }
 
-2.3 Profile Edit API
-- Endpoint: POST / PUT /api/v1/profile/edit
+3.2 Verify Aadhaar OTP API
+- Endpoint: POST /api/v1/aadhaar/otp-verify
 - Headers: Authorization: Bearer <token>
-- Description: Update user profile details in MySQL.
+- Request Body:
+  {
+    "ref_id": "adh_ref_1789380000000",
+    "otp": "4321"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Aadhaar KYC verification completed successfully",
+    "aadhaar_status": "VERIFIED",
+    "is_kyc_completed": true
+  }
 
-2.4 KYC Verification API
-- Endpoint: POST /api/v1/kyc/verify
-- Headers: Authorization: Bearer <token>
-- Description: Submit KYC document details for identity verification.
-
---------------------------------------------------------------------------------
-3. AADHAAR APIs (/api/v1/aadhaar)
---------------------------------------------------------------------------------
-
-3.1 Send Aadhaar OTP API: POST /api/v1/aadhaar/send-otp
-3.2 Verify Aadhaar OTP API: POST /api/v1/aadhaar/otp-verify
 3.3 Upload Aadhaar Card Document API: POST /api/v1/aadhaar/upload
 
 --------------------------------------------------------------------------------
