@@ -2,12 +2,13 @@
                        WITME USER APP - API DOCUMENTATION
 ================================================================================
 
-Base URL: http://localhost:5000/api/v1
+Base URL: http://localhost:5000/api/v1 (or https://withmeapi-userapp.onrender.com/api/v1)
 
 --------------------------------------------------------------------------------
 DATABASE & SMS CONFIGURATION
 --------------------------------------------------------------------------------
 MySQL Database: homef4fw_homefaci (Host: homefaciliti.com:3306)
+SMS Provider: SMSGATEWAYHUB
 SMS DLT Sender ID: HMFCLI
 SMS Entity ID: 1201173444411453897
 SMS DLT Template ID: 1207173589889308632
@@ -19,32 +20,33 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 
 1.1 Send OTP API
 - Endpoint: POST /api/v1/auth/send-otp
-- Description: Send OTP to specified phone number via DLT SMS.
+- Description: Send 4-digit OTP to specified phone number via SMSGATEWAYHUB DLT SMS.
 - Request Body:
   {
     "country_code": "+91",
-    "phone_number": "9876543210"
+    "phone_number": "7250642635"
   }
 - Response (200 OK):
   {
     "success": true,
-    "message": "OTP sent successfully via DLT SMS",
+    "message": "OTP sent successfully to your mobile number via SMS",
     "data": {
-      "phone_number": "+919876543210",
+      "country_code": "+91",
+      "phone_number": "7250642635",
+      "full_phone_number": "+917250642635",
       "otp_id": "otp_123456",
-      "dlt_sender_id": "HMFCLI",
-      "dlt_template_id": "1207173589889308632",
       "expires_in_seconds": 600
     }
   }
 
 1.2 Verify OTP API
 - Endpoint: POST /api/v1/auth/verify-otp
-- Description: Verify OTP code and issue JWT token.
+- Description: Verify 4-digit OTP code and issue JWT token.
 - Request Body:
   {
-    "phone_number": "+919876543210",
-    "otp_code": "123456"
+    "country_code": "+91",
+    "phone_number": "7250642635",
+    "otp_code": "8675"
   }
 - Response (200 OK):
   {
@@ -53,7 +55,9 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "user": {
       "user_id": "usr_998877",
-      "phone_number": "9876543210",
+      "country_code": "+91",
+      "phone_number": "7250642635",
+      "full_phone_number": "+917250642635",
       "is_profile_complete": false,
       "kyc_status": "NOT_STARTED"
     }
@@ -61,61 +65,62 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 
 1.3 Resend OTP API
 - Endpoint: POST /api/v1/auth/resend-otp
-- Description: Resend OTP code to the phone number.
+- Description: Resend 4-digit OTP code to the phone number.
 - Request Body:
   {
-    "phone_number": "+919876543210"
+    "country_code": "+91",
+    "phone_number": "7250642635"
   }
 - Response (200 OK):
   {
     "success": true,
-    "message": "OTP resent successfully via DLT SMS"
+    "message": "OTP resent successfully to your mobile number via SMS"
   }
 
 1.4 Country Code List API
 - Endpoint: GET /api/v1/auth/country-codes
 - Description: Retrieve supported country codes with flag icons and calling codes.
-- Response (200 OK):
-  {
-    "success": true,
-    "data": [
-      { "name": "India", "code": "IN", "dial_code": "+91", "flag": "🇮🇳" },
-      { "name": "United States", "code": "US", "dial_code": "+1", "flag": "🇺🇸" }
-    ]
-  }
 
 1.5 Terms of Service API
 - Endpoint: GET /api/v1/auth/terms-of-service
-- Description: Fetch Terms of Service document for authentication flow.
-- Response (200 OK):
-  {
-    "success": true,
-    "data": {
-      "title": "Terms of Service",
-      "content": "Full terms content..."
-    }
-  }
 
 1.6 Privacy Policy API
 - Endpoint: GET /api/v1/auth/privacy-policy
-- Description: Fetch Privacy Policy document.
+
+--------------------------------------------------------------------------------
+2. PROFILE & KYC APIs (/api/v1/getProfile & /api/v1/profile)
+--------------------------------------------------------------------------------
+
+2.1 getProfile API
+- Endpoint: GET /api/v1/getProfile (or GET /api/v1/profile)
+- Headers: Authorization: Bearer <token>
+- Description: Retrieve logged-in user profile details including token status, gender interest preference, photo verification status, and KYC status.
 - Response (200 OK):
   {
     "success": true,
+    "api_name": "getProfile",
+    "message": "User profile fetched successfully",
     "data": {
-      "title": "Privacy Policy",
-      "content": "Full privacy policy content..."
+      "user_id": "usr_998877",
+      "name": "Alex Sharma",
+      "country_code": "+91",
+      "phone_number": "7250642635",
+      "full_phone_number": "+917250642635",
+      "email": "alex.sharma@example.com",
+      "gender": "Male",
+      "interested_in_gender": "Female",
+      "dob": "1998-05-15",
+      "bio": "Enthusiastic explorer and tech lover",
+      "city": "Mumbai",
+      "profile_image": "http://localhost:5000/uploads/default_avatar.jpg",
+      "is_logged_in": true,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "is_photo_verified": true,
+      "photo_verification_status": "VERIFIED",
+      "is_kyc_completed": false,
+      "kyc_status": "NOT_VERIFIED"
     }
   }
-
---------------------------------------------------------------------------------
-2. PROFILE & KYC APIs (/api/v1/profile & /api/v1/kyc)
---------------------------------------------------------------------------------
-
-2.1 Get Profile API
-- Endpoint: GET /api/v1/profile
-- Headers: Authorization: Bearer <token>
-- Description: Retrieve logged-in user profile details.
 
 2.2 Profile Edit API
 - Endpoint: POST / PUT /api/v1/profile/edit
@@ -131,30 +136,17 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 3. AADHAAR APIs (/api/v1/aadhaar)
 --------------------------------------------------------------------------------
 
-3.1 Send Aadhaar OTP API
-- Endpoint: POST /api/v1/aadhaar/send-otp
-- Description: Send Aadhaar verification OTP.
-
-3.2 Verify Aadhaar OTP API
-- Endpoint: POST /api/v1/aadhaar/otp-verify
-- Description: Verify Aadhaar OTP code.
-
-3.3 Upload Aadhaar Card Document API
-- Endpoint: POST /api/v1/aadhaar/upload
-- Description: Upload front and back photos of Aadhaar card.
+3.1 Send Aadhaar OTP API: POST /api/v1/aadhaar/send-otp
+3.2 Verify Aadhaar OTP API: POST /api/v1/aadhaar/otp-verify
+3.3 Upload Aadhaar Card Document API: POST /api/v1/aadhaar/upload
 
 --------------------------------------------------------------------------------
 4. PROFILE / LIVE APIs (/api/v1/profile-live)
 --------------------------------------------------------------------------------
 
-4.1 Who Viewed Your Live / Interest API
-- Endpoint: GET / POST /api/v1/profile-live/viewed-interest
-
-4.2 Profile Photo Upload API
-- Endpoint: POST /api/v1/profile-live/photo-upload
-
-4.3 Face Scan Recognition API
-- Endpoint: POST /api/v1/profile-live/face-scan
+4.1 Who Viewed Your Live / Interest API: GET / POST /api/v1/profile-live/viewed-interest
+4.2 Profile Photo Upload API: POST /api/v1/profile-live/photo-upload
+4.3 Face Scan Recognition API: POST /api/v1/profile-live/face-scan
 
 --------------------------------------------------------------------------------
 5. ACTIVITIES & SEARCH APIs (/api/v1/activities)
