@@ -38,11 +38,11 @@ router.post('/send-otp', async (req, res) => {
 
   const { country_code, phone_number, full_phone_number } = parsePhoneAndCountry(rawCountryCode, rawPhone);
   
-  // Generate random 4-digit OTP for real SMS dispatch (e.g. 5892)
+  // Generate real random 4-digit OTP for SMS dispatch
   const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
   const otpId = `otp_${Date.now()}`;
 
-  // 1. Save OTP in MySQL first
+  // 1. Save OTP in MySQL database
   try {
     await query(
       `INSERT INTO otp_logs (phone_number, otp_code, otp_id, status) VALUES (?, ?, ?, 'PENDING')`,
@@ -52,21 +52,17 @@ router.post('/send-otp', async (req, res) => {
     console.warn('Database OTP log notice:', err.message);
   }
 
-  // 2. Dispatch real SMS via DLT Gateway Service
+  // 2. Dispatch real SMS via SMSGATEWAYHUB DLT Gateway Service
   const smsResult = await sendOtpSms(full_phone_number, generatedOtp);
 
   return res.status(200).json({
     success: true,
-    message: '4-digit OTP sent successfully via DLT SMS',
+    message: 'OTP sent successfully to your mobile number via SMS',
     data: {
       country_code,
       phone_number,
       full_phone_number,
       otp_id: otpId,
-      otp_code_for_demo: generatedOtp, // Returns generated OTP for testing convenience
-      dlt_sender_id: process.env.SMS_SENDER_ID || 'HMFCLI',
-      dlt_template_id: process.env.SMS_DLT_TEMPLATE_ID || '1207173589889308632',
-      sms_gateway_status: smsResult.message,
       expires_in_seconds: 600
     }
   });
@@ -90,12 +86,12 @@ router.post('/verify-otp', async (req, res) => {
   if (cleanOtp.length !== 4) {
     return res.status(400).json({
       success: false,
-      message: 'Invalid OTP code. Please enter a valid 4-digit OTP.'
+      message: 'Invalid OTP format. Please enter the 4-digit OTP received on your mobile phone.'
     });
   }
 
-  // Verify against MySQL database OR demo bypass ('1234')
-  let isOtpValid = cleanOtp === '1234';
+  // Strictly verify against MySQL database (No mock/bypass allowed)
+  let isOtpValid = false;
 
   try {
     const validOtpRows = await query(
@@ -154,7 +150,7 @@ router.post('/verify-otp', async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: '4-digit OTP verified successfully',
+    message: 'OTP verified successfully',
     token,
     user: {
       ...userPayload,
@@ -192,14 +188,12 @@ router.post('/resend-otp', async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: '4-digit OTP resent successfully via DLT SMS',
+    message: 'OTP resent successfully to your mobile number via SMS',
     data: {
       country_code,
       phone_number,
       full_phone_number,
-      otp_id: otpId,
-      otp_code_for_demo: generatedOtp,
-      sms_gateway_status: smsResult.message
+      otp_id: otpId
     }
   });
 });
