@@ -10,7 +10,6 @@ const parsePhoneAndCountry = (countryCodeInput = '+91', phoneInput = '') => {
   let country_code = countryCodeInput.startsWith('+') ? countryCodeInput : `+${countryCodeInput.trim()}`;
   let phone_number = phoneInput.trim();
 
-  // If phone_number was provided with a leading +, extract country code
   if (phone_number.startsWith('+')) {
     if (phone_number.startsWith('+91')) {
       country_code = '+91';
@@ -38,21 +37,23 @@ router.post('/send-otp', async (req, res) => {
   }
 
   const { country_code, phone_number, full_phone_number } = parsePhoneAndCountry(rawCountryCode, rawPhone);
-  const otpCode = '1234'; // 4-digit OTP
+  
+  // Generate random 4-digit OTP for real SMS dispatch (e.g. 5892)
+  const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
   const otpId = `otp_${Date.now()}`;
 
-  // Trigger DLT SMS gateway
-  await sendOtpSms(full_phone_number, otpCode);
-
-  // MySQL persistence
+  // 1. Save OTP in MySQL first
   try {
     await query(
       `INSERT INTO otp_logs (phone_number, otp_code, otp_id, status) VALUES (?, ?, ?, 'PENDING')`,
-      [full_phone_number, otpCode, otpId]
+      [full_phone_number, generatedOtp, otpId]
     );
   } catch (err) {
     console.warn('Database OTP log notice:', err.message);
   }
+
+  // 2. Dispatch real SMS via DLT Gateway Service
+  const smsResult = await sendOtpSms(full_phone_number, generatedOtp);
 
   return res.status(200).json({
     success: true,
@@ -62,9 +63,10 @@ router.post('/send-otp', async (req, res) => {
       phone_number,
       full_phone_number,
       otp_id: otpId,
-      otp_code_for_demo: otpCode,
+      otp_code_for_demo: generatedOtp, // Returns generated OTP for testing convenience
       dlt_sender_id: process.env.SMS_SENDER_ID || 'HMFCLI',
       dlt_template_id: process.env.SMS_DLT_TEMPLATE_ID || '1207173589889308632',
+      sms_gateway_status: smsResult.message,
       expires_in_seconds: 600
     }
   });
@@ -81,15 +83,42 @@ router.post('/verify-otp', async (req, res) => {
     });
   }
 
-  // Validate 4-digit OTP
-  if (otp_code.length !== 4 && otp_code !== '1234') {
+  const { country_code, phone_number, full_phone_number } = parsePhoneAndCountry(rawCountryCode, rawPhone);
+
+  // Validate 4-digit OTP format
+  const cleanOtp = otp_code.toString().trim();
+  if (cleanOtp.length !== 4) {
     return res.status(400).json({
       success: false,
       message: 'Invalid OTP code. Please enter a valid 4-digit OTP.'
     });
   }
 
-  const { country_code, phone_number, full_phone_number } = parsePhoneAndCountry(rawCountryCode, rawPhone);
+  // Verify against MySQL database OR demo bypass ('1234')
+  let isOtpValid = cleanOtp === '1234';
+
+  try {
+    const validOtpRows = await query(
+      `SELECT * FROM otp_logs WHERE (phone_number = ? OR phone_number = ?) AND otp_code = ? AND status = 'PENDING' ORDER BY id DESC LIMIT 1`,
+      [phone_number, full_phone_number, cleanOtp]
+    );
+
+    if (validOtpRows && validOtpRows.length > 0) {
+      isOtpValid = true;
+      // Mark OTP as used
+      await query(`UPDATE otp_logs SET status = 'VERIFIED' WHERE id = ?`, [validOtpRows[0].id]);
+    }
+  } catch (err) {
+    console.warn('MySQL OTP Verification notice:', err.message);
+  }
+
+  if (!isOtpValid) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid or expired 4-digit OTP code.'
+    });
+  }
+
   const userId = `usr_${Date.now()}`;
   let userPayload = {
     user_id: 'usr_998877',
@@ -99,7 +128,7 @@ router.post('/verify-otp', async (req, res) => {
     name: 'Alex Sharma'
   };
 
-  // MySQL User Record
+  // MySQL User Lookup / Registration
   try {
     const existingUsers = await query(`SELECT * FROM users WHERE phone_number = ? OR phone_number = ?`, [phone_number, full_phone_number]);
     if (existingUsers && existingUsers.length > 0) {
@@ -147,8 +176,19 @@ router.post('/resend-otp', async (req, res) => {
   }
 
   const { country_code, phone_number, full_phone_number } = parsePhoneAndCountry(rawCountryCode, rawPhone);
-  const otpCode = '1234';
-  await sendOtpSms(full_phone_number, otpCode);
+  const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+  const otpId = `otp_${Date.now()}`;
+
+  try {
+    await query(
+      `INSERT INTO otp_logs (phone_number, otp_code, otp_id, status) VALUES (?, ?, ?, 'PENDING')`,
+      [full_phone_number, generatedOtp, otpId]
+    );
+  } catch (err) {
+    console.warn('Database OTP log notice:', err.message);
+  }
+
+  const smsResult = await sendOtpSms(full_phone_number, generatedOtp);
 
   return res.status(200).json({
     success: true,
@@ -157,7 +197,9 @@ router.post('/resend-otp', async (req, res) => {
       country_code,
       phone_number,
       full_phone_number,
-      otp_code_for_demo: otpCode
+      otp_id: otpId,
+      otp_code_for_demo: generatedOtp,
+      sms_gateway_status: smsResult.message
     }
   });
 });
