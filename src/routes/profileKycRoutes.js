@@ -91,7 +91,55 @@ const handleGetProfile = async (req, res) => {
 router.get('/getProfile', authenticateToken, handleGetProfile);
 router.get('/profile', authenticateToken, handleGetProfile);
 
-// 2. Profile Edit API — POST / PUT
+// 2. Interest Selection API — POST (/profile/interest-selection and /interest-selection)
+const handleInterestSelection = async (req, res) => {
+  const { interested_in_gender } = req.body;
+
+  if (!interested_in_gender) {
+    return res.status(400).json({
+      success: false,
+      message: 'interested_in_gender field is required. Options: Male, Female, Other, Both'
+    });
+  }
+
+  const userId = req.user.id || req.user.user_id || 'usr_998877';
+  const existingProfile = userProfilesStore[userId] || {};
+
+  const updatedProfile = {
+    ...existingProfile,
+    user_id: userId,
+    interested_in_gender: interested_in_gender.trim(),
+    updated_at: new Date().toISOString()
+  };
+
+  userProfilesStore[userId] = updatedProfile;
+
+  // Persist into MySQL users table
+  try {
+    await query(
+      `UPDATE users SET interested_in_gender = ? WHERE id = ?`,
+      [interested_in_gender.trim(), userId]
+    );
+  } catch (err) {
+    console.warn('MySQL Interest Selection notice:', err.message);
+  }
+
+  return res.status(200).json({
+    success: true,
+    api_name: 'interestSelection',
+    message: `Gender interest preference updated to '${interested_in_gender}' successfully`,
+    data: {
+      user_id: userId,
+      interested_in_gender: interested_in_gender.trim(),
+      updated_at: updatedProfile.updated_at
+    }
+  });
+};
+
+router.post('/profile/interest-selection', authenticateToken, handleInterestSelection);
+router.post('/interest-selection', authenticateToken, handleInterestSelection);
+
+// 3. Profile Edit API — POST / PUT
 const handleProfileEdit = async (req, res) => {
   const userId = req.user.id || req.user.user_id || 'usr_998877';
   const existingProfile = userProfilesStore[userId] || {};
@@ -133,7 +181,7 @@ const handleProfileEdit = async (req, res) => {
 router.post('/profile/edit', authenticateToken, handleProfileEdit);
 router.put('/profile/edit', authenticateToken, handleProfileEdit);
 
-// 3. KYC Verification API — POST
+// 4. KYC Verification API — POST
 router.post('/kyc/verify', authenticateToken, async (req, res) => {
   const { document_type, document_number, full_name, dob } = req.body;
 

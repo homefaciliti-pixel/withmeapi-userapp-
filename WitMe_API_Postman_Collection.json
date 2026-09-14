@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "WitMe User App REST APIs (Render Live)",
-    "description": "Postman Collection for WitMe User App APIs deployed on Render with 4-digit OTP and separate country_code support",
+    "description": "Postman Collection for WitMe User App APIs deployed on Render with 4-digit OTP, getProfile, and Interest Selection support",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -84,28 +84,6 @@
               "path": ["auth", "country-codes"]
             }
           }
-        },
-        {
-          "name": "Terms of Service",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/auth/terms-of-service",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "terms-of-service"]
-            }
-          }
-        },
-        {
-          "name": "Privacy Policy",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/auth/privacy-policy",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "privacy-policy"]
-            }
-          }
         }
       ]
     },
@@ -113,16 +91,35 @@
       "name": "2. Profile & KYC",
       "item": [
         {
-          "name": "Get Profile",
+          "name": "getProfile",
           "request": {
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{authToken}}" }
             ],
             "url": {
-              "raw": "{{baseUrl}}/profile",
+              "raw": "{{baseUrl}}/getProfile",
               "host": ["{{baseUrl}}"],
-              "path": ["profile"]
+              "path": ["getProfile"]
+            }
+          }
+        },
+        {
+          "name": "Interest Selection (Gender Preference)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"interested_in_gender\": \"Female\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/profile/interest-selection",
+              "host": ["{{baseUrl}}"],
+              "path": ["profile", "interest-selection"]
             }
           }
         },
@@ -161,87 +158,6 @@
               "raw": "{{baseUrl}}/kyc/verify",
               "host": ["{{baseUrl}}"],
               "path": ["kyc", "verify"]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "3. Aadhaar Verification",
-      "item": [
-        {
-          "name": "Send Aadhaar OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"aadhaar_number\": \"123456789012\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/aadhaar/send-otp",
-              "host": ["{{baseUrl}}"],
-              "path": ["aadhaar", "send-otp"]
-            }
-          }
-        },
-        {
-          "name": "Verify Aadhaar OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"ref_id\": \"adh_ref_123\",\n  \"otp\": \"4321\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/aadhaar/otp-verify",
-              "host": ["{{baseUrl}}"],
-              "path": ["aadhaar", "otp-verify"]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "4. Activities & Explore",
-      "item": [
-        {
-          "name": "Popular Activities",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/activities/popular-activities",
-              "host": ["{{baseUrl}}"],
-              "path": ["activities", "popular-activities"]
-            }
-          }
-        },
-        {
-          "name": "Recommended Partners",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/activities/recommended-partners",
-              "host": ["{{baseUrl}}"],
-              "path": ["activities", "recommended-partners"]
-            }
-          }
-        },
-        {
-          "name": "Explore Feed",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/explore",
-              "host": ["{{baseUrl}}"],
-              "path": ["explore"]
             }
           }
         }

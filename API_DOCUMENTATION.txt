@@ -65,27 +65,15 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 
 1.3 Resend OTP API
 - Endpoint: POST /api/v1/auth/resend-otp
-- Description: Resend 4-digit OTP code to the phone number.
 - Request Body:
   {
     "country_code": "+91",
     "phone_number": "7250642635"
   }
-- Response (200 OK):
-  {
-    "success": true,
-    "message": "OTP resent successfully to your mobile number via SMS"
-  }
 
-1.4 Country Code List API
-- Endpoint: GET /api/v1/auth/country-codes
-- Description: Retrieve supported country codes with flag icons and calling codes.
-
-1.5 Terms of Service API
-- Endpoint: GET /api/v1/auth/terms-of-service
-
-1.6 Privacy Policy API
-- Endpoint: GET /api/v1/auth/privacy-policy
+1.4 Country Code List API: GET /api/v1/auth/country-codes
+1.5 Terms of Service API: GET /api/v1/auth/terms-of-service
+1.6 Privacy Policy API: GET /api/v1/auth/privacy-policy
 
 --------------------------------------------------------------------------------
 2. PROFILE & KYC APIs (/api/v1/getProfile & /api/v1/profile)
@@ -122,12 +110,32 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     }
   }
 
-2.2 Profile Edit API
+2.2 Interest Selection API (POST)
+- Endpoint: POST /api/v1/profile/interest-selection (or POST /api/v1/interest-selection)
+- Headers: Authorization: Bearer <token>
+- Description: Set or update user's gender interest preference (Male, Female, Other, Both).
+- Request Body:
+  {
+    "interested_in_gender": "Female"   // Options: "Male", "Female", "Other", "Both"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "api_name": "interestSelection",
+    "message": "Gender interest preference updated to 'Female' successfully",
+    "data": {
+      "user_id": "usr_998877",
+      "interested_in_gender": "Female",
+      "updated_at": "2026-09-14T15:36:44.000Z"
+    }
+  }
+
+2.3 Profile Edit API
 - Endpoint: POST / PUT /api/v1/profile/edit
 - Headers: Authorization: Bearer <token>
 - Description: Update user profile details in MySQL.
 
-2.3 KYC Verification API
+2.4 KYC Verification API
 - Endpoint: POST /api/v1/kyc/verify
 - Headers: Authorization: Bearer <token>
 - Description: Submit KYC document details for identity verification.
