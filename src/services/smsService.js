@@ -17,7 +17,7 @@ const smsConfig = {
  * @returns {string} Formatted SMS content
  */
 const formatSmsTemplate = (otp) => {
-  return smsConfig.templateText.replace('{#var#}', otp);
+  return smsConfig.templateText.split('{#var#}').join(otp);
 };
 
 /**
@@ -46,7 +46,7 @@ const sendOtpSms = async (phoneNumber, otp) => {
     // SMSGATEWAYHUB Official HTTP GET API URL
     const smsGatewayHubUrl = `https://www.smsgatewayhub.com/api/mt/SendSMS?APIKey=${apiKey}&senderid=${smsConfig.senderId}&channel=2&DCS=0&flashSms=0&number=${cleanPhone}&text=${encodedText}&route=1&EntityId=${smsConfig.entityId}&dlttemplateid=${smsConfig.templateId}`;
 
-    console.log(`[SMSGATEWAYHUB REQUEST]: Dispatching to www.smsgatewayhub.com with APIKey...`);
+    console.log(`[SMSGATEWAYHUB REQUEST]: Dispatching to www.smsgatewayhub.com...`);
     const response = await fetch(smsGatewayHubUrl);
     const responseData = await response.json().catch(async () => {
       const text = await response.text().catch(() => '');
