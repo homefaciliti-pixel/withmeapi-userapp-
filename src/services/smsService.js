@@ -8,7 +8,7 @@ const smsConfig = {
   senderId: process.env.SMS_SENDER_ID || 'HMFCLI',
   templateText: process.env.SMS_TEMPLATE_TEXT || 'Your OTP for registering on Superhome is: {#var#}. This code is valid for the next 10 minutes. Thank You, Super Home',
   provider: process.env.SMSProvider || process.env.SMS_PROVIDER || process.env.SMS_VENDOR || 'SMSGATEWAYHUB',
-  apiKey: process.env.SMS_API_KEY || process.env.APIKey || process.env.API_KEY || process.env.SMS_KEY || process.env.AUTHKEY || process.env.AUTH_KEY || ''
+  apiKey: process.env.SMS_API_KEY || process.env.APIKey || process.env.API_KEY || process.env.SMS_KEY || process.env.AUTHKEY || process.env.AUTH_KEY || 'b395HRZTRUGZThPOeRSnVg'
 };
 
 /**
@@ -38,48 +38,36 @@ const sendOtpSms = async (phoneNumber, otp) => {
   console.log(`  - OTP Code: ${otp}`);
   console.log(`  - Message Body: "${formattedMessage}"`);
 
-  // SMSGATEWAYHUB Integration
-  if (smsConfig.provider.toUpperCase() === 'SMSGATEWAYHUB' || smsConfig.apiKey) {
-    try {
-      const apiKey = smsConfig.apiKey || 'YOUR_API_KEY';
-      const encodedText = encodeURIComponent(formattedMessage);
-      
-      // SMSGATEWAYHUB Official HTTP GET API URL
-      const smsGatewayHubUrl = `https://www.smsgatewayhub.com/api/mt/SendSMS?APIKey=${apiKey}&senderid=${smsConfig.senderId}&channel=2&DCS=0&flashSms=0&number=${cleanPhone}&text=${encodedText}&route=1&EntityId=${smsConfig.entityId}&dlttemplateid=${smsConfig.templateId}`;
+  // SMSGATEWAYHUB Live Integration
+  try {
+    const apiKey = smsConfig.apiKey || 'b395HRZTRUGZThPOeRSnVg';
+    const encodedText = encodeURIComponent(formattedMessage);
+    
+    // SMSGATEWAYHUB Official HTTP GET API URL
+    const smsGatewayHubUrl = `https://www.smsgatewayhub.com/api/mt/SendSMS?APIKey=${apiKey}&senderid=${smsConfig.senderId}&channel=2&DCS=0&flashSms=0&number=${cleanPhone}&text=${encodedText}&route=1&EntityId=${smsConfig.entityId}&dlttemplateid=${smsConfig.templateId}`;
 
-      console.log(`[SMSGATEWAYHUB REQUEST]: Dispatching to www.smsgatewayhub.com...`);
-      const response = await fetch(smsGatewayHubUrl);
-      const responseData = await response.json().catch(async () => {
-        const text = await response.text().catch(() => '');
-        return { raw_response: text };
-      });
+    console.log(`[SMSGATEWAYHUB REQUEST]: Dispatching to www.smsgatewayhub.com with APIKey...`);
+    const response = await fetch(smsGatewayHubUrl);
+    const responseData = await response.json().catch(async () => {
+      const text = await response.text().catch(() => '');
+      return { raw_response: text };
+    });
 
-      console.log(`[SMSGATEWAYHUB RESPONSE]:`, responseData);
+    console.log(`[SMSGATEWAYHUB RESPONSE]:`, responseData);
 
-      return {
-        success: true,
-        provider: 'SMSGATEWAYHUB',
-        message: 'SMS request dispatched to SMSGATEWAYHUB API',
-        gateway_response: responseData
-      };
-    } catch (error) {
-      console.error('❌ SMSGATEWAYHUB API Error:', error.message);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
+    return {
+      success: true,
+      provider: 'SMSGATEWAYHUB',
+      message: 'SMS request dispatched to SMSGATEWAYHUB API',
+      gateway_response: responseData
+    };
+  } catch (error) {
+    console.error('❌ SMSGATEWAYHUB API Error:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
   }
-
-  return {
-    success: true,
-    message: 'SMS formatted and logged',
-    details: {
-      phone_number: cleanPhone,
-      otp_code: otp,
-      formatted_message: formattedMessage
-    }
-  };
 };
 
 module.exports = {
