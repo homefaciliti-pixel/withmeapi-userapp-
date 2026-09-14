@@ -7,16 +7,24 @@ const { query } = require('../config/db');
 
 // Helper to normalize phone and country code
 const parsePhoneAndCountry = (countryCodeInput = '+91', phoneInput = '') => {
-  let country_code = countryCodeInput.startsWith('+') ? countryCodeInput : `+${countryCodeInput.trim()}`;
-  let phone_number = phoneInput.trim();
+  let country_code = (countryCodeInput || '+91').toString().trim();
+  if (!country_code.startsWith('+')) {
+    country_code = `+${country_code}`;
+  }
 
+  let phone_number = (phoneInput || '').toString().trim();
+
+  // If phone_number was provided with a leading country code (+91 / +1), extract it cleanly
   if (phone_number.startsWith('+')) {
     if (phone_number.startsWith('+91')) {
       country_code = '+91';
-      phone_number = phone_number.replace('+91', '');
+      phone_number = phone_number.replace('+91', '').trim();
     } else if (phone_number.startsWith('+1')) {
       country_code = '+1';
-      phone_number = phone_number.replace('+1', '');
+      phone_number = phone_number.replace('+1', '').trim();
+    } else if (phone_number.startsWith('+971')) {
+      country_code = '+971';
+      phone_number = phone_number.replace('+971', '').trim();
     }
   }
 
@@ -90,13 +98,13 @@ router.post('/verify-otp', async (req, res) => {
     });
   }
 
-  // Strictly verify against MySQL database (No mock/bypass allowed)
+  // Strictly verify against MySQL database by full_phone_number or phone_number
   let isOtpValid = false;
 
   try {
     const validOtpRows = await query(
       `SELECT * FROM otp_logs WHERE (phone_number = ? OR phone_number = ?) AND otp_code = ? AND status = 'PENDING' ORDER BY id DESC LIMIT 1`,
-      [phone_number, full_phone_number, cleanOtp]
+      [full_phone_number, phone_number, cleanOtp]
     );
 
     if (validOtpRows && validOtpRows.length > 0) {
@@ -126,13 +134,13 @@ router.post('/verify-otp', async (req, res) => {
 
   // MySQL User Lookup / Registration
   try {
-    const existingUsers = await query(`SELECT * FROM users WHERE phone_number = ? OR phone_number = ?`, [phone_number, full_phone_number]);
+    const existingUsers = await query(`SELECT * FROM users WHERE phone_number = ? OR phone_number = ?`, [full_phone_number, phone_number]);
     if (existingUsers && existingUsers.length > 0) {
       userPayload = {
         user_id: existingUsers[0].id,
         country_code,
-        phone_number: existingUsers[0].phone_number,
-        full_phone_number,
+        phone_number: existingUsers[0].phone_number.replace(country_code, ''),
+        full_phone_number: existingUsers[0].phone_number.startsWith('+') ? existingUsers[0].phone_number : `${country_code}${existingUsers[0].phone_number}`,
         name: existingUsers[0].name
       };
     } else {
@@ -193,7 +201,8 @@ router.post('/resend-otp', async (req, res) => {
       country_code,
       phone_number,
       full_phone_number,
-      otp_id: otpId
+      otp_id: otpId,
+      expires_in_seconds: 600
     }
   });
 });

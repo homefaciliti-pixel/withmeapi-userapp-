@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "WitMe User App REST APIs (Render Live)",
-    "description": "Postman Collection for WitMe User App APIs deployed on Render with 4-digit OTP support",
+    "description": "Postman Collection for WitMe User App APIs deployed on Render with 4-digit OTP and separate country_code support",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -39,7 +39,7 @@
           }
         },
         {
-          "name": "Verify OTP (4-digit: 1234)",
+          "name": "Verify OTP",
           "request": {
             "method": "POST",
             "header": [
@@ -47,7 +47,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone_number\": \"+919876543210\",\n  \"otp_code\": \"1234\"\n}"
+              "raw": "{\n  \"country_code\": \"+91\",\n  \"phone_number\": \"9876543210\",\n  \"otp_code\": \"8675\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/verify-otp",
@@ -65,7 +65,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone_number\": \"+919876543210\"\n}"
+              "raw": "{\n  \"country_code\": \"+91\",\n  \"phone_number\": \"9876543210\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/resend-otp",
@@ -189,7 +189,7 @@
           }
         },
         {
-          "name": "Verify Aadhaar OTP (4-digit: 4321)",
+          "name": "Verify Aadhaar OTP",
           "request": {
             "method": "POST",
             "header": [
