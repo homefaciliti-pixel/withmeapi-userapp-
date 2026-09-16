@@ -3,15 +3,24 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
-// Mock viewers and interest list
-let liveViewers = [
-  { user_id: 'usr_101', name: 'Sara Khan', profile_pic: 'http://localhost:5000/uploads/user101.jpg', viewed_at: '2026-09-11T10:30:00Z', type: 'LIVE_VIEWER' },
-  { user_id: 'usr_102', name: 'Rohan Verma', profile_pic: 'http://localhost:5000/uploads/user102.jpg', viewed_at: '2026-09-11T11:00:00Z', type: 'EXPRESSED_INTEREST' }
-];
+const getBaseUrl = (req) => {
+  if (req) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    return `${protocol}://${host}`;
+  }
+  return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
+};
 
 // 1. Who Viewed Your Live / Interest API — GET & POST
 router.get('/viewed-interest', authenticateToken, (req, res) => {
+  const baseUrl = getBaseUrl(req);
   const { type } = req.query; // 'viewers' or 'interests'
+
+  const liveViewers = [
+    { user_id: 'usr_101', name: 'Sara Khan', profile_pic: `${baseUrl}/uploads/user101.jpg`, viewed_at: '2026-09-11T10:30:00Z', type: 'LIVE_VIEWER' },
+    { user_id: 'usr_102', name: 'Rohan Verma', profile_pic: `${baseUrl}/uploads/user102.jpg`, viewed_at: '2026-09-11T11:00:00Z', type: 'EXPRESSED_INTEREST' }
+  ];
 
   let filtered = liveViewers;
   if (type === 'viewers') {
@@ -37,14 +46,6 @@ router.post('/viewed-interest', authenticateToken, (req, res) => {
     });
   }
 
-  liveViewers.push({
-    user_id: req.user.id || 'usr_998877',
-    name: req.user.name || 'Alex Sharma',
-    profile_pic: 'http://localhost:5000/uploads/profile.jpg',
-    viewed_at: new Date().toISOString(),
-    type: action === 'EXPRESS_INTEREST' ? 'EXPRESSED_INTEREST' : 'LIVE_VIEWER'
-  });
-
   return res.status(200).json({
     success: true,
     message: `Successfully performed action: ${action} for user ${target_user_id}`
@@ -53,11 +54,12 @@ router.post('/viewed-interest', authenticateToken, (req, res) => {
 
 // 2. Profile Photo Upload API — POST
 router.post('/photo-upload', authenticateToken, upload.single('photo'), (req, res) => {
+  const baseUrl = getBaseUrl(req);
   const photoFile = req.file;
 
   const photoUrl = photoFile
-    ? `http://localhost:5000/uploads/${photoFile.filename}`
-    : 'http://localhost:5000/uploads/default_uploaded_photo.jpg';
+    ? `${baseUrl}/uploads/${photoFile.filename}`
+    : `${baseUrl}/uploads/default_uploaded_photo.jpg`;
 
   return res.status(200).json({
     success: true,
@@ -68,9 +70,6 @@ router.post('/photo-upload', authenticateToken, upload.single('photo'), (req, re
 
 // 3. Face Scan Recognition API — POST
 router.post('/face-scan', authenticateToken, (req, res) => {
-  const { face_image_base64 } = req.body;
-
-  // Liveness check & facial features match simulation
   return res.status(200).json({
     success: true,
     message: 'Face scan liveness and recognition verification successful',

@@ -3,53 +3,48 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { query } = require('../config/db');
 
-// Mock Profile Store Fallback
-let userProfilesStore = {
-  usr_998877: {
-    user_id: 'usr_998877',
-    name: 'Alex Sharma',
-    country_code: '+91',
-    phone_number: '7250642635',
-    full_phone_number: '+917250642635',
-    email: 'alex.sharma@example.com',
-    gender: 'Male',
-    interested_in_gender: 'Female',
-    dob: '1998-05-15',
-    bio: 'Enthusiastic explorer and tech lover',
-    interests: ['Travel', 'Music', 'Fitness', 'Coding'],
-    city: 'Mumbai',
-    profile_image: 'http://localhost:5000/uploads/default_avatar.jpg',
-    is_photo_verified: true,
-    photo_verification_status: 'VERIFIED',
-    is_kyc_completed: false,
-    kyc_status: 'NOT_VERIFIED'
+const getBaseUrl = (req) => {
+  if (req) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    return `${protocol}://${host}`;
   }
+  return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
+
+// Mock Profile Store Fallback
+let userProfilesStore = {};
 
 // Handler for getProfile
 const handleGetProfile = async (req, res) => {
+  const baseUrl = getBaseUrl(req);
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1] ? authHeader.split(' ')[1] : 'mock_token_active';
   const userId = req.user.id || req.user.user_id || 'usr_998877';
 
   let profileData = userProfilesStore[userId] || {
     user_id: userId,
-    name: req.user.name || 'User',
+    name: req.user.name || 'Alex Sharma',
     country_code: req.user.country_code || '+91',
     phone_number: req.user.phone_number || '7250642635',
     full_phone_number: req.user.full_phone_number || '+917250642635',
-    email: 'user@example.com',
+    email: 'alex.sharma@example.com',
     gender: 'Male',
     interested_in_gender: 'Female',
     dob: '1998-05-15',
-    bio: 'Profile bio',
+    bio: 'Enthusiastic explorer and tech lover',
     city: 'Mumbai',
-    profile_image: 'http://localhost:5000/uploads/default_avatar.jpg',
-    is_photo_verified: false,
-    photo_verification_status: 'NOT_VERIFIED',
+    profile_image: `${baseUrl}/uploads/default_avatar.jpg`,
+    is_photo_verified: true,
+    photo_verification_status: 'VERIFIED',
     is_kyc_completed: false,
     kyc_status: 'NOT_VERIFIED'
   };
+
+  // Ensure image URL uses live host if it contained localhost
+  if (profileData.profile_image && profileData.profile_image.includes('localhost')) {
+    profileData.profile_image = profileData.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl);
+  }
 
   // Try fetching profile from MySQL Database
   try {
@@ -66,7 +61,7 @@ const handleGetProfile = async (req, res) => {
         dob: u.dob || profileData.dob,
         bio: u.bio || profileData.bio,
         city: u.city || profileData.city,
-        profile_image: u.profile_image || profileData.profile_image,
+        profile_image: u.profile_image ? u.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl) : profileData.profile_image,
         kyc_status: u.kyc_status || profileData.kyc_status,
         is_kyc_completed: u.kyc_status === 'VERIFIED'
       };

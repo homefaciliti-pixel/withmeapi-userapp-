@@ -2,30 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
 
-// Mock Activity Data
-const popularActivities = [
-  { id: 'act_top1', name: 'Weekend Trekking & Camping', category: 'Outdoor', participants_count: 1420, rating: 4.9, banner: 'http://localhost:5000/uploads/trek.jpg' },
-  { id: 'act_top2', name: 'Board Game & Coffee Night', category: 'Social', participants_count: 890, rating: 4.8, banner: 'http://localhost:5000/uploads/games.jpg' },
-  { id: 'act_top3', name: 'Morning Badminton Doubles', category: 'Sports', participants_count: 650, rating: 4.7, banner: 'http://localhost:5000/uploads/badminton.jpg' }
-];
-
-const products = {
-  prod_101: {
-    product_id: 'prod_101',
-    name: 'VIP Activity Access Pass',
-    price: 499,
-    currency: 'INR',
-    validity_days: 30,
-    features: ['Unlimited Partner Requests', 'Priority Live Stream Badge', 'Ad-free Experience']
-  },
-  prod_102: {
-    product_id: 'prod_102',
-    name: 'Premium Activity Explorer Pass',
-    price: 999,
-    currency: 'INR',
-    validity_days: 90,
-    features: ['All VIP Features', 'Face Scan Verification Shield', 'Top Search Listing']
+const getBaseUrl = (req) => {
+  if (req) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    return `${protocol}://${host}`;
   }
+  return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
 
 // 1. Planning Today List / Selection API — GET
@@ -59,6 +42,13 @@ router.get('/search', authenticateToken, (req, res) => {
 
 // 3. Popular Activities List API — GET
 router.get('/popular-activities', authenticateToken, (req, res) => {
+  const baseUrl = getBaseUrl(req);
+  const popularActivities = [
+    { id: 'act_top1', name: 'Weekend Trekking & Camping', category: 'Outdoor', participants_count: 1420, rating: 4.9, banner: `${baseUrl}/uploads/trek.jpg` },
+    { id: 'act_top2', name: 'Board Game & Coffee Night', category: 'Social', participants_count: 890, rating: 4.8, banner: `${baseUrl}/uploads/games.jpg` },
+    { id: 'act_top3', name: 'Morning Badminton Doubles', category: 'Sports', participants_count: 650, rating: 4.7, banner: `${baseUrl}/uploads/badminton.jpg` }
+  ];
+
   return res.status(200).json({
     success: true,
     count: popularActivities.length,
@@ -68,6 +58,7 @@ router.get('/popular-activities', authenticateToken, (req, res) => {
 
 // 4. Recommended Partner List API — GET
 router.get('/recommended-partners', authenticateToken, (req, res) => {
+  const baseUrl = getBaseUrl(req);
   return res.status(200).json({
     success: true,
     partners: [
@@ -81,7 +72,7 @@ router.get('/recommended-partners', authenticateToken, (req, res) => {
         match_score: '94%',
         interests: ['Trekking', 'Coding'],
         location: 'Mumbai',
-        profile_image: 'http://localhost:5000/uploads/rohan.jpg'
+        profile_image: `${baseUrl}/uploads/rohan.jpg`
       },
       {
         user_id: 'usr_405',
@@ -93,7 +84,7 @@ router.get('/recommended-partners', authenticateToken, (req, res) => {
         match_score: '89%',
         interests: ['Music', 'Coffee'],
         location: 'Mumbai',
-        profile_image: 'http://localhost:5000/uploads/neha.jpg'
+        profile_image: `${baseUrl}/uploads/neha.jpg`
       },
       {
         user_id: 'usr_406',
@@ -105,7 +96,7 @@ router.get('/recommended-partners', authenticateToken, (req, res) => {
         match_score: '85%',
         interests: ['Fitness', 'Gaming'],
         location: 'Delhi',
-        profile_image: 'http://localhost:5000/uploads/aarav.jpg'
+        profile_image: `${baseUrl}/uploads/aarav.jpg`
       }
     ]
   });
@@ -113,6 +104,25 @@ router.get('/recommended-partners', authenticateToken, (req, res) => {
 
 // 5. Product Details API — GET
 router.get('/product-details/:id', authenticateToken, (req, res) => {
+  const products = {
+    prod_101: {
+      product_id: 'prod_101',
+      name: 'VIP Activity Access Pass',
+      price: 499,
+      currency: 'INR',
+      validity_days: 30,
+      features: ['Unlimited Partner Requests', 'Priority Live Stream Badge', 'Ad-free Experience']
+    },
+    prod_102: {
+      product_id: 'prod_102',
+      name: 'Premium Activity Explorer Pass',
+      price: 999,
+      currency: 'INR',
+      validity_days: 90,
+      features: ['All VIP Features', 'Face Scan Verification Shield', 'Top Search Listing']
+    }
+  };
+
   const productId = req.params.id;
   const product = products[productId] || products['prod_101'];
 

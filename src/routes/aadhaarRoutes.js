@@ -4,8 +4,18 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 const { query } = require('../config/db');
 
+const getBaseUrl = (req) => {
+  if (req) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    return `${protocol}://${host}`;
+  }
+  return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
+};
+
 // Helper for Aadhaar KYC Submission & OTP trigger
 const handleAadhaarKycSubmit = async (req, res) => {
+  const baseUrl = getBaseUrl(req);
   const { full_name, nick_name, aadhaar_number, age } = req.body;
 
   if (!aadhaar_number) {
@@ -27,11 +37,11 @@ const handleAadhaarKycSubmit = async (req, res) => {
   const backFile = req.files && req.files['back_image'] ? req.files['back_image'][0] : null;
 
   const frontUrl = frontFile
-    ? `http://localhost:5000/uploads/${frontFile.filename}`
-    : req.body.front_url || 'http://localhost:5000/uploads/mock_aadhaar_front.jpg';
+    ? `${baseUrl}/uploads/${frontFile.filename}`
+    : (req.body.front_url ? req.body.front_url.replace(/http:\/\/localhost:\d+/, baseUrl) : `${baseUrl}/uploads/mock_aadhaar_front.jpg`);
   const backUrl = backFile
-    ? `http://localhost:5000/uploads/${backFile.filename}`
-    : req.body.back_url || 'http://localhost:5000/uploads/mock_aadhaar_back.jpg';
+    ? `${baseUrl}/uploads/${backFile.filename}`
+    : (req.body.back_url ? req.body.back_url.replace(/http:\/\/localhost:\d+/, baseUrl) : `${baseUrl}/uploads/mock_aadhaar_back.jpg`);
 
   const userId = req.user.id || req.user.user_id || 'usr_998877';
   const refId = `adh_ref_${Date.now()}`;

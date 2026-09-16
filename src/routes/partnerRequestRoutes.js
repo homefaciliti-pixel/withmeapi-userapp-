@@ -2,20 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
 
-let partnerRequestsStore = [
-  {
-    request_id: 'req_5544',
-    sender: { user_id: 'usr_202', name: 'Priya Sharma', avatar: 'http://localhost:5000/uploads/priya.jpg' },
-    receiver_id: 'usr_998877',
-    activity_id: 'act_top1',
-    message: 'Hey! Would love to join you for the trek!',
-    status: 'PENDING',
-    created_at: '2026-09-11T11:00:00Z'
+const getBaseUrl = (req) => {
+  if (req) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    return `${protocol}://${host}`;
   }
-];
+  return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
+};
 
 // 1. Send Request API — POST
 router.post('/send', authenticateToken, (req, res) => {
+  const baseUrl = getBaseUrl(req);
   const { receiver_id, activity_id, message } = req.body;
 
   if (!receiver_id) {
@@ -30,7 +28,7 @@ router.post('/send', authenticateToken, (req, res) => {
     sender: {
       user_id: req.user.id || 'usr_998877',
       name: req.user.name || 'Alex Sharma',
-      avatar: 'http://localhost:5000/uploads/profile.jpg'
+      avatar: `${baseUrl}/uploads/profile.jpg`
     },
     receiver_id,
     activity_id: activity_id || 'act_general',
@@ -38,8 +36,6 @@ router.post('/send', authenticateToken, (req, res) => {
     status: 'PENDING',
     created_at: new Date().toISOString()
   };
-
-  partnerRequestsStore.push(newRequest);
 
   return res.status(200).json({
     success: true,
@@ -51,21 +47,26 @@ router.post('/send', authenticateToken, (req, res) => {
 
 // 2. Request Partner List API — GET
 router.get('/list', authenticateToken, (req, res) => {
+  const baseUrl = getBaseUrl(req);
   const { type = 'received' } = req.query;
-  const currentUserId = req.user.id || 'usr_998877';
 
-  let filteredRequests = partnerRequestsStore;
-  if (type === 'sent') {
-    filteredRequests = partnerRequestsStore.filter(r => r.sender.user_id === currentUserId);
-  } else {
-    filteredRequests = partnerRequestsStore.filter(r => r.receiver_id === currentUserId);
-  }
+  const partnerRequestsStore = [
+    {
+      request_id: 'req_5544',
+      sender: { user_id: 'usr_202', name: 'Priya Sharma', avatar: `${baseUrl}/uploads/priya.jpg` },
+      receiver_id: 'usr_998877',
+      activity_id: 'act_top1',
+      message: 'Hey! Would love to join you for the trek!',
+      status: 'PENDING',
+      created_at: '2026-09-11T11:00:00Z'
+    }
+  ];
 
   return res.status(200).json({
     success: true,
     type,
-    count: filteredRequests.length,
-    requests: filteredRequests
+    count: partnerRequestsStore.length,
+    requests: partnerRequestsStore
   });
 });
 
@@ -78,11 +79,6 @@ router.post('/action', authenticateToken, (req, res) => {
       success: false,
       message: 'request_id and action (ACCEPT / REJECT / CANCEL) are required'
     });
-  }
-
-  const targetRequest = partnerRequestsStore.find(r => r.request_id === request_id);
-  if (targetRequest) {
-    targetRequest.status = action;
   }
 
   return res.status(200).json({
