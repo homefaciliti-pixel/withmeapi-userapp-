@@ -71,8 +71,42 @@ router.get('/recommended-partners', authenticateToken, (req, res) => {
   return res.status(200).json({
     success: true,
     partners: [
-      { user_id: 'usr_404', name: 'Rohan Mehta', match_score: '94%', interests: ['Trekking', 'Coding'], location: 'Mumbai' },
-      { user_id: 'usr_405', name: 'Neha Kapoor', match_score: '89%', interests: ['Music', 'Coffee'], location: 'Mumbai' }
+      {
+        user_id: 'usr_404',
+        name: 'Rohan Mehta',
+        age: 26,
+        rating: 4.8,
+        price: 499,
+        currency: 'INR',
+        match_score: '94%',
+        interests: ['Trekking', 'Coding'],
+        location: 'Mumbai',
+        profile_image: 'http://localhost:5000/uploads/rohan.jpg'
+      },
+      {
+        user_id: 'usr_405',
+        name: 'Neha Kapoor',
+        age: 23,
+        rating: 4.9,
+        price: 299,
+        currency: 'INR',
+        match_score: '89%',
+        interests: ['Music', 'Coffee'],
+        location: 'Mumbai',
+        profile_image: 'http://localhost:5000/uploads/neha.jpg'
+      },
+      {
+        user_id: 'usr_406',
+        name: 'Aarav Sharma',
+        age: 25,
+        rating: 4.7,
+        price: 399,
+        currency: 'INR',
+        match_score: '85%',
+        interests: ['Fitness', 'Gaming'],
+        location: 'Delhi',
+        profile_image: 'http://localhost:5000/uploads/aarav.jpg'
+      }
     ]
   });
 });

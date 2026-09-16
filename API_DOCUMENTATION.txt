@@ -67,48 +67,8 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 3.1 Aadhaar KYC Submit & Send OTP API
 - Endpoint: POST /api/v1/aadhaar/kyc-submit (also POST /api/v1/aadhaar/send-otp)
 - Headers: Authorization: Bearer <token> (multipart/form-data)
-- Description: Submit Aadhaar KYC details (Name, Nickname, Aadhaar Number, Age) and upload front & back document images to trigger OTP.
-- Form Data / Body Params:
-  - full_name: "Alex Sharma"
-  - nick_name: "Alex"
-  - aadhaar_number: "123456789012"
-  - age: "25"
-  - front_image: (file upload - Aadhaar Front side)
-  - back_image: (file upload - Aadhaar Back side)
-- Response (200 OK):
-  {
-    "success": true,
-    "api_name": "aadhaarKycSubmit",
-    "message": "Aadhaar details and documents uploaded. OTP sent to Aadhaar-linked mobile number.",
-    "ref_id": "adh_ref_1789380000000",
-    "expires_in_seconds": 300,
-    "data": {
-      "full_name": "Alex Sharma",
-      "nick_name": "Alex",
-      "aadhaar_number": "XXXXXXXX9012",
-      "age": 25,
-      "front_url": "http://localhost:5000/uploads/front_image-123.jpg",
-      "back_url": "http://localhost:5000/uploads/back_image-123.jpg",
-      "kyc_status": "PENDING_OTP_VERIFICATION"
-    }
-  }
 
-3.2 Verify Aadhaar OTP API
-- Endpoint: POST /api/v1/aadhaar/otp-verify
-- Headers: Authorization: Bearer <token>
-- Request Body:
-  {
-    "ref_id": "adh_ref_1789380000000",
-    "otp": "4321"
-  }
-- Response (200 OK):
-  {
-    "success": true,
-    "message": "Aadhaar KYC verification completed successfully",
-    "aadhaar_status": "VERIFIED",
-    "is_kyc_completed": true
-  }
-
+3.2 Verify Aadhaar OTP API: POST /api/v1/aadhaar/otp-verify
 3.3 Upload Aadhaar Card Document API: POST /api/v1/aadhaar/upload
 
 --------------------------------------------------------------------------------
@@ -126,7 +86,42 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 5.1 Planning Today List / Selection API: GET /api/v1/activities/planning-today
 5.2 Search API: GET /api/v1/activities/search
 5.3 Popular Activities List API: GET /api/v1/activities/popular-activities
-5.4 Recommended Partner List API: GET /api/v1/activities/recommended-partners
+
+5.4 Recommended Partner List API
+- Endpoint: GET /api/v1/activities/recommended-partners
+- Headers: Authorization: Bearer <token>
+- Description: Get AI-recommended partner matches including age, rating, price, match score, interests, and location.
+- Response (200 OK):
+  {
+    "success": true,
+    "partners": [
+      {
+        "user_id": "usr_404",
+        "name": "Rohan Mehta",
+        "age": 26,
+        "rating": 4.8,
+        "price": 499,
+        "currency": "INR",
+        "match_score": "94%",
+        "interests": ["Trekking", "Coding"],
+        "location": "Mumbai",
+        "profile_image": "http://localhost:5000/uploads/rohan.jpg"
+      },
+      {
+        "user_id": "usr_405",
+        "name": "Neha Kapoor",
+        "age": 23,
+        "rating": 4.9,
+        "price": 299,
+        "currency": "INR",
+        "match_score": "89%",
+        "interests": ["Music", "Coffee"],
+        "location": "Mumbai",
+        "profile_image": "http://localhost:5000/uploads/neha.jpg"
+      }
+    ]
+  }
+
 5.5 Product Details API: GET /api/v1/activities/product-details/:id
 
 --------------------------------------------------------------------------------

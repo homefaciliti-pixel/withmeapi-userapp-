@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "WitMe User App REST APIs (Render Live)",
-    "description": "Postman Collection for WitMe User App APIs deployed on Render with 4-digit OTP, getProfile, and Interest Selection support",
+    "description": "Postman Collection for WitMe User App APIs deployed on Render with 4-digit OTP, getProfile, Interest Selection, and updated Recommended Partners",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -73,17 +73,6 @@
               "path": ["auth", "resend-otp"]
             }
           }
-        },
-        {
-          "name": "Get Country Codes",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/auth/country-codes",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "country-codes"]
-            }
-          }
         }
       ]
     },
@@ -105,7 +94,7 @@
           }
         },
         {
-          "name": "Interest Selection (Gender Preference)",
+          "name": "Interest Selection",
           "request": {
             "method": "POST",
             "header": [
@@ -122,42 +111,34 @@
               "path": ["profile", "interest-selection"]
             }
           }
-        },
+        }
+      ]
+    },
+    {
+      "name": "3. Activities & Explore",
+      "item": [
         {
-          "name": "Edit Profile",
+          "name": "Recommended Partners (Includes rating, price, age)",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Alex Sharma\",\n  \"email\": \"alex@example.com\",\n  \"city\": \"Mumbai\"\n}"
-            },
             "url": {
-              "raw": "{{baseUrl}}/profile/edit",
+              "raw": "{{baseUrl}}/activities/recommended-partners",
               "host": ["{{baseUrl}}"],
-              "path": ["profile", "edit"]
+              "path": ["activities", "recommended-partners"]
             }
           }
         },
         {
-          "name": "Submit KYC",
+          "name": "Popular Activities",
           "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{authToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"document_type\": \"PAN_CARD\",\n  \"document_number\": \"ABCDE1234F\",\n  \"full_name\": \"Alex Sharma\",\n  \"dob\": \"1998-05-15\"\n}"
-            },
+            "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/kyc/verify",
+              "raw": "{{baseUrl}}/activities/popular-activities",
               "host": ["{{baseUrl}}"],
-              "path": ["kyc", "verify"]
+              "path": ["activities", "popular-activities"]
             }
           }
         }
