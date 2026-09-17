@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -16,7 +17,22 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static uploads folder serve
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadsDir = path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadsDir));
+
+// Fallback image handler if an upload file is not found on disk
+app.get('/uploads/:filename', (req, res) => {
+  const filename = req.params.filename || 'Image';
+  const label = filename.split('.')[0].replace(/_/g, ' ');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+    <rect width="400" height="400" fill="#6C5CE7"/>
+    <circle cx="200" cy="160" r="60" fill="#FFFFFF" opacity="0.8"/>
+    <path d="M100,320 C100,240 140,220 200,220 C260,220 300,240 300,320 Z" fill="#FFFFFF" opacity="0.8"/>
+    <text x="50%" y="370" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#FFFFFF" text-anchor="middle">${label}</text>
+  </svg>`;
+  res.setHeader('Content-Type', 'image/svg+xml');
+  return res.status(200).send(svg);
+});
 
 // Import Route Modules
 const authRoutes = require('./src/routes/authRoutes');

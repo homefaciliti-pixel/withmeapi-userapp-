@@ -18,24 +18,8 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 1. AUTHENTICATION APIs (/api/v1/auth)
 --------------------------------------------------------------------------------
 
-1.1 Send OTP API
-- Endpoint: POST /api/v1/auth/send-otp
-- Description: Send 4-digit OTP to specified phone number via SMSGATEWAYHUB DLT SMS.
-- Request Body:
-  {
-    "country_code": "+91",
-    "phone_number": "7250642635"
-  }
-
-1.2 Verify OTP API
-- Endpoint: POST /api/v1/auth/verify-otp
-- Request Body:
-  {
-    "country_code": "+91",
-    "phone_number": "7250642635",
-    "otp_code": "8675"
-  }
-
+1.1 Send OTP API: POST /api/v1/auth/send-otp
+1.2 Verify OTP API: POST /api/v1/auth/verify-otp
 1.3 Resend OTP API: POST /api/v1/auth/resend-otp
 1.4 Country Code List API: GET /api/v1/auth/country-codes
 1.5 Terms of Service API: GET /api/v1/auth/terms-of-service
@@ -45,18 +29,8 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 2. PROFILE & KYC APIs (/api/v1/getProfile & /api/v1/profile)
 --------------------------------------------------------------------------------
 
-2.1 getProfile API
-- Endpoint: GET /api/v1/getProfile (or GET /api/v1/profile)
-- Headers: Authorization: Bearer <token>
-
-2.2 Interest Selection API (POST)
-- Endpoint: POST /api/v1/profile/interest-selection (or POST /api/v1/interest-selection)
-- Headers: Authorization: Bearer <token>
-- Request Body:
-  {
-    "interested_in_gender": "Female"   // Options: "Male", "Female", "Other", "Both"
-  }
-
+2.1 getProfile API: GET /api/v1/getProfile (or GET /api/v1/profile)
+2.2 Interest Selection API: POST /api/v1/profile/interest-selection
 2.3 Profile Edit API: POST / PUT /api/v1/profile/edit
 2.4 KYC Verification API: POST /api/v1/kyc/verify
 
@@ -64,10 +38,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 3. AADHAAR KYC APIs (/api/v1/aadhaar)
 --------------------------------------------------------------------------------
 
-3.1 Aadhaar KYC Submit & Send OTP API
-- Endpoint: POST /api/v1/aadhaar/kyc-submit (also POST /api/v1/aadhaar/send-otp)
-- Headers: Authorization: Bearer <token> (multipart/form-data)
-
+3.1 Aadhaar KYC Submit & Send OTP API: POST /api/v1/aadhaar/kyc-submit
 3.2 Verify Aadhaar OTP API: POST /api/v1/aadhaar/otp-verify
 3.3 Upload Aadhaar Card Document API: POST /api/v1/aadhaar/upload
 
@@ -86,57 +57,62 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 5.1 Planning Today List / Selection API: GET /api/v1/activities/planning-today
 5.2 Search API: GET /api/v1/activities/search
 5.3 Popular Activities List API: GET /api/v1/activities/popular-activities
-
-5.4 Recommended Partner List API
-- Endpoint: GET /api/v1/activities/recommended-partners
-- Headers: Authorization: Bearer <token>
-- Description: Get AI-recommended partner matches including age, rating, price, match score, interests, and location.
-- Response (200 OK):
-  {
-    "success": true,
-    "partners": [
-      {
-        "user_id": "usr_404",
-        "name": "Rohan Mehta",
-        "age": 26,
-        "rating": 4.8,
-        "price": 499,
-        "currency": "INR",
-        "match_score": "94%",
-        "interests": ["Trekking", "Coding"],
-        "location": "Mumbai",
-        "profile_image": "http://localhost:5000/uploads/rohan.jpg"
-      },
-      {
-        "user_id": "usr_405",
-        "name": "Neha Kapoor",
-        "age": 23,
-        "rating": 4.9,
-        "price": 299,
-        "currency": "INR",
-        "match_score": "89%",
-        "interests": ["Music", "Coffee"],
-        "location": "Mumbai",
-        "profile_image": "http://localhost:5000/uploads/neha.jpg"
-      }
-    ]
-  }
-
+5.4 Recommended Partner List API: GET /api/v1/activities/recommended-partners
 5.5 Product Details API: GET /api/v1/activities/product-details/:id
-
---------------------------------------------------------------------------------
-6. PARTNER REQUEST APIs (/api/v1/partner-request)
---------------------------------------------------------------------------------
-
-6.1 Send Request API: POST /api/v1/partner-request/send
-6.2 Request Partner List API: GET /api/v1/partner-request/list
-6.3 Request Action API: POST /api/v1/partner-request/action
 
 --------------------------------------------------------------------------------
 7. EXPLORE APIs (/api/v1/explore)
 --------------------------------------------------------------------------------
 
-7.1 Explore API: GET /api/v1/explore
+7.1 Explore API
+- Endpoint: GET /api/v1/explore
+- Headers: Authorization: Bearer <token>
+- Description: Get feed of explore items including user_id, age, gender, interests, rating, price, and image.
+- Response (200 OK):
+  {
+    "success": true,
+    "page": 1,
+    "limit": 10,
+    "count": 3,
+    "items": [
+      {
+        "user_id": "usr_201",
+        "id": "exp_1",
+        "type": "PROFILE",
+        "name": "Ananya Verma",
+        "age": 24,
+        "gender": "Female",
+        "interests": ["Music", "Coffee", "Trekking"],
+        "rating": 4.9,
+        "price": 299,
+        "currency": "INR",
+        "distance": "2.4 km away",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+        "avatar": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg"
+      },
+      {
+        "user_id": "usr_202",
+        "id": "exp_2",
+        "type": "LIVE",
+        "title": "Acoustic Music Session",
+        "host": "Rohan Mehta",
+        "name": "Rohan Mehta",
+        "age": 26,
+        "gender": "Male",
+        "interests": ["Guitar", "Singing", "Music"],
+        "rating": 4.8,
+        "price": 499,
+        "currency": "INR",
+        "viewers_count": 320,
+        "distance": "1.8 km away",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/live1.jpg",
+        "avatar": "https://withmeapi-userapp.onrender.com/uploads/rohan.jpg",
+        "thumbnail": "https://withmeapi-userapp.onrender.com/uploads/live1.jpg"
+      }
+    ]
+  }
+
 7.2 Filter API: POST /api/v1/explore/filter
 
 --------------------------------------------------------------------------------
