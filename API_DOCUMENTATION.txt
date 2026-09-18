@@ -29,10 +29,53 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 2. PROFILE & KYC APIs (/api/v1/getProfile & /api/v1/profile)
 --------------------------------------------------------------------------------
 
-2.1 getProfile API: GET /api/v1/getProfile (or GET /api/v1/profile)
-2.2 Interest Selection API: POST /api/v1/profile/interest-selection
-2.3 Profile Edit API: POST / PUT /api/v1/profile/edit
-2.4 KYC Verification API: POST /api/v1/kyc/verify
+2.1 getProfile API
+- Endpoint: GET /api/v1/getProfile (or GET /api/v1/profile)
+- Headers: Authorization: Bearer <token>
+
+2.2 Detailed User Profile API (with profile_image list)
+- Endpoint: GET /api/v1/profile/details/:id (also GET /api/v1/user-details/:id or GET /api/v1/profile/details)
+- Headers: Authorization: Bearer <token>
+- Description: Retrieve detailed public profile of a user including profile_image as an array list, location, rating, interests, and available_for activity passes.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Profile details fetched successfully",
+    "data": {
+      "id": "usr_203",
+      "name": "Priya Sharma",
+      "age": 25,
+      "gender": "Female",
+      "verified": true,
+      "location": {
+        "city": "Jaipur",
+        "state": "Rajasthan",
+        "country": "India"
+      },
+      "rating": 4.8,
+      "total_reviews": 120,
+      "profile_image": [
+        "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/user101.jpg"
+      ],
+      "about": "Friendly, outgoing and loves exploring new places and meeting people.",
+      "interests": [
+        { "name": "Coffee", "icon": "coffee" },
+        { "name": "Travel", "icon": "flight" },
+        { "name": "Music", "icon": "music_note" }
+      ],
+      "available_for": [
+        { "name": "Coffee", "icon": "coffee", "price": 299, "currency": "INR" },
+        { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
+        { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
+      ]
+    }
+  }
+
+2.3 Interest Selection API: POST /api/v1/profile/interest-selection
+2.4 Profile Edit API: POST / PUT /api/v1/profile/edit
+2.5 KYC Verification API: POST /api/v1/kyc/verify
 
 --------------------------------------------------------------------------------
 3. AADHAAR KYC APIs (/api/v1/aadhaar)
@@ -64,55 +107,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 7. EXPLORE APIs (/api/v1/explore)
 --------------------------------------------------------------------------------
 
-7.1 Explore API
-- Endpoint: GET /api/v1/explore
-- Headers: Authorization: Bearer <token>
-- Description: Get feed of explore items including user_id, age, gender, interests, rating, price, and image.
-- Response (200 OK):
-  {
-    "success": true,
-    "page": 1,
-    "limit": 10,
-    "count": 3,
-    "items": [
-      {
-        "user_id": "usr_201",
-        "id": "exp_1",
-        "type": "PROFILE",
-        "name": "Ananya Verma",
-        "age": 24,
-        "gender": "Female",
-        "interests": ["Music", "Coffee", "Trekking"],
-        "rating": 4.9,
-        "price": 299,
-        "currency": "INR",
-        "distance": "2.4 km away",
-        "image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
-        "avatar": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
-        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg"
-      },
-      {
-        "user_id": "usr_202",
-        "id": "exp_2",
-        "type": "LIVE",
-        "title": "Acoustic Music Session",
-        "host": "Rohan Mehta",
-        "name": "Rohan Mehta",
-        "age": 26,
-        "gender": "Male",
-        "interests": ["Guitar", "Singing", "Music"],
-        "rating": 4.8,
-        "price": 499,
-        "currency": "INR",
-        "viewers_count": 320,
-        "distance": "1.8 km away",
-        "image": "https://withmeapi-userapp.onrender.com/uploads/live1.jpg",
-        "avatar": "https://withmeapi-userapp.onrender.com/uploads/rohan.jpg",
-        "thumbnail": "https://withmeapi-userapp.onrender.com/uploads/live1.jpg"
-      }
-    ]
-  }
-
+7.1 Explore API: GET /api/v1/explore
 7.2 Filter API: POST /api/v1/explore/filter
 
 --------------------------------------------------------------------------------

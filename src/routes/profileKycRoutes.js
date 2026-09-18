@@ -15,6 +15,59 @@ const getBaseUrl = (req) => {
 // Global User Profiles Memory Store
 let userProfilesStore = {};
 
+// Detailed User Profiles Catalog Mock Store
+const detailedProfilesCatalog = {
+  usr_203: {
+    id: 'usr_203',
+    name: 'Priya Sharma',
+    age: 25,
+    gender: 'Female',
+    verified: true,
+    location: {
+      city: 'Jaipur',
+      state: 'Rajasthan',
+      country: 'India'
+    },
+    rating: 4.8,
+    total_reviews: 120,
+    about: 'Friendly, outgoing and loves exploring new places and meeting people.',
+    interests: [
+      { name: 'Coffee', icon: 'coffee' },
+      { name: 'Travel', icon: 'flight' },
+      { name: 'Music', icon: 'music_note' }
+    ],
+    available_for: [
+      { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+      { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+      { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+    ]
+  },
+  usr_404: {
+    id: 'usr_404',
+    name: 'Rohan Mehta',
+    age: 26,
+    gender: 'Male',
+    verified: true,
+    location: {
+      city: 'Mumbai',
+      state: 'Maharashtra',
+      country: 'India'
+    },
+    rating: 4.9,
+    total_reviews: 145,
+    about: 'Tech enthusiast, guitarist and outdoor trekker.',
+    interests: [
+      { name: 'Trekking', icon: 'hiking' },
+      { name: 'Coding', icon: 'code' },
+      { name: 'Guitar', icon: 'music_note' }
+    ],
+    available_for: [
+      { name: 'Trekking', icon: 'hiking', price: 499, currency: 'INR' },
+      { name: 'Coffee & Code', icon: 'coffee', price: 299, currency: 'INR' }
+    ]
+  }
+};
+
 // Handler for getProfile
 const handleGetProfile = async (req, res) => {
   const baseUrl = getBaseUrl(req);
@@ -25,6 +78,12 @@ const handleGetProfile = async (req, res) => {
   const userPhone = req.user.phone_number || '7250642635';
   const userCountryCode = req.user.country_code || '+91';
   const userFullPhone = req.user.full_phone_number || `${userCountryCode}${userPhone}`;
+
+  const imageList = [
+    `${baseUrl}/uploads/default_avatar.jpg`,
+    `${baseUrl}/uploads/profile.jpg`,
+    `${baseUrl}/uploads/user101.jpg`
+  ];
 
   // Default Base Profile Template with full details
   let defaultProfile = {
@@ -39,7 +98,8 @@ const handleGetProfile = async (req, res) => {
     dob: '1998-05-15',
     bio: 'Enthusiastic explorer and tech lover',
     city: 'Mumbai',
-    profile_image: `${baseUrl}/uploads/default_avatar.jpg`,
+    profile_image: imageList[0],
+    profile_images: imageList,
     is_photo_verified: true,
     photo_verification_status: 'VERIFIED',
     is_kyc_completed: false,
@@ -70,6 +130,7 @@ const handleGetProfile = async (req, res) => {
         bio: u.bio || profileData.bio,
         city: u.city || profileData.city,
         profile_image: u.profile_image ? u.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl) : profileData.profile_image,
+        profile_images: imageList,
         is_photo_verified: profileData.is_photo_verified !== undefined ? profileData.is_photo_verified : true,
         photo_verification_status: profileData.photo_verification_status || 'VERIFIED',
         kyc_status: u.kyc_status || profileData.kyc_status,
@@ -99,7 +160,43 @@ const handleGetProfile = async (req, res) => {
 router.get('/getProfile', authenticateToken, handleGetProfile);
 router.get('/profile', authenticateToken, handleGetProfile);
 
-// 2. Interest Selection API — POST (/profile/interest-selection and /interest-selection)
+// 2. Profile Details API (With Profile Image List array & available_for) — GET
+const handleDetailedProfileView = (req, res) => {
+  const baseUrl = getBaseUrl(req);
+  const targetId = req.params.id || req.query.id || 'usr_203';
+  const catalog = detailedProfilesCatalog[targetId] || detailedProfilesCatalog['usr_203'];
+
+  const profileImagesList = [
+    `${baseUrl}/uploads/priya.jpg`,
+    `${baseUrl}/uploads/ananya.jpg`,
+    `${baseUrl}/uploads/user101.jpg`
+  ];
+
+  return res.status(200).json({
+    success: true,
+    message: 'Profile details fetched successfully',
+    data: {
+      id: catalog.id,
+      name: catalog.name,
+      age: catalog.age,
+      gender: catalog.gender,
+      verified: catalog.verified,
+      location: catalog.location,
+      rating: catalog.rating,
+      total_reviews: catalog.total_reviews,
+      profile_image: profileImagesList,
+      about: catalog.about,
+      interests: catalog.interests,
+      available_for: catalog.available_for
+    }
+  });
+};
+
+router.get('/profile/details/:id', authenticateToken, handleDetailedProfileView);
+router.get('/profile/details', authenticateToken, handleDetailedProfileView);
+router.get('/user-details/:id', authenticateToken, handleDetailedProfileView);
+
+// 3. Interest Selection API — POST (/profile/interest-selection and /interest-selection)
 const handleInterestSelection = async (req, res) => {
   const { interested_in_gender } = req.body;
 
@@ -147,7 +244,7 @@ const handleInterestSelection = async (req, res) => {
 router.post('/profile/interest-selection', authenticateToken, handleInterestSelection);
 router.post('/interest-selection', authenticateToken, handleInterestSelection);
 
-// 3. Profile Edit API — POST / PUT
+// 4. Profile Edit API — POST / PUT
 const handleProfileEdit = async (req, res) => {
   const userId = req.user.user_id || req.user.id || 'usr_998877';
   const existingProfile = userProfilesStore[userId] || {};
@@ -190,7 +287,7 @@ const handleProfileEdit = async (req, res) => {
 router.post('/profile/edit', authenticateToken, handleProfileEdit);
 router.put('/profile/edit', authenticateToken, handleProfileEdit);
 
-// 4. KYC Verification API — POST
+// 5. KYC Verification API — POST
 router.post('/kyc/verify', authenticateToken, async (req, res) => {
   const { document_type, document_number, full_name, dob } = req.body;
 
