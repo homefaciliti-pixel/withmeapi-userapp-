@@ -68,7 +68,7 @@ const detailedProfilesCatalog = {
   }
 };
 
-// Handler for getProfile
+// Handler for getProfile & Combined Profile Data
 const handleGetProfile = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const authHeader = req.headers['authorization'];
@@ -144,17 +144,69 @@ const handleGetProfile = async (req, res) => {
   // Cache updated profile in memory
   userProfilesStore[userId] = profileData;
 
+  const detailedData = {
+    location: {
+      city: profileData.city || 'Mumbai',
+      state: 'Maharashtra',
+      country: 'India'
+    },
+    rating: 4.8,
+    total_reviews: 120,
+    about: profileData.bio || 'Friendly, outgoing and loves exploring new places and meeting people.',
+    interests: [
+      { name: 'Coffee', icon: 'coffee' },
+      { name: 'Travel', icon: 'flight' },
+      { name: 'Music', icon: 'music_note' }
+    ],
+    available_for: [
+      { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+      { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+      { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+    ]
+  };
+
+  const combinedData = {
+    ...profileData,
+    ...detailedData,
+    is_logged_in: true,
+    token: token
+  };
+
   return res.status(200).json({
     success: true,
-    api_name: 'getProfile',
-    message: 'User profile details fetched successfully',
-    data: {
-      ...profileData,
-      is_logged_in: true,
-      token: token
+    api_name: 'getProfileCombined',
+    message: 'User profile and KYC details fetched successfully',
+    data: combinedData,
+    profile: profileData,
+    detailed_profile: {
+      id: profileData.user_id,
+      name: profileData.name,
+      age: 26,
+      gender: profileData.gender,
+      verified: profileData.is_photo_verified,
+      location: detailedData.location,
+      rating: detailedData.rating,
+      total_reviews: detailedData.total_reviews,
+      profile_image: profileData.profile_images,
+      about: detailedData.about,
+      interests: detailedData.interests,
+      available_for: detailedData.available_for
+    },
+    interest_selection: {
+      interested_in_gender: profileData.interested_in_gender || 'Female'
+    },
+    kyc_verification: {
+      is_kyc_completed: profileData.is_kyc_completed,
+      kyc_status: profileData.kyc_status
     }
   });
 };
+
+// 2.0 Combined All-In-One Profile & KYC GET API
+router.get('/profile/all-in-one', authenticateToken, handleGetProfile);
+router.get('/profile/combined', authenticateToken, handleGetProfile);
+router.get('/profile/dashboard', authenticateToken, handleGetProfile);
+router.get('/profile/full-details', authenticateToken, handleGetProfile);
 
 // 1. getProfile API — GET (/getProfile and /profile)
 router.get('/getProfile', authenticateToken, handleGetProfile);
@@ -244,15 +296,60 @@ const handleInterestSelection = async (req, res) => {
 router.post('/profile/interest-selection', authenticateToken, handleInterestSelection);
 router.post('/interest-selection', authenticateToken, handleInterestSelection);
 
-// 4. Profile Edit API — POST / PUT
-const handleProfileEdit = async (req, res) => {
+// 4. Combined Profile Edit / Update API (Handles Profile Fields, Interest Selection & KYC Submit in 1 Call) — POST / PUT
+const handleProfileEditCombined = async (req, res) => {
   const userId = req.user.user_id || req.user.id || 'usr_998877';
   const existingProfile = userProfilesStore[userId] || {};
+
+  const {
+    name,
+    email,
+    gender,
+    interested_in_gender,
+    dob,
+    bio,
+    city,
+    document_type,
+    document_number,
+    full_name
+  } = req.body;
+
+  let kycSubmitted = false;
+  let kycDetails = null;
+
+  const updatedInterestedIn = interested_in_gender ? interested_in_gender.trim() : existingProfile.interested_in_gender || 'Female';
+
+  if (document_type && document_number) {
+    kycSubmitted = true;
+    kycDetails = {
+      document_type,
+      document_number_masked: document_number.slice(-4).padStart(document_number.length, '*'),
+      full_name: full_name || name || existingProfile.name || 'User',
+      status: 'PENDING_VERIFICATION'
+    };
+
+    try {
+      await query(`UPDATE users SET kyc_status = 'PENDING_VERIFICATION' WHERE id = ? OR phone_number = ?`, [userId, req.user.phone_number || '']);
+      await query(
+        `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'PENDING_VERIFICATION')`,
+        [userId, document_type, document_number, full_name || name || 'User']
+      );
+    } catch (err) {
+      console.warn('MySQL Combined KYC notice:', err.message);
+    }
+  }
 
   const updatedProfile = {
     ...existingProfile,
     user_id: userId,
-    ...req.body,
+    ...(name && { name }),
+    ...(email && { email }),
+    ...(gender && { gender }),
+    interested_in_gender: updatedInterestedIn,
+    ...(dob && { dob }),
+    ...(bio && { bio }),
+    ...(city && { city }),
+    ...(kycSubmitted && { kyc_status: 'PENDING_VERIFICATION', is_kyc_completed: false }),
     updated_at: new Date().toISOString()
   };
 
@@ -261,7 +358,7 @@ const handleProfileEdit = async (req, res) => {
   // Update MySQL database if available
   try {
     await query(
-      `UPDATE users SET name = ?, email = ?, gender = ?, interested_in_gender = ?, city = ?, bio = ? WHERE id = ? OR phone_number = ?`,
+      `UPDATE users SET name = ?, email = ?, gender = ?, interested_in_gender = ?, city = ?, bio = ?${kycSubmitted ? ", kyc_status = 'PENDING_VERIFICATION'" : ''} WHERE id = ? OR phone_number = ?`,
       [
         updatedProfile.name || 'User',
         updatedProfile.email || null,
@@ -279,13 +376,16 @@ const handleProfileEdit = async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: 'Profile updated successfully',
-    data: updatedProfile
+    message: 'Profile details updated successfully',
+    data: updatedProfile,
+    ...(kycSubmitted && { kyc_submission: kycDetails })
   });
 };
 
-router.post('/profile/edit', authenticateToken, handleProfileEdit);
-router.put('/profile/edit', authenticateToken, handleProfileEdit);
+router.post('/profile/edit', authenticateToken, handleProfileEditCombined);
+router.put('/profile/edit', authenticateToken, handleProfileEditCombined);
+router.post('/profile/combined-update', authenticateToken, handleProfileEditCombined);
+router.post('/profile/update-all', authenticateToken, handleProfileEditCombined);
 
 // 5. KYC Verification API — POST
 router.post('/kyc/verify', authenticateToken, async (req, res) => {

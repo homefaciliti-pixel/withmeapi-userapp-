@@ -29,6 +29,76 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 2. PROFILE & KYC APIs (/api/v1/getProfile & /api/v1/profile)
 --------------------------------------------------------------------------------
 
+2.0 COMBINED ALL-IN-ONE PROFILE & KYC GET API
+- Endpoint: GET /api/v1/profile/combined (or GET /api/v1/getProfile, /api/v1/profile/all-in-one, /api/v1/profile/full-details)
+- Headers: Authorization: Bearer <token>
+- Description: Combines basic profile, detailed profile attributes (location, rating, reviews, interests, available_for options), gender interest selection, and KYC status into a single response.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "User profile and KYC details fetched successfully",
+    "data": {
+      "user_id": "usr_998877",
+      "name": "Alex Sharma",
+      "gender": "Male",
+      "interested_in_gender": "Female",
+      "country_code": "+91",
+      "phone_number": "7250642635",
+      "full_phone_number": "+917250642635",
+      "email": "alex.sharma@example.com",
+      "dob": "1998-05-15",
+      "bio": "Enthusiastic explorer and tech lover",
+      "city": "Mumbai",
+      "location": {
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "country": "India"
+      },
+      "rating": 4.8,
+      "total_reviews": 120,
+      "profile_image": "https://withmeapi-userapp.onrender.com/uploads/default_avatar.jpg",
+      "profile_images": [
+        "https://withmeapi-userapp.onrender.com/uploads/default_avatar.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/profile.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/user101.jpg"
+      ],
+      "interests": [
+        { "name": "Coffee", "icon": "coffee" },
+        { "name": "Travel", "icon": "flight" },
+        { "name": "Music", "icon": "music_note" }
+      ],
+      "available_for": [
+        { "name": "Coffee", "icon": "coffee", "price": 299, "currency": "INR" },
+        { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
+        { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
+      ],
+      "is_photo_verified": true,
+      "photo_verification_status": "VERIFIED",
+      "is_kyc_completed": false,
+      "kyc_status": "NOT_VERIFIED"
+    },
+    "profile": { ... },
+    "detailed_profile": { ... },
+    "interest_selection": { "interested_in_gender": "Female" },
+    "kyc_verification": { "is_kyc_completed": false, "kyc_status": "NOT_VERIFIED" }
+  }
+
+2.0 COMBINED PROFILE & KYC UPDATE POST API
+- Endpoint: POST /api/v1/profile/combined-update (or POST /api/v1/profile/edit, POST /api/v1/profile/update-all)
+- Headers: Authorization: Bearer <token>
+- Description: Allows updating profile fields (name, email, gender, dob, bio, city), interest selection (interested_in_gender), AND submitting KYC document info in a single call.
+- Request Body (JSON):
+  {
+    "name": "Alex Sharma",
+    "email": "alex@example.com",
+    "gender": "Male",
+    "interested_in_gender": "Female",
+    "city": "Mumbai",
+    "bio": "Music & travel lover",
+    "document_type": "AADHAAR",
+    "document_number": "123456789012"
+  }
+
 2.1 getProfile API: GET /api/v1/getProfile (or GET /api/v1/profile)
 2.2 Detailed User Profile API: GET /api/v1/profile/details/:id
 2.3 Interest Selection API: POST /api/v1/profile/interest-selection
