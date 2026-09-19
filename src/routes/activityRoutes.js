@@ -17,9 +17,12 @@ const getCombinedActivitiesData = (req) => {
   const { q = '', location = '', category = '' } = req.query || {};
 
   const planning_today = [
-    { id: 'plan_1', title: 'Coffee & Afternoon Networking', time: '16:00', location: 'Bandras Cafe', status: 'AVAILABLE' },
-    { id: 'plan_2', title: 'Evening Gym & Fitness Partner', time: '18:30', location: 'Cult.fit Studio', status: 'SELECTED' },
-    { id: 'plan_3', title: 'Night Live Acoustic Session', time: '21:00', location: 'Online Live Room', status: 'AVAILABLE' }
+    { id: 'cat_01', title: 'Coffee', image: `${baseUrl}/uploads/categories/coffee.png` },
+    { id: 'cat_02', title: 'Dinner', image: `${baseUrl}/uploads/categories/dinner.png` },
+    { id: 'cat_03', title: 'Travel', image: `${baseUrl}/uploads/categories/travel.png` },
+    { id: 'cat_04', title: 'Movie', image: `${baseUrl}/uploads/categories/movie.png` },
+    { id: 'cat_05', title: 'Event', image: `${baseUrl}/uploads/categories/event.png` },
+    { id: 'cat_06', title: 'Conversation', image: `${baseUrl}/uploads/categories/conversation.png` }
   ];
 
   const search = [
@@ -141,10 +144,45 @@ router.get('/', authenticateToken, handleCombinedActivities);
 
 // 1. Planning Today List / Selection API — GET
 router.get('/planning-today', authenticateToken, (req, res) => {
-  const combinedData = getCombinedActivitiesData(req);
+  const baseUrl = getBaseUrl(req);
+  const categories = [
+    {
+      id: 'cat_01',
+      title: 'Coffee',
+      image: `${baseUrl}/uploads/categories/coffee.png`
+    },
+    {
+      id: 'cat_02',
+      title: 'Dinner',
+      image: `${baseUrl}/uploads/categories/dinner.png`
+    },
+    {
+      id: 'cat_03',
+      title: 'Travel',
+      image: `${baseUrl}/uploads/categories/travel.png`
+    },
+    {
+      id: 'cat_04',
+      title: 'Movie',
+      image: `${baseUrl}/uploads/categories/movie.png`
+    },
+    {
+      id: 'cat_05',
+      title: 'Event',
+      image: `${baseUrl}/uploads/categories/event.png`
+    },
+    {
+      id: 'cat_06',
+      title: 'Conversation',
+      image: `${baseUrl}/uploads/categories/conversation.png`
+    }
+  ];
+
   return res.status(200).json({
     success: true,
-    data: combinedData.planning_today
+    count: categories.length,
+    categories,
+    data: categories
   });
 });
 

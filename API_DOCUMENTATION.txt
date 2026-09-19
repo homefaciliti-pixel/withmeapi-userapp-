@@ -216,7 +216,48 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     ]
   }
 
-5.1 Planning Today List / Selection API: GET /api/v1/activities/planning-today
+5.1 Planning Today List / Selection API
+- Endpoint: GET /api/v1/activities/planning-today
+- Headers: Authorization: Bearer <token>
+- Description: Retrieve categories list for today's activity planning.
+- Response (200 OK):
+  {
+    "success": true,
+    "count": 6,
+    "categories": [
+      {
+        "id": "cat_01",
+        "title": "Coffee",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/categories/coffee.png"
+      },
+      {
+        "id": "cat_02",
+        "title": "Dinner",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/categories/dinner.png"
+      },
+      {
+        "id": "cat_03",
+        "title": "Travel",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/categories/travel.png"
+      },
+      {
+        "id": "cat_04",
+        "title": "Movie",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/categories/movie.png"
+      },
+      {
+        "id": "cat_05",
+        "title": "Event",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/categories/event.png"
+      },
+      {
+        "id": "cat_06",
+        "title": "Conversation",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/categories/conversation.png"
+      }
+    ]
+  }
+
 5.2 Search API
 - Endpoint: GET /api/v1/activities/search?q=coffee
 - Headers: Authorization: Bearer <token>
