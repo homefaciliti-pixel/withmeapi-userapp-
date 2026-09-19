@@ -75,9 +75,10 @@ const handleGetProfile = async (req, res) => {
   const token = authHeader && authHeader.split(' ')[1] ? authHeader.split(' ')[1] : 'mock_token_active';
 
   const userId = req.user.user_id || req.user.id || 'usr_998877';
-  const userPhone = req.user.phone_number || '7250642635';
+  const rawPhone = (req.user.phone_number || '7250642635').toString();
+  const userPhone = rawPhone.replace(/^\+91/, '');
   const userCountryCode = req.user.country_code || '+91';
-  const userFullPhone = req.user.full_phone_number || `${userCountryCode}${userPhone}`;
+  const userFullPhone = rawPhone.startsWith('+') ? rawPhone : `${userCountryCode}${userPhone}`;
 
   const imageList = [
     `${baseUrl}/uploads/default_avatar.jpg`,
