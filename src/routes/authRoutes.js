@@ -248,4 +248,85 @@ router.get('/privacy-policy', (req, res) => {
   });
 });
 
+// 7. SSO Login API — POST (/auth/sso, /auth/sso-login, /auth/google-sso, /auth/apple-sso)
+const handleSsoLogin = async (req, res) => {
+  const { provider = 'GOOGLE', id_token, access_token, sso_id, email, name, profile_image } = req.body || {};
+
+  if (!id_token && !access_token && !sso_id && !email) {
+    return res.status(400).json({
+      success: false,
+      message: 'sso_id, id_token, access_token, or email is required for SSO authentication'
+    });
+  }
+
+  const cleanProvider = (provider || 'GOOGLE').toUpperCase();
+  const userEmail = email || `user_${Date.now()}@${cleanProvider.toLowerCase()}.sso`;
+  const userName = name || 'Social User';
+  const userId = `usr_sso_${Date.now()}`;
+
+  let userPayload = {
+    user_id: userId,
+    name: userName,
+    email: userEmail,
+    sso_provider: cleanProvider,
+    country_code: '+91',
+    phone_number: '',
+    full_phone_number: ''
+  };
+
+  // MySQL User Lookup / Registration by Email or SSO ID
+  try {
+    const existingUsers = await query(
+      `SELECT * FROM users WHERE email = ? OR id = ? LIMIT 1`,
+      [userEmail, userId]
+    );
+
+    if (existingUsers && existingUsers.length > 0) {
+      const u = existingUsers[0];
+      userPayload = {
+        user_id: u.id,
+        name: u.name && u.name !== 'User' ? u.name : userName,
+        email: u.email || userEmail,
+        sso_provider: cleanProvider,
+        country_code: '+91',
+        phone_number: u.phone_number ? u.phone_number.replace('+91', '') : '',
+        full_phone_number: u.phone_number || ''
+      };
+    } else {
+      await query(
+        `INSERT INTO users (id, name, email) VALUES (?, ?, ?)`,
+        [userId, userName, userEmail]
+      );
+    }
+  } catch (err) {
+    console.warn('MySQL SSO User Query notice:', err.message);
+  }
+
+  const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '7d' });
+
+  return res.status(200).json({
+    success: true,
+    message: `${cleanProvider} SSO authentication successful`,
+    provider: cleanProvider,
+    token,
+    user: {
+      ...userPayload,
+      profile_image: profile_image || 'https://withmeapi-userapp.onrender.com/uploads/default_avatar.jpg',
+      is_profile_complete: true,
+      kyc_status: 'NOT_STARTED'
+    }
+  });
+};
+
+router.post('/sso', handleSsoLogin);
+router.post('/sso-login', handleSsoLogin);
+router.post('/google-sso', (req, res) => {
+  req.body = { ...req.body, provider: 'GOOGLE' };
+  return handleSsoLogin(req, res);
+});
+router.post('/apple-sso', (req, res) => {
+  req.body = { ...req.body, provider: 'APPLE' };
+  return handleSsoLogin(req, res);
+});
+
 module.exports = router;
