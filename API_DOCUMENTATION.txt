@@ -55,6 +55,68 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 5. ACTIVITIES & SEARCH APIs (/api/v1/activities)
 --------------------------------------------------------------------------------
 
+5.0 COMBINED / ALL-IN-ONE ACTIVITIES API
+- Endpoint: GET /api/v1/activities (or /api/v1/activities/all-in-one or /api/v1/activities/dashboard)
+- Headers: Authorization: Bearer <token>
+- Description: Combines Planning Today, Search, Popular Activities, and Recommended Partners into a single response.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Combined activities data fetched successfully",
+    "planning_today": [
+      { "id": "plan_1", "title": "Coffee & Afternoon Networking", "time": "16:00", "location": "Bandras Cafe", "status": "AVAILABLE" },
+      { "id": "plan_2", "title": "Evening Gym & Fitness Partner", "time": "18:30", "location": "Cult.fit Studio", "status": "SELECTED" },
+      { "id": "plan_3", "title": "Night Live Acoustic Session", "time": "21:00", "location": "Online Live Room", "status": "AVAILABLE" }
+    ],
+    "search": [
+      { "type": "activity", "id": "act_10", "title": "Fitness Club in Mumbai", "category": "Sports" },
+      { "type": "partner", "id": "usr_301", "name": "Kavya Singh", "interests": ["Trekking", "Photography"], "city": "Mumbai" }
+    ],
+    "popular_activities": [
+      { "id": "act_top1", "name": "Weekend Trekking & Camping", "category": "Outdoor", "participants_count": 1420, "rating": 4.9, "banner": "https://withmeapi-userapp.onrender.com/uploads/trek.jpg" },
+      { "id": "act_top2", "name": "Board Game & Coffee Night", "category": "Social", "participants_count": 890, "rating": 4.8, "banner": "https://withmeapi-userapp.onrender.com/uploads/games.jpg" },
+      { "id": "act_top3", "name": "Morning Badminton Doubles", "category": "Sports", "participants_count": 650, "rating": 4.7, "banner": "https://withmeapi-userapp.onrender.com/uploads/badminton.jpg" }
+    ],
+    "recommended_partners": [
+      {
+        "user_id": "usr_404",
+        "name": "Rohan Mehta",
+        "age": 26,
+        "rating": 4.8,
+        "price": 499,
+        "currency": "INR",
+        "match_score": "94%",
+        "interests": ["Trekking", "Coding"],
+        "location": "Mumbai",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/rohan.jpg"
+      },
+      {
+        "user_id": "usr_405",
+        "name": "Neha Kapoor",
+        "age": 23,
+        "rating": 4.9,
+        "price": 299,
+        "currency": "INR",
+        "match_score": "89%",
+        "interests": ["Music", "Coffee"],
+        "location": "Mumbai",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/neha.jpg"
+      },
+      {
+        "user_id": "usr_406",
+        "name": "Aarav Sharma",
+        "age": 25,
+        "rating": 4.7,
+        "price": 399,
+        "currency": "INR",
+        "match_score": "85%",
+        "interests": ["Fitness", "Gaming"],
+        "location": "Delhi",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/aarav.jpg"
+      }
+    ]
+  }
+
 5.1 Planning Today List / Selection API: GET /api/v1/activities/planning-today
 5.2 Search API: GET /api/v1/activities/search
 5.3 Popular Activities List API: GET /api/v1/activities/popular-activities
