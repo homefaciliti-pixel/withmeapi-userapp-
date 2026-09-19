@@ -23,8 +23,48 @@ const getCombinedActivitiesData = (req) => {
   ];
 
   const search = [
-    { type: 'activity', id: 'act_10', title: `Fitness Club in ${location || 'Mumbai'}`, category: category || 'Sports' },
-    { type: 'partner', id: 'usr_301', name: 'Kavya Singh', interests: ['Trekking', 'Photography'], city: location || 'Mumbai' }
+    {
+      type: 'partner',
+      id: 'usr_301',
+      name: 'Priya',
+      city: location || 'Jaipur',
+      rating: 4.8,
+      price: 999,
+      currency: 'INR',
+      price_type: 'session',
+      image: `${baseUrl}/uploads/priya.jpg`,
+      is_verified: true,
+      interests: ['Coffee', 'Travel'],
+      status: 'available'
+    },
+    {
+      type: 'partner',
+      id: 'usr_302',
+      name: 'Anjali',
+      city: location || 'Jaipur',
+      rating: 4.9,
+      price: 1199,
+      currency: 'INR',
+      price_type: 'session',
+      image: `${baseUrl}/uploads/ananya.jpg`,
+      is_verified: true,
+      interests: ['Coffee', 'Events'],
+      status: 'available'
+    },
+    {
+      type: 'partner',
+      id: 'usr_303',
+      name: 'Rohan',
+      city: location || 'Mumbai',
+      rating: 4.7,
+      price: 899,
+      currency: 'INR',
+      price_type: 'session',
+      image: `${baseUrl}/uploads/rohan.jpg`,
+      is_verified: true,
+      interests: ['Coffee', 'Coding'],
+      status: 'available'
+    }
   ];
 
   const popular_activities = [
@@ -115,7 +155,12 @@ router.get('/search', authenticateToken, (req, res) => {
 
   return res.status(200).json({
     success: true,
-    query: { q, location, category },
+    message: 'Search results found',
+    query: {
+      q,
+      location,
+      category
+    },
     count: combinedData.search.length,
     results: combinedData.search
   });

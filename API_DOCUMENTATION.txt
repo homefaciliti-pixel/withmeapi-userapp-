@@ -217,7 +217,75 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
   }
 
 5.1 Planning Today List / Selection API: GET /api/v1/activities/planning-today
-5.2 Search API: GET /api/v1/activities/search
+5.2 Search API
+- Endpoint: GET /api/v1/activities/search?q=coffee
+- Headers: Authorization: Bearer <token>
+- Description: Search activities and partners by query term `q`, location, or category.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Search results found",
+    "query": {
+      "q": "coffee",
+      "location": "",
+      "category": ""
+    },
+    "count": 3,
+    "results": [
+      {
+        "type": "partner",
+        "id": "usr_301",
+        "name": "Priya",
+        "city": "Jaipur",
+        "rating": 4.8,
+        "price": 999,
+        "currency": "INR",
+        "price_type": "session",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+        "is_verified": true,
+        "interests": [
+          "Coffee",
+          "Travel"
+        ],
+        "status": "available"
+      },
+      {
+        "type": "partner",
+        "id": "usr_302",
+        "name": "Anjali",
+        "city": "Jaipur",
+        "rating": 4.9,
+        "price": 1199,
+        "currency": "INR",
+        "price_type": "session",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+        "is_verified": true,
+        "interests": [
+          "Coffee",
+          "Events"
+        ],
+        "status": "available"
+      },
+      {
+        "type": "partner",
+        "id": "usr_303",
+        "name": "Rohan",
+        "city": "Mumbai",
+        "rating": 4.7,
+        "price": 899,
+        "currency": "INR",
+        "price_type": "session",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/rohan.jpg",
+        "is_verified": true,
+        "interests": [
+          "Coffee",
+          "Coding"
+        ],
+        "status": "available"
+      }
+    ]
+  }
+
 5.3 Popular Activities List API: GET /api/v1/activities/popular-activities
 5.4 Recommended Partner List API: GET /api/v1/activities/recommended-partners
 
