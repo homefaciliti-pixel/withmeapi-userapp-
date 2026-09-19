@@ -29,50 +29,8 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 2. PROFILE & KYC APIs (/api/v1/getProfile & /api/v1/profile)
 --------------------------------------------------------------------------------
 
-2.1 getProfile API
-- Endpoint: GET /api/v1/getProfile (or GET /api/v1/profile)
-- Headers: Authorization: Bearer <token>
-
-2.2 Detailed User Profile API (with profile_image list)
-- Endpoint: GET /api/v1/profile/details/:id (also GET /api/v1/user-details/:id or GET /api/v1/profile/details)
-- Headers: Authorization: Bearer <token>
-- Description: Retrieve detailed public profile of a user including profile_image as an array list, location, rating, interests, and available_for activity passes.
-- Response (200 OK):
-  {
-    "success": true,
-    "message": "Profile details fetched successfully",
-    "data": {
-      "id": "usr_203",
-      "name": "Priya Sharma",
-      "age": 25,
-      "gender": "Female",
-      "verified": true,
-      "location": {
-        "city": "Jaipur",
-        "state": "Rajasthan",
-        "country": "India"
-      },
-      "rating": 4.8,
-      "total_reviews": 120,
-      "profile_image": [
-        "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
-        "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
-        "https://withmeapi-userapp.onrender.com/uploads/user101.jpg"
-      ],
-      "about": "Friendly, outgoing and loves exploring new places and meeting people.",
-      "interests": [
-        { "name": "Coffee", "icon": "coffee" },
-        { "name": "Travel", "icon": "flight" },
-        { "name": "Music", "icon": "music_note" }
-      ],
-      "available_for": [
-        { "name": "Coffee", "icon": "coffee", "price": 299, "currency": "INR" },
-        { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
-        { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
-      ]
-    }
-  }
-
+2.1 getProfile API: GET /api/v1/getProfile (or GET /api/v1/profile)
+2.2 Detailed User Profile API: GET /api/v1/profile/details/:id
 2.3 Interest Selection API: POST /api/v1/profile/interest-selection
 2.4 Profile Edit API: POST / PUT /api/v1/profile/edit
 2.5 KYC Verification API: POST /api/v1/kyc/verify
@@ -101,7 +59,48 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 5.2 Search API: GET /api/v1/activities/search
 5.3 Popular Activities List API: GET /api/v1/activities/popular-activities
 5.4 Recommended Partner List API: GET /api/v1/activities/recommended-partners
-5.5 Product Details API: GET /api/v1/activities/product-details/:id
+
+5.5 Product Details / User Partner Details API
+- Endpoint: GET /api/v1/activities/product-details/:id
+- Example URL: GET https://withmeapi-userapp.onrender.com/api/v1/activities/product-details/usr_201
+- Headers: Authorization: Bearer <token>
+- Description: Retrieve detailed partner/product profile including location, rating, reviews, interests, and available_for activity options.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Profile details fetched successfully",
+    "data": {
+      "id": "usr_203",
+      "name": "Priya Sharma",
+      "age": 25,
+      "gender": "Female",
+      "verified": true,
+      "location": {
+        "city": "Jaipur",
+        "state": "Rajasthan",
+        "country": "India"
+      },
+      "rating": 4.8,
+      "total_reviews": 120,
+      "profile_image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+      "profile_images": [
+        "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/user101.jpg"
+      ],
+      "about": "Friendly, outgoing and loves exploring new places and meeting people.",
+      "interests": [
+        { "name": "Coffee", "icon": "coffee" },
+        { "name": "Travel", "icon": "flight" },
+        { "name": "Music", "icon": "music_note" }
+      ],
+      "available_for": [
+        { "name": "Coffee", "icon": "coffee", "price": 299, "currency": "INR" },
+        { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
+        { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
+      ]
+    }
+  }
 
 --------------------------------------------------------------------------------
 7. EXPLORE APIs (/api/v1/explore)

@@ -102,34 +102,84 @@ router.get('/recommended-partners', authenticateToken, (req, res) => {
   });
 });
 
-// 5. Product Details API — GET
-router.get('/product-details/:id', authenticateToken, (req, res) => {
-  const products = {
-    prod_101: {
-      product_id: 'prod_101',
-      name: 'VIP Activity Access Pass',
-      price: 499,
-      currency: 'INR',
-      validity_days: 30,
-      features: ['Unlimited Partner Requests', 'Priority Live Stream Badge', 'Ad-free Experience']
-    },
-    prod_102: {
-      product_id: 'prod_102',
-      name: 'Premium Activity Explorer Pass',
-      price: 999,
-      currency: 'INR',
-      validity_days: 90,
-      features: ['All VIP Features', 'Face Scan Verification Shield', 'Top Search Listing']
-    }
+// Mock detailed user profile catalog for product-details endpoint
+const userProductDetailsMap = {
+  usr_201: {
+    id: 'usr_201',
+    name: 'Ananya Verma',
+    age: 24,
+    gender: 'Female',
+    verified: true,
+    location: { city: 'Mumbai', state: 'Maharashtra', country: 'India' },
+    rating: 4.9,
+    total_reviews: 150,
+    about: 'Loves music, coffee meetups, and weekend trekking trips.'
+  },
+  usr_203: {
+    id: 'usr_203',
+    name: 'Priya Sharma',
+    age: 25,
+    gender: 'Female',
+    verified: true,
+    location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+    rating: 4.8,
+    total_reviews: 120,
+    about: 'Friendly, outgoing and loves exploring new places and meeting people.'
+  }
+};
+
+// 5. Product Details API — GET (/activities/product-details/:id and /activities/product-details)
+const handleProductDetails = (req, res) => {
+  const baseUrl = getBaseUrl(req);
+  const targetId = req.params.id || req.query.id || 'usr_203';
+  const profileInfo = userProductDetailsMap[targetId] || {
+    id: targetId,
+    name: 'Priya Sharma',
+    age: 25,
+    gender: 'Female',
+    verified: true,
+    location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+    rating: 4.8,
+    total_reviews: 120,
+    about: 'Friendly, outgoing and loves exploring new places and meeting people.'
   };
 
-  const productId = req.params.id;
-  const product = products[productId] || products['prod_101'];
+  const imagesList = [
+    `${baseUrl}/uploads/priya.jpg`,
+    `${baseUrl}/uploads/ananya.jpg`,
+    `${baseUrl}/uploads/user101.jpg`
+  ];
 
   return res.status(200).json({
     success: true,
-    data: product
+    message: 'Profile details fetched successfully',
+    data: {
+      id: profileInfo.id,
+      name: profileInfo.name,
+      age: profileInfo.age,
+      gender: profileInfo.gender,
+      verified: profileInfo.verified,
+      location: profileInfo.location,
+      rating: profileInfo.rating,
+      total_reviews: profileInfo.total_reviews,
+      profile_image: imagesList[0],
+      profile_images: imagesList,
+      about: profileInfo.about,
+      interests: [
+        { name: 'Coffee', icon: 'coffee' },
+        { name: 'Travel', icon: 'flight' },
+        { name: 'Music', icon: 'music_note' }
+      ],
+      available_for: [
+        { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+        { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+      ]
+    }
   });
-});
+};
+
+router.get('/product-details/:id', authenticateToken, handleProductDetails);
+router.get('/product-details', authenticateToken, handleProductDetails);
 
 module.exports = router;
