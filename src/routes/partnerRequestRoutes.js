@@ -50,23 +50,44 @@ router.get('/list', authenticateToken, (req, res) => {
   const baseUrl = getBaseUrl(req);
   const { type = 'received' } = req.query;
 
-  const partnerRequestsStore = [
+  const partnersList = [
     {
-      request_id: 'req_5544',
-      sender: { user_id: 'usr_202', name: 'Priya Sharma', avatar: `${baseUrl}/uploads/priya.jpg` },
-      receiver_id: 'usr_998877',
-      activity_id: 'act_top1',
-      message: 'Hey! Would love to join you for the trek!',
-      status: 'PENDING',
-      created_at: '2026-09-11T11:00:00Z'
+      id: 101,
+      name: 'Priya',
+      city: 'Jaipur',
+      rating: 4.8,
+      price: 999,
+      currency: 'INR',
+      price_type: 'session',
+      profile_image: `${baseUrl}/uploads/priya.jpg`,
+      is_verified: true,
+      interests: ['Coffee', 'Travel'],
+      status: 'available'
+    },
+    {
+      id: 102,
+      name: 'Anjali',
+      city: 'Jaipur',
+      rating: 4.9,
+      price: 1199,
+      currency: 'INR',
+      price_type: 'session',
+      profile_image: `${baseUrl}/uploads/ananya.jpg`,
+      is_verified: true,
+      interests: ['Coffee', 'Events'],
+      status: 'available'
     }
   ];
 
   return res.status(200).json({
     success: true,
-    type,
-    count: partnerRequestsStore.length,
-    requests: partnerRequestsStore
+    message: 'Available partners fetched successfully',
+    data: {
+      partners: partnersList
+    },
+    partners: partnersList,
+    count: partnersList.length,
+    requests: partnersList
   });
 });
 

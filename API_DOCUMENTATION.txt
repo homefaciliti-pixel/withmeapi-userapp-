@@ -373,6 +373,59 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
   }
 
 --------------------------------------------------------------------------------
+6. PARTNER REQUEST APIs (/api/v1/partner-request)
+--------------------------------------------------------------------------------
+
+6.1 Send Partner Request API: POST /api/v1/partner-request/send
+6.2 Request Partner List API
+- Endpoint: GET /api/v1/partner-request/list
+- Headers: Authorization: Bearer <token>
+- Description: Retrieve list of available partners with rating, price, verified status, and interests.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Available partners fetched successfully",
+    "data": {
+      "partners": [
+        {
+          "id": 101,
+          "name": "Priya",
+          "city": "Jaipur",
+          "rating": 4.8,
+          "price": 999,
+          "currency": "INR",
+          "price_type": "session",
+          "profile_image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+          "is_verified": true,
+          "interests": [
+            "Coffee",
+            "Travel"
+          ],
+          "status": "available"
+        },
+        {
+          "id": 102,
+          "name": "Anjali",
+          "city": "Jaipur",
+          "rating": 4.9,
+          "price": 1199,
+          "currency": "INR",
+          "price_type": "session",
+          "profile_image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+          "is_verified": true,
+          "interests": [
+            "Coffee",
+            "Events"
+          ],
+          "status": "available"
+        }
+      ]
+    }
+  }
+
+6.3 Partner Request Action API: POST /api/v1/partner-request/action
+
+--------------------------------------------------------------------------------
 7. EXPLORE APIs (/api/v1/explore)
 --------------------------------------------------------------------------------
 
