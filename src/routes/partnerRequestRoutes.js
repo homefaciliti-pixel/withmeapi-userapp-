@@ -64,7 +64,11 @@ router.get('/list', authenticateToken, (req, res) => {
       avatar: `${baseUrl}/uploads/priya.jpg`,
       is_verified: true,
       interests: ['Coffee', 'Travel'],
-      status: 'available'
+      status: 'available',
+      is_accepted: true,
+      request_accepted: true,
+      is_request_accepted: true,
+      accepted: true
     },
     {
       id: 102,
@@ -79,7 +83,11 @@ router.get('/list', authenticateToken, (req, res) => {
       avatar: `${baseUrl}/uploads/ananya.jpg`,
       is_verified: true,
       interests: ['Coffee', 'Events'],
-      status: 'available'
+      status: 'available',
+      is_accepted: false,
+      request_accepted: false,
+      is_request_accepted: false,
+      accepted: false
     }
   ];
 

@@ -451,7 +451,11 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
             "Coffee",
             "Travel"
           ],
-          "status": "available"
+          "status": "available",
+          "is_accepted": true,
+          "request_accepted": true,
+          "is_request_accepted": true,
+          "accepted": true
         },
         {
           "id": 102,
@@ -467,7 +471,11 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
             "Coffee",
             "Events"
           ],
-          "status": "available"
+          "status": "available",
+          "is_accepted": false,
+          "request_accepted": false,
+          "is_request_accepted": false,
+          "accepted": false
         }
       ]
     }
