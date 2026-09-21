@@ -107,6 +107,7 @@ const partnerRequestRoutes = require('./src/routes/partnerRequestRoutes');
 const exploreRoutes = require('./src/routes/exploreRoutes');
 const generalRoutes = require('./src/routes/generalRoutes');
 const bookingRoutes = require('./src/routes/bookingRoutes');
+const paymentRoutes = require('./src/routes/paymentRoutes');
 
 // Bind Routes to Base API Path
 app.use('/api/v1/auth', authRoutes);
@@ -117,6 +118,11 @@ app.use('/api/v1/activities', activityRoutes);
 app.use('/api/v1/partner-request', partnerRequestRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
 app.use('/bookings', bookingRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/payment', paymentRoutes);
+app.use('/payments', paymentRoutes);
+app.use('/payment', paymentRoutes);
+app.use('/checkout', paymentRoutes);
 app.use('/api/v1', exploreRoutes);
 app.use('/api/v1/general', generalRoutes);
 

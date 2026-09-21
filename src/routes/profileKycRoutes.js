@@ -388,14 +388,14 @@ router.put('/profile/edit', authenticateToken, handleProfileEditCombined);
 router.post('/profile/combined-update', authenticateToken, handleProfileEditCombined);
 router.post('/profile/update-all', authenticateToken, handleProfileEditCombined);
 
-// 5. KYC Verification API — POST
-router.post('/kyc/verify', authenticateToken, async (req, res) => {
-  const { document_type, document_number, full_name, dob } = req.body;
+// 5. KYC Verification & Submit API — POST (/kyc/verify, /kyc/submit, /kyc/post, /kyc)
+const handleKycSubmit = async (req, res) => {
+  const { document_type, document_number, full_name, dob } = req.body || {};
 
   if (!document_type || !document_number) {
     return res.status(400).json({
       success: false,
-      message: 'document_type and document_number are required'
+      message: 'document_type and document_number are required (Options: AADHAAR, PAN, PASSPORT, DRIVING_LICENSE)'
     });
   }
 
@@ -405,29 +405,44 @@ router.post('/kyc/verify', authenticateToken, async (req, res) => {
     userProfilesStore[userId].is_kyc_completed = false;
   }
 
+  const kycId = `KYC_${Math.floor(100000 + Math.random() * 900000)}`;
+  const submittedAt = new Date().toISOString();
+
   try {
     await query(`UPDATE users SET kyc_status = 'PENDING_VERIFICATION' WHERE id = ? OR phone_number = ?`, [userId, req.user.phone_number || '']);
     await query(
       `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'PENDING_VERIFICATION')`,
-      [userId, document_type, document_number, full_name]
+      [userId, document_type, document_number, full_name || req.user.name || 'User']
     );
   } catch (err) {
     console.warn('MySQL KYC submission notice:', err.message);
   }
 
-  return res.status(200).json({
-    success: true,
-    message: 'KYC documents submitted successfully for verification',
+  const kycData = {
+    kyc_id: kycId,
     status: 'PENDING_VERIFICATION',
     is_kyc_completed: false,
-    kyc_id: `kyc_${Date.now()}`,
-    submitted_data: {
-      document_type,
-      document_number_masked: document_number.slice(-4).padStart(document_number.length, '*'),
-      full_name,
-      dob
-    }
+    document_type,
+    document_number_masked: document_number.slice(-4).padStart(document_number.length, '*'),
+    full_name: full_name || req.user.name || 'Alex Sharma',
+    dob: dob || '1998-05-15',
+    submitted_at: submittedAt
+  };
+
+  return res.status(200).json({
+    success: true,
+    message: 'KYC details submitted successfully for verification',
+    data: kycData,
+    status: 'PENDING_VERIFICATION',
+    is_kyc_completed: false,
+    kyc_id: kycId,
+    submitted_data: kycData
   });
-});
+};
+
+router.post('/kyc/verify', authenticateToken, handleKycSubmit);
+router.post('/kyc/submit', authenticateToken, handleKycSubmit);
+router.post('/kyc/post', authenticateToken, handleKycSubmit);
+router.post('/kyc', authenticateToken, handleKycSubmit);
 
 module.exports = router;
