@@ -350,8 +350,8 @@ const handleProductDetails = (req, res) => {
 
   const imagesList = [
     `${baseUrl}/uploads/priya.jpg`,
-    `${baseUrl}/uploads/ananya.jpg`,
-    `${baseUrl}/uploads/user101.jpg`
+    `${baseUrl}/uploads/priya2.jpg`,
+    `${baseUrl}/uploads/priya3.jpg`
   ];
 
   return res.status(200).json({

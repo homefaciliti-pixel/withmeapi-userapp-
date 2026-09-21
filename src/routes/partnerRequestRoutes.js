@@ -25,6 +25,16 @@ const getApprovedPartnersList = (baseUrl) => [
     profile_image: `${baseUrl}/uploads/priya.jpg`,
     image: `${baseUrl}/uploads/priya.jpg`,
     avatar: `${baseUrl}/uploads/priya.jpg`,
+    profile_images: [
+      `${baseUrl}/uploads/priya.jpg`,
+      `${baseUrl}/uploads/priya2.jpg`,
+      `${baseUrl}/uploads/priya3.jpg`
+    ],
+    photos: [
+      `${baseUrl}/uploads/priya.jpg`,
+      `${baseUrl}/uploads/priya2.jpg`,
+      `${baseUrl}/uploads/priya3.jpg`
+    ],
     is_verified: true,
     is_approved: true,
     approval_status: 'approved',
