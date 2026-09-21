@@ -60,6 +60,8 @@ router.get('/list', authenticateToken, (req, res) => {
       currency: 'INR',
       price_type: 'session',
       profile_image: `${baseUrl}/uploads/priya.jpg`,
+      image: `${baseUrl}/uploads/priya.jpg`,
+      avatar: `${baseUrl}/uploads/priya.jpg`,
       is_verified: true,
       interests: ['Coffee', 'Travel'],
       status: 'available'
@@ -73,6 +75,8 @@ router.get('/list', authenticateToken, (req, res) => {
       currency: 'INR',
       price_type: 'session',
       profile_image: `${baseUrl}/uploads/ananya.jpg`,
+      image: `${baseUrl}/uploads/ananya.jpg`,
+      avatar: `${baseUrl}/uploads/ananya.jpg`,
       is_verified: true,
       interests: ['Coffee', 'Events'],
       status: 'available'

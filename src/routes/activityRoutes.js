@@ -71,9 +71,9 @@ const getCombinedActivitiesData = (req) => {
   ];
 
   const popular_activities = [
-    { id: 'act_top1', name: 'Weekend Trekking & Camping', category: 'Outdoor', participants_count: 1420, rating: 4.9, banner: `${baseUrl}/uploads/trek.jpg` },
-    { id: 'act_top2', name: 'Board Game & Coffee Night', category: 'Social', participants_count: 890, rating: 4.8, banner: `${baseUrl}/uploads/games.jpg` },
-    { id: 'act_top3', name: 'Morning Badminton Doubles', category: 'Sports', participants_count: 650, rating: 4.7, banner: `${baseUrl}/uploads/badminton.jpg` }
+    { id: 'act_top1', name: 'Weekend Trekking & Camping', category: 'Outdoor', participants_count: 1420, rating: 4.9, banner: `${baseUrl}/uploads/trek.jpg`, image: `${baseUrl}/uploads/trek.jpg`, thumbnail: `${baseUrl}/uploads/trek.jpg` },
+    { id: 'act_top2', name: 'Board Game & Coffee Night', category: 'Social', participants_count: 890, rating: 4.8, banner: `${baseUrl}/uploads/games.jpg`, image: `${baseUrl}/uploads/games.jpg`, thumbnail: `${baseUrl}/uploads/games.jpg` },
+    { id: 'act_top3', name: 'Morning Badminton Doubles', category: 'Sports', participants_count: 650, rating: 4.7, banner: `${baseUrl}/uploads/badminton.jpg`, image: `${baseUrl}/uploads/badminton.jpg`, thumbnail: `${baseUrl}/uploads/badminton.jpg` }
   ];
 
   const recommended_partners = [
@@ -87,7 +87,9 @@ const getCombinedActivitiesData = (req) => {
       match_score: '94%',
       interests: ['Trekking', 'Coding'],
       location: 'Mumbai',
-      profile_image: `${baseUrl}/uploads/rohan.jpg`
+      profile_image: `${baseUrl}/uploads/rohan.jpg`,
+      image: `${baseUrl}/uploads/rohan.jpg`,
+      avatar: `${baseUrl}/uploads/rohan.jpg`
     },
     {
       user_id: 'usr_405',
@@ -99,7 +101,9 @@ const getCombinedActivitiesData = (req) => {
       match_score: '89%',
       interests: ['Music', 'Coffee'],
       location: 'Mumbai',
-      profile_image: `${baseUrl}/uploads/neha.jpg`
+      profile_image: `${baseUrl}/uploads/neha.jpg`,
+      image: `${baseUrl}/uploads/neha.jpg`,
+      avatar: `${baseUrl}/uploads/neha.jpg`
     },
     {
       user_id: 'usr_406',
@@ -111,7 +115,9 @@ const getCombinedActivitiesData = (req) => {
       match_score: '85%',
       interests: ['Fitness', 'Gaming'],
       location: 'Delhi',
-      profile_image: `${baseUrl}/uploads/aarav.jpg`
+      profile_image: `${baseUrl}/uploads/aarav.jpg`,
+      image: `${baseUrl}/uploads/aarav.jpg`,
+      avatar: `${baseUrl}/uploads/aarav.jpg`
     }
   ];
 
