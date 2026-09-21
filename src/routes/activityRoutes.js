@@ -307,68 +307,37 @@ router.get('/recommended-partners', authenticateToken, (req, res) => {
 });
 
 // Mock detailed user profile catalog for product-details endpoint
-const userProductDetailsMap = {
-  usr_201: {
-    id: 'usr_201',
-    name: 'Ananya Verma',
-    age: 24,
-    gender: 'Female',
-    verified: true,
-    location: { city: 'Mumbai', state: 'Maharashtra', country: 'India' },
-    rating: 4.9,
-    total_reviews: 150,
-    about: 'Loves music, coffee meetups, and weekend trekking trips.'
-  },
-  usr_203: {
-    id: 'usr_203',
-    name: 'Priya Sharma',
-    age: 25,
-    gender: 'Female',
-    verified: true,
-    location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
-    rating: 4.8,
-    total_reviews: 120,
-    about: 'Friendly, outgoing and loves exploring new places and meeting people.'
-  }
-};
+// Dynamic helper to resolve partner details by ID or Name
+const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+  const cleanId = String(targetId).trim().toLowerCase();
 
-// 5. Product Details API — GET (/activities/product-details/:id and /activities/product-details)
-const handleProductDetails = (req, res) => {
-  const baseUrl = getBaseUrl(req);
-  const targetId = req.params.id || req.query.id || 'usr_203';
-  const profileInfo = userProductDetailsMap[targetId] || {
-    id: targetId,
-    name: 'Priya Sharma',
-    age: 25,
-    gender: 'Female',
-    verified: true,
-    location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
-    rating: 4.8,
-    total_reviews: 120,
-    about: 'Friendly, outgoing and loves exploring new places and meeting people.'
-  };
-
-  const imagesList = [
-    `${baseUrl}/uploads/priya.jpg`,
-    `${baseUrl}/uploads/priya2.jpg`,
-    `${baseUrl}/uploads/priya3.jpg`
-  ];
-
-  return res.status(200).json({
-    success: true,
-    message: 'Profile details fetched successfully',
-    data: {
-      id: profileInfo.id,
-      name: profileInfo.name,
-      age: profileInfo.age,
-      gender: profileInfo.gender,
-      verified: profileInfo.verified,
-      location: profileInfo.location,
-      rating: profileInfo.rating,
-      total_reviews: profileInfo.total_reviews,
-      profile_image: imagesList[0],
-      profile_images: imagesList,
-      about: profileInfo.about,
+  // 1. Priya (IDs: 101, usr_101, usr_203, usr_301, priya)
+  if (cleanId === '101' || cleanId === 'usr_101' || cleanId === 'usr_203' || cleanId === 'usr_301' || cleanId.includes('priya')) {
+    return {
+      id: 'usr_203',
+      partner_id: 101,
+      name: 'Priya Sharma',
+      age: 23,
+      gender: 'Female',
+      verified: true,
+      city: 'Jaipur',
+      location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+      rating: 4.8,
+      total_reviews: 120,
+      about: 'Friendly, outgoing and loves exploring new places, coffee meetups, and meeting people.',
+      profile_image: `${baseUrl}/uploads/priya.jpg`,
+      image: `${baseUrl}/uploads/priya.jpg`,
+      avatar: `${baseUrl}/uploads/priya.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya2.jpg`,
+        `${baseUrl}/uploads/priya3.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya2.jpg`,
+        `${baseUrl}/uploads/priya3.jpg`
+      ],
       interests: [
         { name: 'Coffee', icon: 'coffee' },
         { name: 'Travel', icon: 'flight' },
@@ -379,7 +348,242 @@ const handleProductDetails = (req, res) => {
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ]
-    }
+    };
+  }
+
+  // 2. Anjali (IDs: 102, usr_102, usr_302, anjali)
+  if (cleanId === '102' || cleanId === 'usr_102' || cleanId === 'usr_302' || cleanId.includes('anjali')) {
+    return {
+      id: 'usr_102',
+      partner_id: 102,
+      name: 'Anjali Sharma',
+      age: 24,
+      gender: 'Female',
+      verified: true,
+      city: 'Jaipur',
+      location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+      rating: 4.9,
+      total_reviews: 135,
+      about: 'Loves social gatherings, food dates, and music events.',
+      profile_image: `${baseUrl}/uploads/anjali.jpg`,
+      image: `${baseUrl}/uploads/anjali.jpg`,
+      avatar: `${baseUrl}/uploads/anjali.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/anjali.jpg`,
+        `${baseUrl}/uploads/ananya.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/anjali.jpg`,
+        `${baseUrl}/uploads/ananya.jpg`
+      ],
+      interests: [
+        { name: 'Coffee', icon: 'coffee' },
+        { name: 'Events', icon: 'event' },
+        { name: 'Dinner', icon: 'restaurant' }
+      ],
+      available_for: [
+        { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+        { name: 'Event', icon: 'event', price: 599, currency: 'INR' }
+      ]
+    };
+  }
+
+  // 3. Riya Mehta (IDs: 103, usr_103, usr_202, usr_303, usr_404, riya, rohan)
+  if (cleanId === '103' || cleanId === 'usr_103' || cleanId === 'usr_202' || cleanId === 'usr_303' || cleanId === 'usr_404' || cleanId.includes('riya') || cleanId.includes('rohan')) {
+    return {
+      id: 'usr_404',
+      partner_id: 103,
+      name: 'Riya Mehta',
+      age: 26,
+      gender: 'Female',
+      verified: true,
+      city: 'Mumbai',
+      location: { city: 'Mumbai', state: 'Maharashtra', country: 'India' },
+      rating: 4.8,
+      total_reviews: 145,
+      about: 'Tech enthusiast, guitarist, and outdoor trekking partner.',
+      profile_image: `${baseUrl}/uploads/riya.jpg`,
+      image: `${baseUrl}/uploads/riya.jpg`,
+      avatar: `${baseUrl}/uploads/riya.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/riya.jpg`,
+        `${baseUrl}/uploads/neha.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/riya.jpg`,
+        `${baseUrl}/uploads/neha.jpg`
+      ],
+      interests: [
+        { name: 'Trekking', icon: 'hiking' },
+        { name: 'Coding', icon: 'code' },
+        { name: 'Guitar', icon: 'music_note' }
+      ],
+      available_for: [
+        { name: 'Coffee & Code', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Trekking', icon: 'hiking', price: 499, currency: 'INR' },
+        { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+      ]
+    };
+  }
+
+  // 4. Neha Kapoor (IDs: 104, usr_104, usr_405, neha)
+  if (cleanId === '104' || cleanId === 'usr_104' || cleanId === 'usr_405' || cleanId.includes('neha')) {
+    return {
+      id: 'usr_405',
+      partner_id: 104,
+      name: 'Neha Kapoor',
+      age: 23,
+      gender: 'Female',
+      verified: true,
+      city: 'Mumbai',
+      location: { city: 'Mumbai', state: 'Maharashtra', country: 'India' },
+      rating: 4.9,
+      total_reviews: 110,
+      about: 'Passionate about acoustic music, fashion, and cafe conversations.',
+      profile_image: `${baseUrl}/uploads/neha.jpg`,
+      image: `${baseUrl}/uploads/neha.jpg`,
+      avatar: `${baseUrl}/uploads/neha.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/neha.jpg`,
+        `${baseUrl}/uploads/kavya.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/neha.jpg`,
+        `${baseUrl}/uploads/kavya.jpg`
+      ],
+      interests: [
+        { name: 'Music', icon: 'music_note' },
+        { name: 'Coffee', icon: 'coffee' }
+      ],
+      available_for: [
+        { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Movie', icon: 'movie', price: 399, currency: 'INR' }
+      ]
+    };
+  }
+
+  // 5. Sneha Sharma (IDs: 105, usr_105, usr_406, sneha, aarav)
+  if (cleanId === '105' || cleanId === 'usr_105' || cleanId === 'usr_406' || cleanId.includes('sneha') || cleanId.includes('aarav')) {
+    return {
+      id: 'usr_406',
+      partner_id: 105,
+      name: 'Sneha Sharma',
+      age: 25,
+      gender: 'Female',
+      verified: true,
+      city: 'Delhi',
+      location: { city: 'Delhi', state: 'Delhi NCR', country: 'India' },
+      rating: 4.7,
+      total_reviews: 95,
+      about: 'Fitness lover, gamer, and movie enthusiast.',
+      profile_image: `${baseUrl}/uploads/sneha.jpg`,
+      image: `${baseUrl}/uploads/sneha.jpg`,
+      avatar: `${baseUrl}/uploads/sneha.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/sneha.jpg`,
+        `${baseUrl}/uploads/kavya.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/sneha.jpg`,
+        `${baseUrl}/uploads/kavya.jpg`
+      ],
+      interests: [
+        { name: 'Fitness', icon: 'fitness_center' },
+        { name: 'Gaming', icon: 'sports_esports' }
+      ],
+      available_for: [
+        { name: 'Movie', icon: 'movie', price: 399, currency: 'INR' },
+        { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }
+      ]
+    };
+  }
+
+  // 6. Ananya Verma (IDs: 106, usr_106, usr_201, exp_1, ananya)
+  if (cleanId === '106' || cleanId === 'usr_106' || cleanId === 'usr_201' || cleanId === 'exp_1' || cleanId.includes('ananya')) {
+    return {
+      id: 'usr_201',
+      partner_id: 106,
+      name: 'Ananya Verma',
+      age: 24,
+      gender: 'Female',
+      verified: true,
+      city: 'Mumbai',
+      location: { city: 'Mumbai', state: 'Maharashtra', country: 'India' },
+      rating: 4.9,
+      total_reviews: 150,
+      about: 'Loves music, coffee meetups, and weekend trekking trips.',
+      profile_image: `${baseUrl}/uploads/ananya.jpg`,
+      image: `${baseUrl}/uploads/ananya.jpg`,
+      avatar: `${baseUrl}/uploads/ananya.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/ananya.jpg`,
+        `${baseUrl}/uploads/anjali.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/ananya.jpg`,
+        `${baseUrl}/uploads/anjali.jpg`
+      ],
+      interests: [
+        { name: 'Coffee', icon: 'coffee' },
+        { name: 'Trekking', icon: 'hiking' }
+      ],
+      available_for: [
+        { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }
+      ]
+    };
+  }
+
+  // Default Fallback: Priya Sharma
+  return {
+    id: targetId || 'usr_203',
+    partner_id: 101,
+    name: 'Priya Sharma',
+    age: 23,
+    gender: 'Female',
+    verified: true,
+    city: 'Jaipur',
+    location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+    rating: 4.8,
+    total_reviews: 120,
+    about: 'Friendly, outgoing and loves exploring new places, coffee meetups, and meeting people.',
+    profile_image: `${baseUrl}/uploads/priya.jpg`,
+    image: `${baseUrl}/uploads/priya.jpg`,
+    avatar: `${baseUrl}/uploads/priya.jpg`,
+    profile_images: [
+      `${baseUrl}/uploads/priya.jpg`,
+      `${baseUrl}/uploads/priya2.jpg`,
+      `${baseUrl}/uploads/priya3.jpg`
+    ],
+    photos: [
+      `${baseUrl}/uploads/priya.jpg`,
+      `${baseUrl}/uploads/priya2.jpg`,
+      `${baseUrl}/uploads/priya3.jpg`
+    ],
+    interests: [
+      { name: 'Coffee', icon: 'coffee' },
+      { name: 'Travel', icon: 'flight' },
+      { name: 'Music', icon: 'music_note' }
+    ],
+    available_for: [
+      { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+      { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+      { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+    ]
+  };
+};
+
+// 5. Product Details API — GET (/activities/product-details/:id and /activities/product-details)
+const handleProductDetails = (req, res) => {
+  const baseUrl = getBaseUrl(req);
+  const targetId = req.params.id || req.query.id || 'usr_203';
+  const partnerProfile = getPartnerProfileById(targetId, baseUrl);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Profile details fetched successfully',
+    data: partnerProfile
   });
 };
 

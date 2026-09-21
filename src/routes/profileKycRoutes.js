@@ -217,13 +217,99 @@ router.get('/profile', authenticateToken, handleGetProfile);
 const handleDetailedProfileView = (req, res) => {
   const baseUrl = getBaseUrl(req);
   const targetId = req.params.id || req.query.id || 'usr_203';
-  const catalog = detailedProfilesCatalog[targetId] || detailedProfilesCatalog['usr_203'];
+  const cleanId = String(targetId).trim().toLowerCase();
 
-  const profileImagesList = [
-    `${baseUrl}/uploads/priya.jpg`,
-    `${baseUrl}/uploads/ananya.jpg`,
-    `${baseUrl}/uploads/user101.jpg`
-  ];
+  let catalog = {
+    id: targetId,
+    name: 'Priya Sharma',
+    age: 23,
+    gender: 'Female',
+    verified: true,
+    location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+    rating: 4.8,
+    total_reviews: 120,
+    about: 'Friendly, outgoing and loves exploring new places and meeting people.',
+    profile_images: [`${baseUrl}/uploads/priya.jpg`, `${baseUrl}/uploads/priya2.jpg`, `${baseUrl}/uploads/priya3.jpg`],
+    interests: [{ name: 'Coffee', icon: 'coffee' }, { name: 'Travel', icon: 'flight' }],
+    available_for: [{ name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' }, { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }]
+  };
+
+  if (cleanId === '102' || cleanId === 'usr_102' || cleanId === 'usr_302' || cleanId.includes('anjali')) {
+    catalog = {
+      id: 'usr_102',
+      name: 'Anjali Sharma',
+      age: 24,
+      gender: 'Female',
+      verified: true,
+      location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+      rating: 4.9,
+      total_reviews: 135,
+      about: 'Loves social gatherings, food dates, and music events.',
+      profile_images: [`${baseUrl}/uploads/anjali.jpg`, `${baseUrl}/uploads/ananya.jpg`],
+      interests: [{ name: 'Coffee', icon: 'coffee' }, { name: 'Events', icon: 'event' }],
+      available_for: [{ name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' }, { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }]
+    };
+  } else if (cleanId === '103' || cleanId === 'usr_103' || cleanId === 'usr_202' || cleanId === 'usr_303' || cleanId === 'usr_404' || cleanId.includes('riya') || cleanId.includes('rohan')) {
+    catalog = {
+      id: 'usr_404',
+      name: 'Riya Mehta',
+      age: 26,
+      gender: 'Female',
+      verified: true,
+      location: { city: 'Mumbai', state: 'Maharashtra', country: 'India' },
+      rating: 4.8,
+      total_reviews: 145,
+      about: 'Tech enthusiast, guitarist and outdoor trekker.',
+      profile_images: [`${baseUrl}/uploads/riya.jpg`, `${baseUrl}/uploads/neha.jpg`],
+      interests: [{ name: 'Trekking', icon: 'hiking' }, { name: 'Coding', icon: 'code' }],
+      available_for: [{ name: 'Trekking', icon: 'hiking', price: 499, currency: 'INR' }, { name: 'Coffee & Code', icon: 'coffee', price: 299, currency: 'INR' }]
+    };
+  } else if (cleanId === '104' || cleanId === 'usr_104' || cleanId === 'usr_405' || cleanId.includes('neha')) {
+    catalog = {
+      id: 'usr_405',
+      name: 'Neha Kapoor',
+      age: 23,
+      gender: 'Female',
+      verified: true,
+      location: { city: 'Mumbai', state: 'Maharashtra', country: 'India' },
+      rating: 4.9,
+      total_reviews: 110,
+      about: 'Passionate about acoustic music, fashion, and cafe conversations.',
+      profile_images: [`${baseUrl}/uploads/neha.jpg`, `${baseUrl}/uploads/kavya.jpg`],
+      interests: [{ name: 'Music', icon: 'music_note' }, { name: 'Coffee', icon: 'coffee' }],
+      available_for: [{ name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' }, { name: 'Movie', icon: 'movie', price: 399, currency: 'INR' }]
+    };
+  } else if (cleanId === '105' || cleanId === 'usr_105' || cleanId === 'usr_406' || cleanId.includes('sneha') || cleanId.includes('aarav')) {
+    catalog = {
+      id: 'usr_406',
+      name: 'Sneha Sharma',
+      age: 25,
+      gender: 'Female',
+      verified: true,
+      location: { city: 'Delhi', state: 'Delhi NCR', country: 'India' },
+      rating: 4.7,
+      total_reviews: 95,
+      about: 'Fitness lover, gamer, and movie enthusiast.',
+      profile_images: [`${baseUrl}/uploads/sneha.jpg`, `${baseUrl}/uploads/kavya.jpg`],
+      interests: [{ name: 'Fitness', icon: 'fitness_center' }, { name: 'Gaming', icon: 'sports_esports' }],
+      available_for: [{ name: 'Movie', icon: 'movie', price: 399, currency: 'INR' }, { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }]
+    };
+  } else if (cleanId === '106' || cleanId === 'usr_106' || cleanId === 'usr_201' || cleanId === 'exp_1' || cleanId.includes('ananya')) {
+    catalog = {
+      id: 'usr_201',
+      name: 'Ananya Verma',
+      age: 24,
+      gender: 'Female',
+      verified: true,
+      location: { city: 'Mumbai', state: 'Maharashtra', country: 'India' },
+      rating: 4.9,
+      total_reviews: 150,
+      about: 'Loves music, coffee meetups, and weekend trekking trips.',
+      profile_images: [`${baseUrl}/uploads/ananya.jpg`, `${baseUrl}/uploads/anjali.jpg`],
+      interests: [{ name: 'Coffee', icon: 'coffee' }, { name: 'Trekking', icon: 'hiking' }],
+      available_for: [{ name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' }, { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }]
+    };
+  }
 
   return res.status(200).json({
     success: true,
@@ -237,7 +323,9 @@ const handleDetailedProfileView = (req, res) => {
       location: catalog.location,
       rating: catalog.rating,
       total_reviews: catalog.total_reviews,
-      profile_image: profileImagesList,
+      profile_image: catalog.profile_images[0],
+      profile_images: catalog.profile_images,
+      photos: catalog.profile_images,
       about: catalog.about,
       interests: catalog.interests,
       available_for: catalog.available_for
