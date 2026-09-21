@@ -106,6 +106,7 @@ const activityRoutes = require('./src/routes/activityRoutes');
 const partnerRequestRoutes = require('./src/routes/partnerRequestRoutes');
 const exploreRoutes = require('./src/routes/exploreRoutes');
 const generalRoutes = require('./src/routes/generalRoutes');
+const bookingRoutes = require('./src/routes/bookingRoutes');
 
 // Bind Routes to Base API Path
 app.use('/api/v1/auth', authRoutes);
@@ -114,6 +115,8 @@ app.use('/api/v1/aadhaar', aadhaarRoutes);
 app.use('/api/v1/profile-live', profileLiveRoutes);
 app.use('/api/v1/activities', activityRoutes);
 app.use('/api/v1/partner-request', partnerRequestRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
+app.use('/bookings', bookingRoutes);
 app.use('/api/v1', exploreRoutes);
 app.use('/api/v1/general', generalRoutes);
 

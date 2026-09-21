@@ -492,6 +492,73 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 8.4 Chat API: GET /api/v1/general/chat
 8.5 Call API: GET / POST /api/v1/general/call
 
+--------------------------------------------------------------------------------
+9. BOOKING APIs (/api/v1/bookings & /bookings)
+--------------------------------------------------------------------------------
+
+9.1 Available Slots API
+- Endpoint: GET /bookings/availability?userId=usr_201&date=2026-09-25&duration=1
+- Headers: Authorization: Bearer <token>
+- Description: Check partner time slot availability.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Availability fetched successfully",
+    "data": {
+      "userId": "usr_201",
+      "date": "2026-09-25",
+      "available": true,
+      "slots": [
+        "05:00 PM",
+        "05:30 PM",
+        "06:00 PM",
+        "06:30 PM",
+        "07:00 PM",
+        "07:30 PM",
+        "08:00 PM"
+      ]
+    }
+  }
+
+9.2 Create Booking Request API
+- Endpoint: POST /bookings (or POST /api/v1/bookings)
+- Headers: Authorization: Bearer <token>, Content-Type: application/json
+- Request Body (JSON):
+  {
+    "activity_user_id": "usr_201",
+    "activity": "Coffee",
+    "date": "2026-09-25",
+    "time": "06:00 PM",
+    "duration": 1,
+    "location": {
+      "address": "Jaipur Coffee House",
+      "latitude": 26.9124,
+      "longitude": 75.7873
+    }
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Booking request sent successfully",
+    "data": {
+      "booking_id": "BK100245",
+      "status": "pending",
+      "activity_user_id": "usr_201",
+      "activity": "Coffee",
+      "date": "2026-09-25",
+      "time": "06:00 PM",
+      "duration": 1,
+      "location": {
+        "address": "Jaipur Coffee House",
+        "latitude": 26.9124,
+        "longitude": 75.7873
+      },
+      "price": 299,
+      "currency": "INR",
+      "created_at": "2026-09-19T15:20:00Z"
+    }
+  }
+
 ================================================================================
                               END OF DOCUMENTATION
 ================================================================================
