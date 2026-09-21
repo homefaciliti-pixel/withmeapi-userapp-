@@ -20,9 +20,19 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 const uploadsDir = path.join(__dirname, 'uploads');
 app.use('/uploads', express.static(uploadsDir));
 
+const validJpegBase64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/4QA6RXhpZgAATU0AKgAAAAgAA1D9AAEAAAABAAAAAAD2ABcAABgAAAAAAQAAAAEAAAAAAAAAAAEAAP/bAEMACayVpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZn/2wBDASyVpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZqXpZn/wAARCAAoACgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAbEAADAQEBAQEAAAAAAAAAAAAAAgUGAwQB//EABUBAQEAAAAAAAAAAAAAAAAAAAAB/8QAFREBAQAAAAAAAAAAAAAAAAAAABH/2gAMAw000A/9oADmaxAAAPwD/AP/Z';
+const defaultJpegBuffer = Buffer.from(validJpegBase64, 'base64');
+
 // Fallback image handler if an upload file or nested image is not found on disk
 app.use('/uploads', (req, res) => {
-  const reqPath = req.path || '/image';
+  const reqPath = req.path || '/image.jpg';
+  const ext = path.extname(reqPath).toLowerCase();
+
+  if (ext === '.jpg' || ext === '.jpeg') {
+    res.setHeader('Content-Type', 'image/jpeg');
+    return res.status(200).send(defaultJpegBuffer);
+  }
+
   const filename = path.basename(reqPath) || 'Image';
   const label = filename.split('.')[0].replace(/_/g, ' ') || 'Image';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
