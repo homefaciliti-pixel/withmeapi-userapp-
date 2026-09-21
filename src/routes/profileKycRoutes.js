@@ -81,9 +81,9 @@ const handleGetProfile = async (req, res) => {
   const userFullPhone = rawPhone.startsWith('+') ? rawPhone : `${userCountryCode}${userPhone}`;
 
   const imageList = [
-    `${baseUrl}/uploads/default_avatar.jpg`,
-    `${baseUrl}/uploads/profile.jpg`,
-    `${baseUrl}/uploads/user101.jpg`
+    `${baseUrl}/uploads/profile1.jpg`,
+    `${baseUrl}/uploads/profile2.jpg`,
+    `${baseUrl}/uploads/profile3.jpg`
   ];
 
   // Default Base Profile Template with full details
