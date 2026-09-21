@@ -428,13 +428,17 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 
 6.1 Send Partner Request API: POST /api/v1/partner-request/send
 6.2 Request Partner List API
-- Endpoint: GET /api/v1/partner-request/list
+- Endpoints:
+  - GET /api/v1/partner-request/list
+  - GET /partner-request/list
+  - GET /partner-request/approved
+  - GET /partners/approved
 - Headers: Authorization: Bearer <token>
-- Description: Retrieve list of available partners with rating, price, verified status, and interests.
+- Description: Retrieve list of approved partners with rating, price, verified status, approval status, and accept flags.
 - Response (200 OK):
   {
     "success": true,
-    "message": "Available partners fetched successfully",
+    "message": "Approved partners fetched successfully",
     "data": {
       "partners": [
         {
@@ -446,16 +450,21 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
           "currency": "INR",
           "price_type": "session",
           "profile_image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+          "image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+          "avatar": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
           "is_verified": true,
+          "is_approved": true,
+          "approval_status": "approved",
           "interests": [
             "Coffee",
             "Travel"
           ],
-          "status": "available",
+          "status": "approved",
           "is_accepted": true,
           "request_accepted": true,
           "is_request_accepted": true,
-          "accepted": true
+          "accepted": true,
+          "request_status": "accepted"
         },
         {
           "id": 102,
@@ -466,22 +475,33 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
           "currency": "INR",
           "price_type": "session",
           "profile_image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+          "image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+          "avatar": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
           "is_verified": true,
+          "is_approved": true,
+          "approval_status": "approved",
           "interests": [
             "Coffee",
             "Events"
           ],
-          "status": "available",
-          "is_accepted": false,
-          "request_accepted": false,
-          "is_request_accepted": false,
-          "accepted": false
+          "status": "approved",
+          "is_accepted": true,
+          "request_accepted": true,
+          "is_request_accepted": true,
+          "accepted": true,
+          "request_status": "accepted"
         }
-      ]
+      ],
+      "approved_partners": [ ... ],
+      "pending_partners": []
     }
   }
 
-6.3 Partner Request Action API: POST /api/v1/partner-request/action
+6.3 Approve All / Partner Action API
+- Endpoints:
+  - POST /api/v1/partner-request/action
+  - POST /api/v1/partner-request/approve-all
+  - POST /partner-request/approve
 
 --------------------------------------------------------------------------------
 7. EXPLORE APIs (/api/v1/explore)
