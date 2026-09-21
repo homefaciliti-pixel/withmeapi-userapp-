@@ -68,8 +68,8 @@ const handleAadhaarKycSubmit = async (req, res) => {
     ref_id: refId,
     expires_in_seconds: 300,
     data: {
-      full_name: full_name || req.user.name || 'Alex Sharma',
-      nick_name: nick_name || 'Alex',
+      full_name: full_name || req.user.name || 'Amit',
+      nick_name: nick_name || 'Amit',
       aadhaar_number: maskedAadhaar,
       age: age ? parseInt(age) : 25,
       front_url: frontUrl,
@@ -117,7 +117,7 @@ router.post('/otp-verify', authenticateToken, async (req, res) => {
     is_kyc_completed: true,
     details: {
       ref_id,
-      name: req.user.name || 'Alex Sharma',
+      name: req.user.name || 'Amit',
       masked_aadhaar: 'XXXXXXXX9012',
       gender: 'Male',
       kyc_status: 'VERIFIED'

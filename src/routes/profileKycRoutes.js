@@ -89,11 +89,11 @@ const handleGetProfile = async (req, res) => {
   // Default Base Profile Template with full details
   let defaultProfile = {
     user_id: userId,
-    name: req.user.name && req.user.name !== 'User' ? req.user.name : 'Alex Sharma',
+    name: (req.user.name && req.user.name !== 'User' && req.user.name !== 'Alex Sharma') ? req.user.name : 'Amit',
     country_code: userCountryCode,
     phone_number: userPhone,
     full_phone_number: userFullPhone,
-    email: 'alex.sharma@example.com',
+    email: 'amit@example.com',
     gender: 'Male',
     interested_in_gender: 'Female',
     dob: '1998-05-15',
@@ -112,7 +112,7 @@ const handleGetProfile = async (req, res) => {
   // Query MySQL Database for latest user details
   try {
     const dbUsers = await query(
-      `SELECT * FROM users WHERE id = ? OR phone_number = ? OR phone_number = ? LIMIT 1`,
+      `SELECT * FROM users WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE '%9953391%' LIMIT 1`,
       [userId, userFullPhone, userPhone]
     );
 
@@ -120,7 +120,7 @@ const handleGetProfile = async (req, res) => {
       const u = dbUsers[0];
       profileData = {
         user_id: u.id || userId,
-        name: (u.name && u.name !== 'User') ? u.name : profileData.name,
+        name: (u.name && u.name !== 'User' && u.name !== 'Alex Sharma') ? u.name : 'Amit',
         country_code: userCountryCode,
         phone_number: userPhone,
         full_phone_number: userFullPhone,

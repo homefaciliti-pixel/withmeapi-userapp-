@@ -74,8 +74,8 @@ router.get('/chat', authenticateToken, (req, res) => {
     success: true,
     conversation_id: conversation_id || 'conv_default',
     messages: [
-      { id: 'msg_1', sender_id: 'usr_202', sender_name: 'Priya Sharma', text: 'Hey Alex! Are you ready for today’s activity?', timestamp: '2026-09-11T10:15:00Z' },
-      { id: 'msg_2', sender_id: req.user.id || 'usr_998877', sender_name: req.user.name || 'Alex', text: 'Yes, excited for it!', timestamp: '2026-09-11T10:17:00Z' }
+      { id: 'msg_1', sender_id: 'usr_202', sender_name: 'Priya Sharma', text: 'Hey Amit! Are you ready for today’s activity?', timestamp: '2026-09-11T10:15:00Z' },
+      { id: 'msg_2', sender_id: req.user.id || 'usr_998877', sender_name: req.user.name || 'Amit', text: 'Yes, excited for it!', timestamp: '2026-09-11T10:17:00Z' }
     ]
   });
 });

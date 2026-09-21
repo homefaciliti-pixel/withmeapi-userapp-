@@ -87,7 +87,7 @@ router.post('/send', authenticateToken, (req, res) => {
     request_id: `req_${Date.now()}`,
     sender: {
       user_id: req.user.id || 'usr_998877',
-      name: req.user.name || 'Alex Sharma',
+      name: req.user.name || 'Amit',
       avatar: `${baseUrl}/uploads/profile.jpg`
     },
     receiver_id,
