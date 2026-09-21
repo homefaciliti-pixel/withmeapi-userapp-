@@ -57,13 +57,13 @@ const getCombinedActivitiesData = (req) => {
     {
       type: 'partner',
       id: 'usr_303',
-      name: 'Rohan',
+      name: 'Riya',
       city: location || 'Mumbai',
       rating: 4.7,
       price: 899,
       currency: 'INR',
       price_type: 'session',
-      image: `${baseUrl}/uploads/rohan.jpg`,
+      image: `${baseUrl}/uploads/riya.jpg`,
       is_verified: true,
       interests: ['Coffee', 'Coding'],
       status: 'available'
@@ -154,7 +154,7 @@ const getCombinedActivitiesData = (req) => {
   const recommended_partners = [
     {
       user_id: 'usr_404',
-      name: 'Rohan Mehta',
+      name: 'Riya Mehta',
       age: 26,
       rating: 4.8,
       price: 499,
@@ -162,9 +162,9 @@ const getCombinedActivitiesData = (req) => {
       match_score: '94%',
       interests: ['Trekking', 'Coding'],
       location: 'Mumbai',
-      profile_image: `${baseUrl}/uploads/rohan.jpg`,
-      image: `${baseUrl}/uploads/rohan.jpg`,
-      avatar: `${baseUrl}/uploads/rohan.jpg`
+      profile_image: `${baseUrl}/uploads/riya.jpg`,
+      image: `${baseUrl}/uploads/riya.jpg`,
+      avatar: `${baseUrl}/uploads/riya.jpg`
     },
     {
       user_id: 'usr_405',
@@ -182,7 +182,7 @@ const getCombinedActivitiesData = (req) => {
     },
     {
       user_id: 'usr_406',
-      name: 'Aarav Sharma',
+      name: 'Sneha Sharma',
       age: 25,
       rating: 4.7,
       price: 399,
@@ -190,9 +190,9 @@ const getCombinedActivitiesData = (req) => {
       match_score: '85%',
       interests: ['Fitness', 'Gaming'],
       location: 'Delhi',
-      profile_image: `${baseUrl}/uploads/aarav.jpg`,
-      image: `${baseUrl}/uploads/aarav.jpg`,
-      avatar: `${baseUrl}/uploads/aarav.jpg`
+      profile_image: `${baseUrl}/uploads/sneha.jpg`,
+      image: `${baseUrl}/uploads/sneha.jpg`,
+      avatar: `${baseUrl}/uploads/sneha.jpg`
     }
   ];
 

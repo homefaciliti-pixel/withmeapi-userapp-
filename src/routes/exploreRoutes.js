@@ -39,10 +39,10 @@ router.get('/explore', authenticateToken, (req, res) => {
       id: 'exp_2',
       type: 'LIVE',
       title: 'Acoustic Music Session',
-      host: 'Rohan Mehta',
-      name: 'Rohan Mehta',
+      host: 'Riya Mehta',
+      name: 'Riya Mehta',
       age: 26,
-      gender: 'Male',
+      gender: 'Female',
       interests: ['Guitar', 'Singing', 'Music'],
       rating: 4.8,
       price: 499,
@@ -50,7 +50,8 @@ router.get('/explore', authenticateToken, (req, res) => {
       viewers_count: 320,
       distance: '1.8 km away',
       image: `${baseUrl}/uploads/live1.jpg`,
-      avatar: `${baseUrl}/uploads/rohan.jpg`,
+      avatar: `${baseUrl}/uploads/riya.jpg`,
+      profile_image: `${baseUrl}/uploads/riya.jpg`,
       thumbnail: `${baseUrl}/uploads/live1.jpg`
     },
     {
@@ -120,10 +121,10 @@ router.post('/filter', authenticateToken, (req, res) => {
       id: 'exp_2',
       type: 'LIVE',
       title: 'Acoustic Music Session',
-      host: 'Rohan Mehta',
-      name: 'Rohan Mehta',
+      host: 'Riya Mehta',
+      name: 'Riya Mehta',
       age: 26,
-      gender: 'Male',
+      gender: 'Female',
       interests: ['Guitar', 'Singing', 'Music'],
       rating: 4.8,
       price: 499,
@@ -131,7 +132,8 @@ router.post('/filter', authenticateToken, (req, res) => {
       viewers_count: 320,
       distance: '1.8 km away',
       image: `${baseUrl}/uploads/live1.jpg`,
-      avatar: `${baseUrl}/uploads/rohan.jpg`,
+      avatar: `${baseUrl}/uploads/riya.jpg`,
+      profile_image: `${baseUrl}/uploads/riya.jpg`,
       thumbnail: `${baseUrl}/uploads/live1.jpg`
     }
   ];

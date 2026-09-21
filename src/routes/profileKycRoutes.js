@@ -44,9 +44,9 @@ const detailedProfilesCatalog = {
   },
   usr_404: {
     id: 'usr_404',
-    name: 'Rohan Mehta',
+    name: 'Riya Mehta',
     age: 26,
-    gender: 'Male',
+    gender: 'Female',
     verified: true,
     location: {
       city: 'Mumbai',
