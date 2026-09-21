@@ -327,7 +327,57 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     ]
   }
 
-5.3 Popular Activities List API: GET /api/v1/activities/popular-activities
+5.3 Popular Activities List API
+- Endpoint: GET /api/v1/activities/popular-activities
+- Headers: Authorization: Bearer <token>
+- Description: Retrieve popular activities with titles ending in 'WithMe'.
+- Response (200 OK):
+  {
+    "success": true,
+    "count": 6,
+    "activities": [
+      {
+        "id": "act_top1",
+        "title": "Coffee WithMe",
+        "name": "Coffee WithMe",
+        "category": "Social",
+        "participants_count": 1420,
+        "rating": 4.9,
+        "price": 299,
+        "currency": "INR",
+        "banner": "https://withmeapi-userapp.onrender.com/uploads/categories/coffee.png",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/categories/coffee.png",
+        "thumbnail": "https://withmeapi-userapp.onrender.com/uploads/categories/coffee.png"
+      },
+      {
+        "id": "act_top2",
+        "title": "Dinner WithMe",
+        "name": "Dinner WithMe",
+        "category": "Dining",
+        "participants_count": 1150,
+        "rating": 4.8,
+        "price": 499,
+        "currency": "INR",
+        "banner": "https://withmeapi-userapp.onrender.com/uploads/categories/dinner.png",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/categories/dinner.png",
+        "thumbnail": "https://withmeapi-userapp.onrender.com/uploads/categories/dinner.png"
+      },
+      {
+        "id": "act_top3",
+        "title": "Movie WithMe",
+        "name": "Movie WithMe",
+        "category": "Entertainment",
+        "participants_count": 980,
+        "rating": 4.8,
+        "price": 399,
+        "currency": "INR",
+        "banner": "https://withmeapi-userapp.onrender.com/uploads/categories/movie.png",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/categories/movie.png",
+        "thumbnail": "https://withmeapi-userapp.onrender.com/uploads/categories/movie.png"
+      }
+    ]
+  }
+
 5.4 Recommended Partner List API: GET /api/v1/activities/recommended-partners
 
 5.5 Product Details / User Partner Details API

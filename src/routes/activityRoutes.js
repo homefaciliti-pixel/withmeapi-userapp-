@@ -71,9 +71,84 @@ const getCombinedActivitiesData = (req) => {
   ];
 
   const popular_activities = [
-    { id: 'act_top1', name: 'Weekend Trekking & Camping', category: 'Outdoor', participants_count: 1420, rating: 4.9, banner: `${baseUrl}/uploads/trek.jpg`, image: `${baseUrl}/uploads/trek.jpg`, thumbnail: `${baseUrl}/uploads/trek.jpg` },
-    { id: 'act_top2', name: 'Board Game & Coffee Night', category: 'Social', participants_count: 890, rating: 4.8, banner: `${baseUrl}/uploads/games.jpg`, image: `${baseUrl}/uploads/games.jpg`, thumbnail: `${baseUrl}/uploads/games.jpg` },
-    { id: 'act_top3', name: 'Morning Badminton Doubles', category: 'Sports', participants_count: 650, rating: 4.7, banner: `${baseUrl}/uploads/badminton.jpg`, image: `${baseUrl}/uploads/badminton.jpg`, thumbnail: `${baseUrl}/uploads/badminton.jpg` }
+    {
+      id: 'act_top1',
+      title: 'Coffee WithMe',
+      name: 'Coffee WithMe',
+      category: 'Social',
+      participants_count: 1420,
+      rating: 4.9,
+      price: 299,
+      currency: 'INR',
+      banner: `${baseUrl}/uploads/categories/coffee.png`,
+      image: `${baseUrl}/uploads/categories/coffee.png`,
+      thumbnail: `${baseUrl}/uploads/categories/coffee.png`
+    },
+    {
+      id: 'act_top2',
+      title: 'Dinner WithMe',
+      name: 'Dinner WithMe',
+      category: 'Dining',
+      participants_count: 1150,
+      rating: 4.8,
+      price: 499,
+      currency: 'INR',
+      banner: `${baseUrl}/uploads/categories/dinner.png`,
+      image: `${baseUrl}/uploads/categories/dinner.png`,
+      thumbnail: `${baseUrl}/uploads/categories/dinner.png`
+    },
+    {
+      id: 'act_top3',
+      title: 'Movie WithMe',
+      name: 'Movie WithMe',
+      category: 'Entertainment',
+      participants_count: 980,
+      rating: 4.8,
+      price: 399,
+      currency: 'INR',
+      banner: `${baseUrl}/uploads/categories/movie.png`,
+      image: `${baseUrl}/uploads/categories/movie.png`,
+      thumbnail: `${baseUrl}/uploads/categories/movie.png`
+    },
+    {
+      id: 'act_top4',
+      title: 'Travel WithMe',
+      name: 'Travel WithMe',
+      category: 'Outdoor',
+      participants_count: 890,
+      rating: 4.9,
+      price: 699,
+      currency: 'INR',
+      banner: `${baseUrl}/uploads/categories/travel.png`,
+      image: `${baseUrl}/uploads/categories/travel.png`,
+      thumbnail: `${baseUrl}/uploads/categories/travel.png`
+    },
+    {
+      id: 'act_top5',
+      title: 'Event WithMe',
+      name: 'Event WithMe',
+      category: 'Events',
+      participants_count: 750,
+      rating: 4.7,
+      price: 499,
+      currency: 'INR',
+      banner: `${baseUrl}/uploads/categories/event.png`,
+      image: `${baseUrl}/uploads/categories/event.png`,
+      thumbnail: `${baseUrl}/uploads/categories/event.png`
+    },
+    {
+      id: 'act_top6',
+      title: 'Conversation WithMe',
+      name: 'Conversation WithMe',
+      category: 'Social',
+      participants_count: 620,
+      rating: 4.7,
+      price: 199,
+      currency: 'INR',
+      banner: `${baseUrl}/uploads/categories/conversation.png`,
+      image: `${baseUrl}/uploads/categories/conversation.png`,
+      thumbnail: `${baseUrl}/uploads/categories/conversation.png`
+    }
   ];
 
   const recommended_partners = [
