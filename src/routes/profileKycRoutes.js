@@ -570,9 +570,19 @@ const handleKycSubmit = async (req, res) => {
 
   // Persist into MySQL
   try {
+    const effectivePhone = userPhone || '+919199953391';
     await query(
-      `UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), gender = COALESCE(?, gender), city = COALESCE(?, city), bio = COALESCE(?, bio), kyc_status = 'PENDING_VERIFICATION' WHERE id = ? OR phone_number = ?`,
-      [name, email, gender, city, bio, userId, userPhone]
+      `INSERT INTO users (phone_number, name, email, gender, dob, bio, city, kyc_status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING_VERIFICATION') 
+       ON DUPLICATE KEY UPDATE 
+         name = COALESCE(VALUES(name), name), 
+         email = COALESCE(VALUES(email), email), 
+         gender = COALESCE(VALUES(gender), gender), 
+         dob = COALESCE(VALUES(dob), dob), 
+         bio = COALESCE(VALUES(bio), bio), 
+         city = COALESCE(VALUES(city), city), 
+         kyc_status = 'PENDING_VERIFICATION'`,
+      [effectivePhone, name, email, gender, dob, bio, city]
     );
     await query(
       `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'PENDING_VERIFICATION')`,
