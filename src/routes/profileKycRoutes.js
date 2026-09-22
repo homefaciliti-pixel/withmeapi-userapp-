@@ -229,7 +229,7 @@ const handleDetailedProfileView = (req, res) => {
     rating: 4.8,
     total_reviews: 120,
     about: 'Friendly, outgoing and loves exploring new places and meeting people.',
-    profile_images: [`${baseUrl}/uploads/priya.jpg`, `${baseUrl}/uploads/priya2.jpg`, `${baseUrl}/uploads/priya3.jpg`],
+    profile_images: [`${baseUrl}/uploads/priya.jpg`, `${baseUrl}/uploads/priya2.jpg`, `${baseUrl}/uploads/priya3.jpg`, `${baseUrl}/uploads/priya4.jpg`],
     interests: [{ name: 'Coffee', icon: 'coffee' }, { name: 'Travel', icon: 'flight' }],
     available_for: [{ name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' }, { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }]
   };

@@ -331,12 +331,14 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
       profile_images: [
         `${baseUrl}/uploads/priya.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
-        `${baseUrl}/uploads/priya3.jpg`
+        `${baseUrl}/uploads/priya3.jpg`,
+        `${baseUrl}/uploads/priya4.jpg`
       ],
       photos: [
         `${baseUrl}/uploads/priya.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
-        `${baseUrl}/uploads/priya3.jpg`
+        `${baseUrl}/uploads/priya3.jpg`,
+        `${baseUrl}/uploads/priya4.jpg`
       ],
       interests: [
         { name: 'Coffee', icon: 'coffee' },
@@ -554,12 +556,14 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
     profile_images: [
       `${baseUrl}/uploads/priya.jpg`,
       `${baseUrl}/uploads/priya2.jpg`,
-      `${baseUrl}/uploads/priya3.jpg`
+      `${baseUrl}/uploads/priya3.jpg`,
+      `${baseUrl}/uploads/priya4.jpg`
     ],
     photos: [
       `${baseUrl}/uploads/priya.jpg`,
       `${baseUrl}/uploads/priya2.jpg`,
-      `${baseUrl}/uploads/priya3.jpg`
+      `${baseUrl}/uploads/priya3.jpg`,
+      `${baseUrl}/uploads/priya4.jpg`
     ],
     interests: [
       { name: 'Coffee', icon: 'coffee' },

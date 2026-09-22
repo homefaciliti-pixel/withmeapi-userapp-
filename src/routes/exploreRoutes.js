@@ -75,12 +75,14 @@ router.get('/explore', authenticateToken, (req, res) => {
       profile_images: [
         `${baseUrl}/uploads/priya.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
-        `${baseUrl}/uploads/priya3.jpg`
+        `${baseUrl}/uploads/priya3.jpg`,
+        `${baseUrl}/uploads/priya4.jpg`
       ],
       photos: [
         `${baseUrl}/uploads/priya.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
-        `${baseUrl}/uploads/priya3.jpg`
+        `${baseUrl}/uploads/priya3.jpg`,
+        `${baseUrl}/uploads/priya4.jpg`
       ]
     }
   ];
