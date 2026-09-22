@@ -112,6 +112,9 @@ const paymentRoutes = require('./src/routes/paymentRoutes');
 // Bind Routes to Base API Path
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1', profileKycRoutes);
+app.use('/api/v1/kyc', profileKycRoutes);
+app.use('/kyc', profileKycRoutes);
+app.use('/profile', profileKycRoutes);
 app.use('/api/v1/aadhaar', aadhaarRoutes);
 app.use('/api/v1/profile-live', profileLiveRoutes);
 app.use('/api/v1/activities', activityRoutes);
