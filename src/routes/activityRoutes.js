@@ -574,20 +574,53 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
   };
 };
 
-// 5. Product Details API — GET (/activities/product-details/:id and /activities/product-details)
+// 5. Product Details API — GET (/activities/product-details/:id, /activities/product-details, /activities/available-for/:id, /activities/available-for)
 const handleProductDetails = (req, res) => {
   const baseUrl = getBaseUrl(req);
-  const targetId = req.params.id || req.query.id || 'usr_203';
+  const targetId = req.params.id || req.query.id || req.query.userId || 'usr_203';
   const partnerProfile = getPartnerProfileById(targetId, baseUrl);
 
   return res.status(200).json({
     success: true,
     message: 'Profile details fetched successfully',
-    data: partnerProfile
+    available_for: partnerProfile.available_for,
+    data: partnerProfile,
+    id: partnerProfile.id,
+    name: partnerProfile.name,
+    age: partnerProfile.age,
+    gender: partnerProfile.gender,
+    verified: partnerProfile.verified,
+    location: partnerProfile.location,
+    rating: partnerProfile.rating,
+    total_reviews: partnerProfile.total_reviews,
+    profile_image: partnerProfile.profile_image,
+    profile_images: partnerProfile.profile_images,
+    photos: partnerProfile.photos,
+    about: partnerProfile.about,
+    interests: partnerProfile.interests
+  });
+};
+
+const handleAvailableForOnly = (req, res) => {
+  const baseUrl = getBaseUrl(req);
+  const targetId = req.params.id || req.query.id || req.query.userId || 'usr_203';
+  const partnerProfile = getPartnerProfileById(targetId, baseUrl);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Available activities options fetched successfully',
+    available_for: partnerProfile.available_for,
+    data: {
+      userId: partnerProfile.id,
+      name: partnerProfile.name,
+      available_for: partnerProfile.available_for
+    }
   });
 };
 
 router.get('/product-details/:id', authenticateToken, handleProductDetails);
 router.get('/product-details', authenticateToken, handleProductDetails);
+router.get('/available-for/:id', authenticateToken, handleAvailableForOnly);
+router.get('/available-for', authenticateToken, handleAvailableForOnly);
 
 module.exports = router;

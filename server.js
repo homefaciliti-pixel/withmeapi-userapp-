@@ -115,6 +115,7 @@ app.use('/api/v1', profileKycRoutes);
 app.use('/api/v1/aadhaar', aadhaarRoutes);
 app.use('/api/v1/profile-live', profileLiveRoutes);
 app.use('/api/v1/activities', activityRoutes);
+app.use('/activities', activityRoutes);
 app.use('/api/v1/partner-request', partnerRequestRoutes);
 app.use('/api/v1/partner-requests', partnerRequestRoutes);
 app.use('/api/v1/partners', partnerRequestRoutes);
