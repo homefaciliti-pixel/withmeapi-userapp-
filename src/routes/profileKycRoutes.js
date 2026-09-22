@@ -478,29 +478,76 @@ router.post('/profile/update-all', authenticateToken, handleProfileEditCombined)
 
 // 5. KYC Verification & Submit API — POST (/kyc/verify, /kyc/submit, /kyc/post, /kyc)
 const handleKycSubmit = async (req, res) => {
-  const { document_type, document_number, full_name, dob } = req.body || {};
+  const baseUrl = getBaseUrl(req);
+  const body = req.body || {};
 
-  if (!document_type || !document_number) {
-    return res.status(400).json({
-      success: false,
-      message: 'document_type and document_number are required (Options: AADHAAR, PAN, PASSPORT, DRIVING_LICENSE)'
-    });
-  }
+  // Extract all possible field name variations from JSON, FormData, or query parameters
+  const document_type = (
+    body.document_type ||
+    body.documentType ||
+    body.doc_type ||
+    body.type ||
+    body.kyc_type ||
+    req.query.document_type ||
+    req.query.type ||
+    'AADHAAR'
+  ).toString().toUpperCase();
+
+  const rawDocumentNumber = (
+    body.document_number ||
+    body.documentNumber ||
+    body.doc_number ||
+    body.number ||
+    body.aadhaar_number ||
+    body.pan_number ||
+    body.id_number ||
+    req.query.document_number ||
+    req.query.number ||
+    '123456789012'
+  ).toString();
+
+  const full_name = (
+    body.full_name ||
+    body.fullName ||
+    body.name ||
+    req.user.name ||
+    'Amit'
+  ).toString();
+
+  const dob = (
+    body.dob ||
+    body.date_of_birth ||
+    body.birth_date ||
+    '1998-05-15'
+  ).toString();
 
   const userId = req.user.user_id || req.user.id || 'usr_998877';
+
+  // Handle uploaded document files if any
+  let uploadedFiles = [];
+  if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+    uploadedFiles = req.files.map(f => `${baseUrl}/uploads/${f.filename}`);
+  }
+
+  const maskedNumber = rawDocumentNumber.length >= 4 
+    ? rawDocumentNumber.slice(-4).padStart(rawDocumentNumber.length, '*') 
+    : 'XXXXXXXX9012';
+
+  const kycId = `KYC_${Math.floor(100000 + Math.random() * 900000)}`;
+  const submittedAt = new Date().toISOString();
+
+  // Update in-memory user profile
   if (userProfilesStore[userId]) {
     userProfilesStore[userId].kyc_status = 'PENDING_VERIFICATION';
     userProfilesStore[userId].is_kyc_completed = false;
   }
 
-  const kycId = `KYC_${Math.floor(100000 + Math.random() * 900000)}`;
-  const submittedAt = new Date().toISOString();
-
+  // Persist into MySQL
   try {
     await query(`UPDATE users SET kyc_status = 'PENDING_VERIFICATION' WHERE id = ? OR phone_number = ?`, [userId, req.user.phone_number || '']);
     await query(
       `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'PENDING_VERIFICATION')`,
-      [userId, document_type, document_number, full_name || req.user.name || 'User']
+      [userId, document_type, rawDocumentNumber, full_name]
     );
   } catch (err) {
     console.warn('MySQL KYC submission notice:', err.message);
@@ -511,26 +558,31 @@ const handleKycSubmit = async (req, res) => {
     status: 'PENDING_VERIFICATION',
     is_kyc_completed: false,
     document_type,
-    document_number_masked: document_number.slice(-4).padStart(document_number.length, '*'),
-    full_name: full_name || req.user.name || 'Alex Sharma',
-    dob: dob || '1998-05-15',
+    document_number: rawDocumentNumber,
+    document_number_masked: maskedNumber,
+    full_name,
+    dob,
+    document_files: uploadedFiles.length > 0 ? uploadedFiles : [`${baseUrl}/uploads/mock_aadhaar_front.jpg`, `${baseUrl}/uploads/mock_aadhaar_back.jpg`],
     submitted_at: submittedAt
   };
 
   return res.status(200).json({
     success: true,
     message: 'KYC details submitted successfully for verification',
-    data: kycData,
     status: 'PENDING_VERIFICATION',
     is_kyc_completed: false,
     kyc_id: kycId,
-    submitted_data: kycData
+    data: kycData,
+    submitted_data: kycData,
+    kyc_details: kycData
   });
 };
 
-router.post('/kyc/verify', authenticateToken, handleKycSubmit);
-router.post('/kyc/submit', authenticateToken, handleKycSubmit);
-router.post('/kyc/post', authenticateToken, handleKycSubmit);
-router.post('/kyc', authenticateToken, handleKycSubmit);
+const upload = require('../middleware/uploadMiddleware');
+
+router.post('/kyc/verify', authenticateToken, upload.any(), handleKycSubmit);
+router.post('/kyc/submit', authenticateToken, upload.any(), handleKycSubmit);
+router.post('/kyc/post', authenticateToken, upload.any(), handleKycSubmit);
+router.post('/kyc', authenticateToken, upload.any(), handleKycSubmit);
 
 module.exports = router;
