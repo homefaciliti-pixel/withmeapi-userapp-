@@ -487,7 +487,15 @@ const handleKycSubmit = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const body = req.body || {};
 
-  // Extract all possible field name variations from JSON, FormData, or query parameters
+  // Extract all user profile & KYC fields
+  const name = (body.name || body.full_name || body.fullName || (req.user && req.user.name) || 'Alex Sharma').toString();
+  const nick_name = (body.nick_name || body.nickname || 'Alex').toString();
+  const email = (body.email || 'alex.sharma@example.com').toString();
+  const gender = (body.gender || 'Male').toString();
+  const dob = (body.dob || body.date_of_birth || body.birth_date || '1998-05-15').toString();
+  const city = (body.city || 'Mumbai').toString();
+  const bio = (body.bio || 'Enthusiastic explorer and tech lover').toString();
+
   const document_type = (
     body.document_type ||
     body.documentType ||
@@ -500,11 +508,11 @@ const handleKycSubmit = async (req, res) => {
   ).toString().toUpperCase();
 
   const rawDocumentNumber = (
+    body.aadhaar_number ||
     body.document_number ||
     body.documentNumber ||
     body.doc_number ||
     body.number ||
-    body.aadhaar_number ||
     body.pan_number ||
     body.id_number ||
     req.query.document_number ||
@@ -512,28 +520,30 @@ const handleKycSubmit = async (req, res) => {
     '123456789012'
   ).toString();
 
-  const full_name = (
-    body.full_name ||
-    body.fullName ||
-    body.name ||
-    (req.user && req.user.name) ||
-    'Amit'
-  ).toString();
-
-  const dob = (
-    body.dob ||
-    body.date_of_birth ||
-    body.birth_date ||
-    '1998-05-15'
-  ).toString();
-
   const userId = req.user ? (req.user.user_id || req.user.id || 'usr_998877') : 'usr_998877';
   const userPhone = req.user ? (req.user.phone_number || '') : '';
 
-  // Handle uploaded document files if any
+  // Handle uploaded document files (aadhaar_front, aadhaar_back, etc.)
   let uploadedFiles = [];
+  let frontUrl = body.aadhaar_front_url || body.front_url || `${baseUrl}/uploads/mock_aadhaar_front.jpg`;
+  let backUrl = body.aadhaar_back_url || body.back_url || `${baseUrl}/uploads/mock_aadhaar_back.jpg`;
+
   if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-    uploadedFiles = req.files.map(f => `${baseUrl}/uploads/${f.filename}`);
+    uploadedFiles = req.files.map(f => {
+      const fileUrl = `${baseUrl}/uploads/${f.filename}`;
+      if (f.fieldname === 'aadhaar_front' || f.fieldname === 'front_image' || f.fieldname === 'front') {
+        frontUrl = fileUrl;
+      } else if (f.fieldname === 'aadhaar_back' || f.fieldname === 'back_image' || f.fieldname === 'back') {
+        backUrl = fileUrl;
+      }
+      return fileUrl;
+    });
+    if (uploadedFiles[0] && frontUrl.includes('mock_aadhaar_front.jpg')) {
+      frontUrl = uploadedFiles[0];
+    }
+    if (uploadedFiles[1] && backUrl.includes('mock_aadhaar_back.jpg')) {
+      backUrl = uploadedFiles[1];
+    }
   }
 
   const maskedNumber = rawDocumentNumber.length >= 4 
@@ -545,16 +555,28 @@ const handleKycSubmit = async (req, res) => {
 
   // Update in-memory user profile
   if (userProfilesStore[userId]) {
-    userProfilesStore[userId].kyc_status = 'PENDING_VERIFICATION';
-    userProfilesStore[userId].is_kyc_completed = false;
+    userProfilesStore[userId] = {
+      ...userProfilesStore[userId],
+      name,
+      email,
+      gender,
+      dob,
+      city,
+      bio,
+      kyc_status: 'PENDING_VERIFICATION',
+      is_kyc_completed: false
+    };
   }
 
   // Persist into MySQL
   try {
-    await query(`UPDATE users SET kyc_status = 'PENDING_VERIFICATION' WHERE id = ? OR phone_number = ?`, [userId, userPhone]);
+    await query(
+      `UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), gender = COALESCE(?, gender), city = COALESCE(?, city), bio = COALESCE(?, bio), kyc_status = 'PENDING_VERIFICATION' WHERE id = ? OR phone_number = ?`,
+      [name, email, gender, city, bio, userId, userPhone]
+    );
     await query(
       `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'PENDING_VERIFICATION')`,
-      [userId, document_type, rawDocumentNumber, full_name]
+      [userId, document_type, rawDocumentNumber, name]
     );
   } catch (err) {
     console.warn('MySQL KYC submission notice:', err.message);
@@ -568,12 +590,23 @@ const handleKycSubmit = async (req, res) => {
     kyc_id: kycId,
     status: 'PENDING_VERIFICATION',
     is_kyc_completed: false,
+    name,
+    full_name: name,
+    nick_name,
+    email,
+    gender,
+    dob,
+    city,
+    bio,
     document_type,
     document_number: rawDocumentNumber,
+    aadhaar_number: rawDocumentNumber,
     document_number_masked: maskedNumber,
-    full_name,
-    dob,
-    document_files: uploadedFiles.length > 0 ? uploadedFiles : [`${baseUrl}/uploads/mock_aadhaar_front.jpg`, `${baseUrl}/uploads/mock_aadhaar_back.jpg`],
+    aadhaar_front_url: frontUrl,
+    aadhaar_back_url: backUrl,
+    front_url: frontUrl,
+    back_url: backUrl,
+    document_files: uploadedFiles.length > 0 ? uploadedFiles : [frontUrl, backUrl],
     submitted_at: submittedAt
   };
 
