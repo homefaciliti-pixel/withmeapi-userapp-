@@ -346,7 +346,7 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
         { name: 'Music', icon: 'music_note' }
       ],
       available_for: [
-        { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ]
@@ -571,7 +571,7 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
       { name: 'Music', icon: 'music_note' }
     ],
     available_for: [
-      { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+      { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
       { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
       { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
     ]
