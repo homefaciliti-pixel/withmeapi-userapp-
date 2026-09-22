@@ -584,5 +584,9 @@ router.post('/kyc/verify', authenticateToken, upload.any(), handleKycSubmit);
 router.post('/kyc/submit', authenticateToken, upload.any(), handleKycSubmit);
 router.post('/kyc/post', authenticateToken, upload.any(), handleKycSubmit);
 router.post('/kyc', authenticateToken, upload.any(), handleKycSubmit);
+router.post('/verify', authenticateToken, upload.any(), handleKycSubmit);
+router.post('/submit', authenticateToken, upload.any(), handleKycSubmit);
+router.post('/post', authenticateToken, upload.any(), handleKycSubmit);
+router.post('/', authenticateToken, upload.any(), handleKycSubmit);
 
 module.exports = router;
