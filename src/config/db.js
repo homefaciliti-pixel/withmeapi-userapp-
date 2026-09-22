@@ -29,19 +29,38 @@ const initializeDatabaseTables = async () => {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR(64) PRIMARY KEY,
-        phone_number VARCHAR(20) UNIQUE NOT NULL,
+        phone_number VARCHAR(20) UNIQUE,
         name VARCHAR(100) DEFAULT 'User',
         email VARCHAR(100) DEFAULT NULL,
         gender VARCHAR(20) DEFAULT NULL,
         dob VARCHAR(20) DEFAULT NULL,
         bio TEXT DEFAULT NULL,
         city VARCHAR(100) DEFAULT NULL,
-        kyc_status VARCHAR(50) DEFAULT 'NOT_STARTED',
+        kyc_status VARCHAR(50) DEFAULT 'NOT_VERIFIED',
         profile_image VARCHAR(255) DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+
+    // Ensure pre-existing database tables get updated columns if missing
+    const alterStatements = [
+      'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20) DEFAULT NULL',
+      'ALTER TABLE users ADD COLUMN dob VARCHAR(20) DEFAULT NULL',
+      'ALTER TABLE users ADD COLUMN bio TEXT DEFAULT NULL',
+      'ALTER TABLE users ADD COLUMN city VARCHAR(100) DEFAULT NULL',
+      "ALTER TABLE users ADD COLUMN interested_in_gender VARCHAR(20) DEFAULT 'Female'",
+      'ALTER TABLE users ADD COLUMN profile_image VARCHAR(255) DEFAULT NULL',
+      "ALTER TABLE users MODIFY COLUMN kyc_status VARCHAR(50) DEFAULT 'NOT_VERIFIED'"
+    ];
+
+    for (const sql of alterStatements) {
+      try {
+        await connection.query(sql);
+      } catch (err) {
+        // Ignore column already exists warnings
+      }
+    }
 
     // 2. OTP Store Table
     await connection.query(`
