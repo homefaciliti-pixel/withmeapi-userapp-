@@ -594,13 +594,27 @@ const handleKycSubmit = async (req, res) => {
 
 const upload = require('../middleware/uploadMiddleware');
 
-router.post('/kyc/verify', authenticateToken, upload.any(), handleKycSubmit);
-router.post('/kyc/submit', authenticateToken, upload.any(), handleKycSubmit);
-router.post('/kyc/post', authenticateToken, upload.any(), handleKycSubmit);
-router.post('/kyc', authenticateToken, upload.any(), handleKycSubmit);
-router.post('/verify', authenticateToken, upload.any(), handleKycSubmit);
-router.post('/submit', authenticateToken, upload.any(), handleKycSubmit);
-router.post('/post', authenticateToken, upload.any(), handleKycSubmit);
-router.post('/', authenticateToken, upload.any(), handleKycSubmit);
+const safeUpload = (req, res, next) => {
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+  if (contentType.includes('multipart/form-data')) {
+    upload.any()(req, res, (err) => {
+      if (err) {
+        console.warn('Multer upload notice:', err.message);
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+};
+
+router.post('/kyc/verify', authenticateToken, safeUpload, handleKycSubmit);
+router.post('/kyc/submit', authenticateToken, safeUpload, handleKycSubmit);
+router.post('/kyc/post', authenticateToken, safeUpload, handleKycSubmit);
+router.post('/kyc', authenticateToken, safeUpload, handleKycSubmit);
+router.post('/verify', authenticateToken, safeUpload, handleKycSubmit);
+router.post('/submit', authenticateToken, safeUpload, handleKycSubmit);
+router.post('/post', authenticateToken, safeUpload, handleKycSubmit);
+router.post('/', authenticateToken, safeUpload, handleKycSubmit);
 
 module.exports = router;

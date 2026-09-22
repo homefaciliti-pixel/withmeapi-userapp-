@@ -82,15 +82,23 @@ const handleAadhaarKycSubmit = async (req, res) => {
   });
 };
 
-// 1. Aadhaar KYC Submit API — POST (/aadhaar/kyc-submit, /aadhaar/send-otp, /aadhaar/upload)
-const uploadFields = upload.fields([
-  { name: 'front_image', maxCount: 1 },
-  { name: 'back_image', maxCount: 1 }
-]);
+const safeUploadFields = (req, res, next) => {
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+  if (contentType.includes('multipart/form-data')) {
+    uploadFields(req, res, (err) => {
+      if (err) {
+        console.warn('Multer uploadFields notice:', err.message);
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+};
 
-router.post('/kyc-submit', authenticateToken, uploadFields, handleAadhaarKycSubmit);
-router.post('/send-otp', authenticateToken, uploadFields, handleAadhaarKycSubmit);
-router.post('/upload', authenticateToken, uploadFields, handleAadhaarKycSubmit);
+router.post('/kyc-submit', authenticateToken, safeUploadFields, handleAadhaarKycSubmit);
+router.post('/send-otp', authenticateToken, safeUploadFields, handleAadhaarKycSubmit);
+router.post('/upload', authenticateToken, safeUploadFields, handleAadhaarKycSubmit);
 
 // 2. Aadhaar OTP Verify API — POST
 router.post('/otp-verify', authenticateToken, async (req, res) => {
