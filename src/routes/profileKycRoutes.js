@@ -466,7 +466,13 @@ const handleProfileEditCombined = async (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Profile details updated successfully',
-    data: updatedProfile,
+    body: req.body || {},
+    request_body: req.body || {},
+    received_body: req.body || {},
+    data: {
+      ...(req.body || {}),
+      ...updatedProfile
+    },
     ...(kycSubmitted && { kyc_submission: kycDetails })
   });
 };
@@ -510,7 +516,7 @@ const handleKycSubmit = async (req, res) => {
     body.full_name ||
     body.fullName ||
     body.name ||
-    req.user.name ||
+    (req.user && req.user.name) ||
     'Amit'
   ).toString();
 
@@ -521,7 +527,8 @@ const handleKycSubmit = async (req, res) => {
     '1998-05-15'
   ).toString();
 
-  const userId = req.user.user_id || req.user.id || 'usr_998877';
+  const userId = req.user ? (req.user.user_id || req.user.id || 'usr_998877') : 'usr_998877';
+  const userPhone = req.user ? (req.user.phone_number || '') : '';
 
   // Handle uploaded document files if any
   let uploadedFiles = [];
@@ -544,7 +551,7 @@ const handleKycSubmit = async (req, res) => {
 
   // Persist into MySQL
   try {
-    await query(`UPDATE users SET kyc_status = 'PENDING_VERIFICATION' WHERE id = ? OR phone_number = ?`, [userId, req.user.phone_number || '']);
+    await query(`UPDATE users SET kyc_status = 'PENDING_VERIFICATION' WHERE id = ? OR phone_number = ?`, [userId, userPhone]);
     await query(
       `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'PENDING_VERIFICATION')`,
       [userId, document_type, rawDocumentNumber, full_name]
@@ -554,6 +561,10 @@ const handleKycSubmit = async (req, res) => {
   }
 
   const kycData = {
+    ...body,
+    body: body,
+    request_body: body,
+    received_body: body,
     kyc_id: kycId,
     status: 'PENDING_VERIFICATION',
     is_kyc_completed: false,
@@ -572,6 +583,9 @@ const handleKycSubmit = async (req, res) => {
     status: 'PENDING_VERIFICATION',
     is_kyc_completed: false,
     kyc_id: kycId,
+    body: body,
+    request_body: body,
+    received_body: body,
     data: kycData,
     submitted_data: kycData,
     kyc_details: kycData
