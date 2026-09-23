@@ -12,16 +12,21 @@ const getBaseUrl = (req) => {
 };
 
 // Approved partners list generator
-const getApprovedPartnersList = (baseUrl) => [
+const getApprovedPartnersList = (baseUrl, requestedBookingId) => [
   {
     id: 101,
+    booking_id: requestedBookingId || 'BK197860',
+    request_id: 'req_101',
     user_id: 'usr_101',
+    partner_id: 101,
     name: 'Priya',
+    full_name: 'Priya Sharma',
     city: 'Jaipur',
     rating: 4.8,
     price: 999,
     currency: 'INR',
     price_type: 'session',
+    activity: 'Coffee',
     profile_image: `${baseUrl}/uploads/priya.jpg`,
     image: `${baseUrl}/uploads/priya.jpg`,
     avatar: `${baseUrl}/uploads/priya.jpg`,
@@ -50,20 +55,69 @@ const getApprovedPartnersList = (baseUrl) => [
   },
   {
     id: 102,
+    booking_id: requestedBookingId ? `${requestedBookingId}_102` : 'BK197861',
+    request_id: 'req_102',
     user_id: 'usr_102',
+    partner_id: 102,
     name: 'Anjali',
+    full_name: 'Anjali Sharma',
     city: 'Jaipur',
     rating: 4.9,
     price: 1199,
     currency: 'INR',
     price_type: 'session',
-    profile_image: `${baseUrl}/uploads/ananya.jpg`,
-    image: `${baseUrl}/uploads/ananya.jpg`,
-    avatar: `${baseUrl}/uploads/ananya.jpg`,
+    activity: 'Dinner',
+    profile_image: `${baseUrl}/uploads/anjali.jpg`,
+    image: `${baseUrl}/uploads/anjali.jpg`,
+    avatar: `${baseUrl}/uploads/anjali.jpg`,
+    profile_images: [
+      `${baseUrl}/uploads/anjali.jpg`,
+      `${baseUrl}/uploads/ananya.jpg`
+    ],
+    photos: [
+      `${baseUrl}/uploads/anjali.jpg`,
+      `${baseUrl}/uploads/ananya.jpg`
+    ],
     is_verified: true,
     is_approved: true,
     approval_status: 'approved',
     interests: ['Coffee', 'Events'],
+    status: 'approved',
+    is_accepted: true,
+    request_accepted: true,
+    is_request_accepted: true,
+    accepted: true,
+    request_status: 'accepted'
+  },
+  {
+    id: 103,
+    booking_id: requestedBookingId ? `${requestedBookingId}_103` : 'BK197862',
+    request_id: 'req_103',
+    user_id: 'usr_103',
+    partner_id: 103,
+    name: 'Riya',
+    full_name: 'Riya Mehta',
+    city: 'Mumbai',
+    rating: 4.8,
+    price: 999,
+    currency: 'INR',
+    price_type: 'session',
+    activity: 'Music & Coffee',
+    profile_image: `${baseUrl}/uploads/riya.jpg`,
+    image: `${baseUrl}/uploads/riya.jpg`,
+    avatar: `${baseUrl}/uploads/riya.jpg`,
+    profile_images: [
+      `${baseUrl}/uploads/riya.jpg`,
+      `${baseUrl}/uploads/sneha.jpg`
+    ],
+    photos: [
+      `${baseUrl}/uploads/riya.jpg`,
+      `${baseUrl}/uploads/sneha.jpg`
+    ],
+    is_verified: true,
+    is_approved: true,
+    approval_status: 'approved',
+    interests: ['Music', 'Coffee'],
     status: 'approved',
     is_accepted: true,
     request_accepted: true,
@@ -76,7 +130,7 @@ const getApprovedPartnersList = (baseUrl) => [
 // 1. Send Request API — POST
 router.post('/send', authenticateToken, (req, res) => {
   const baseUrl = getBaseUrl(req);
-  const { receiver_id, activity_id, message } = req.body;
+  const { receiver_id, activity_id, message, booking_id } = req.body;
 
   if (!receiver_id) {
     return res.status(400).json({
@@ -85,8 +139,11 @@ router.post('/send', authenticateToken, (req, res) => {
     });
   }
 
+  const generatedBookingId = booking_id || `BK${Math.floor(100000 + Math.random() * 900000)}`;
+
   const newRequest = {
     request_id: `req_${Date.now()}`,
+    booking_id: generatedBookingId,
     sender: {
       user_id: req.user.id || 'usr_998877',
       name: req.user.name || 'Amit',
@@ -105,6 +162,7 @@ router.post('/send', authenticateToken, (req, res) => {
     success: true,
     message: 'Partner request sent and approved successfully',
     request_id: newRequest.request_id,
+    booking_id: generatedBookingId,
     data: newRequest
   });
 });
@@ -113,14 +171,17 @@ router.post('/send', authenticateToken, (req, res) => {
 const handlePartnerList = (req, res) => {
   const baseUrl = getBaseUrl(req);
   const type = (req.query.type || req.query.status || req.query.filter || '').toLowerCase();
-  const approvedPartners = getApprovedPartnersList(baseUrl);
+  const requestedBookingId = req.query.booking_id || req.query.bookingId || 'BK197860';
+  const approvedPartners = getApprovedPartnersList(baseUrl, requestedBookingId);
 
   // If client specifically requests pending list after all have been approved
   if (type === 'pending' || type === 'unapproved') {
     return res.status(200).json({
       success: true,
       message: 'All pending partners have been approved',
+      booking_id: requestedBookingId,
       data: {
+        booking_id: requestedBookingId,
         partners: [],
         pending_partners: [],
         approved_partners: approvedPartners
@@ -136,7 +197,9 @@ const handlePartnerList = (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Approved partners fetched successfully',
+    booking_id: requestedBookingId,
     data: {
+      booking_id: requestedBookingId,
       partners: approvedPartners,
       approved_partners: approvedPartners,
       pending_partners: []
