@@ -422,6 +422,173 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     }
   }
 
+5.6 Category Companion & Activity Items List API
+- Endpoints:
+  - GET /api/v1/activities/category/:id (e.g. /activities/category/cat_01, /activities/category/coffee)
+  - GET /api/v1/activities/category-details/:id
+  - GET /api/v1/activities/category
+  - GET /api/v1/activities/coffee (or /dinner, /travel, /movie, /event, /conversation)
+  - GET /api/v1/activities/list?category=Coffee
+  - GET /api/v1/activities?category=Coffee
+- Headers: Authorization: Bearer <token>
+- Description: Retrieve companion profiles who have selected and are available for the specified category (e.g., Coffee, Dinner, Travel, Movie, Event, Conversation).
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Coffee activity profiles fetched successfully",
+    "category_id": "cat_01",
+    "category": "Coffee",
+    "title": "Coffee WithMe",
+    "image": "https://withmeapi-userapp.onrender.com/uploads/categories/coffee.png",
+    "count": 6,
+    "items": [
+      {
+        "id": "COF001",
+        "type": "PROFILE",
+        "user_id": "usr_203",
+        "name": "Priya",
+        "full_name": "Priya Sharma",
+        "age": 23,
+        "gender": "Female",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+        "avatar": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+        "rating": 4.8,
+        "distance": "1.2 km",
+        "price": 999,
+        "currency": "INR",
+        "interests": [
+          "Coffee",
+          "Cafe",
+          "Travel"
+        ],
+        "category": "Coffee",
+        "is_verified": true,
+        "is_favorite": false
+      },
+      {
+        "id": "COF002",
+        "type": "PROFILE",
+        "user_id": "usr_201",
+        "name": "Ananya",
+        "full_name": "Ananya Verma",
+        "age": 24,
+        "gender": "Female",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+        "avatar": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
+        "rating": 4.9,
+        "distance": "2.4 km",
+        "price": 349,
+        "currency": "INR",
+        "interests": [
+          "Coffee",
+          "Music",
+          "Books"
+        ],
+        "category": "Coffee",
+        "is_verified": true,
+        "is_favorite": false
+      },
+      {
+        "id": "COF003",
+        "type": "PROFILE",
+        "user_id": "usr_102",
+        "name": "Anjali",
+        "full_name": "Anjali Sharma",
+        "age": 24,
+        "gender": "Female",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/anjali.jpg",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/anjali.jpg",
+        "avatar": "https://withmeapi-userapp.onrender.com/uploads/anjali.jpg",
+        "rating": 4.9,
+        "distance": "1.8 km",
+        "price": 499,
+        "currency": "INR",
+        "interests": [
+          "Coffee",
+          "Cafe",
+          "Events"
+        ],
+        "category": "Coffee",
+        "is_verified": true,
+        "is_favorite": false
+      },
+      {
+        "id": "COF004",
+        "type": "PROFILE",
+        "user_id": "usr_404",
+        "name": "Riya",
+        "full_name": "Riya Mehta",
+        "age": 26,
+        "gender": "Female",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/riya.jpg",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/riya.jpg",
+        "avatar": "https://withmeapi-userapp.onrender.com/uploads/riya.jpg",
+        "rating": 4.8,
+        "distance": "3.1 km",
+        "price": 399,
+        "currency": "INR",
+        "interests": [
+          "Coffee",
+          "Art",
+          "Photography"
+        ],
+        "category": "Coffee",
+        "is_verified": true,
+        "is_favorite": false
+      },
+      {
+        "id": "COF005",
+        "type": "PROFILE",
+        "user_id": "usr_405",
+        "name": "Neha",
+        "full_name": "Neha Kapoor",
+        "age": 23,
+        "gender": "Female",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/neha.jpg",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/neha.jpg",
+        "avatar": "https://withmeapi-userapp.onrender.com/uploads/neha.jpg",
+        "rating": 4.9,
+        "distance": "2.0 km",
+        "price": 299,
+        "currency": "INR",
+        "interests": [
+          "Coffee",
+          "Music",
+          "Cafe"
+        ],
+        "category": "Coffee",
+        "is_verified": true,
+        "is_favorite": false
+      },
+      {
+        "id": "COF006",
+        "type": "PROFILE",
+        "user_id": "usr_406",
+        "name": "Sneha",
+        "full_name": "Sneha Sharma",
+        "age": 25,
+        "gender": "Female",
+        "profile_image": "https://withmeapi-userapp.onrender.com/uploads/sneha.jpg",
+        "image": "https://withmeapi-userapp.onrender.com/uploads/sneha.jpg",
+        "avatar": "https://withmeapi-userapp.onrender.com/uploads/sneha.jpg",
+        "rating": 4.7,
+        "distance": "2.7 km",
+        "price": 349,
+        "currency": "INR",
+        "interests": [
+          "Coffee",
+          "Fitness",
+          "Gaming"
+        ],
+        "category": "Coffee",
+        "is_verified": true,
+        "is_favorite": false
+      }
+    ]
+  }
+
 --------------------------------------------------------------------------------
 6. PARTNER REQUEST APIs (/api/v1/partner-request)
 --------------------------------------------------------------------------------

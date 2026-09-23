@@ -16,6 +16,7 @@ router.get('/explore', authenticateToken, (req, res) => {
   const baseUrl = getBaseUrl(req);
   const page = parseInt(req.query.page || '1');
   const limit = parseInt(req.query.limit || '10');
+  const categoryFilter = (req.query.category || req.query.activity || req.query.type || '').trim().toLowerCase();
 
   const exploreFeed = [
     {
@@ -27,8 +28,9 @@ router.get('/explore', authenticateToken, (req, res) => {
       gender: 'Female',
       interests: ['Music', 'Coffee', 'Trekking'],
       rating: 4.9,
-      price: 299,
+      price: 349,
       currency: 'INR',
+      category: 'Coffee',
       distance: '2.4 km away',
       image: `${baseUrl}/uploads/ananya.jpg`,
       avatar: `${baseUrl}/uploads/ananya.jpg`,
@@ -47,6 +49,7 @@ router.get('/explore', authenticateToken, (req, res) => {
       rating: 4.8,
       price: 499,
       currency: 'INR',
+      category: 'Music',
       viewers_count: 320,
       distance: '1.8 km away',
       image: `${baseUrl}/uploads/live1.jpg`,
@@ -88,12 +91,26 @@ router.get('/explore', authenticateToken, (req, res) => {
     }
   ];
 
+  let items = exploreFeed;
+  if (categoryFilter) {
+    items = exploreFeed.filter(item => {
+      if (item.category && item.category.toLowerCase().includes(categoryFilter)) return true;
+      if (item.activity && item.activity.toLowerCase().includes(categoryFilter)) return true;
+      if (item.interests && item.interests.some(i => i.toLowerCase().includes(categoryFilter))) return true;
+      return false;
+    });
+  }
+
   return res.status(200).json({
     success: true,
     page,
     limit,
-    count: exploreFeed.length,
-    items: exploreFeed
+    count: items.length,
+    items: items,
+    data: {
+      items: items,
+      count: items.length
+    }
   });
 });
 

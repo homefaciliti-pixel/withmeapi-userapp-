@@ -204,8 +204,437 @@ const getCombinedActivitiesData = (req) => {
   };
 };
 
+// Category Items Data Generator
+const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+  const param = String(categoryIdOrName || 'cat_01').trim().toLowerCase();
+
+  // 1. Coffee (cat_01, coffee, 1)
+  if (param === 'cat_01' || param === 'coffee' || param === '1' || param.includes('coffee') || param.includes('cof')) {
+    const coffeeItems = [
+      {
+        id: 'COF001',
+        type: 'PROFILE',
+        user_id: 'usr_203',
+        name: 'Priya',
+        full_name: 'Priya Sharma',
+        age: 23,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/priya.jpg`,
+        image: `${baseUrl}/uploads/priya.jpg`,
+        avatar: `${baseUrl}/uploads/priya.jpg`,
+        rating: 4.8,
+        distance: '1.2 km',
+        price: 999,
+        currency: 'INR',
+        interests: ['Coffee', 'Cafe', 'Travel'],
+        category: 'Coffee',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'COF002',
+        type: 'PROFILE',
+        user_id: 'usr_201',
+        name: 'Ananya',
+        full_name: 'Ananya Verma',
+        age: 24,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/ananya.jpg`,
+        image: `${baseUrl}/uploads/ananya.jpg`,
+        avatar: `${baseUrl}/uploads/ananya.jpg`,
+        rating: 4.9,
+        distance: '2.4 km',
+        price: 349,
+        currency: 'INR',
+        interests: ['Coffee', 'Music', 'Books'],
+        category: 'Coffee',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'COF003',
+        type: 'PROFILE',
+        user_id: 'usr_102',
+        name: 'Anjali',
+        full_name: 'Anjali Sharma',
+        age: 24,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/anjali.jpg`,
+        image: `${baseUrl}/uploads/anjali.jpg`,
+        avatar: `${baseUrl}/uploads/anjali.jpg`,
+        rating: 4.9,
+        distance: '1.8 km',
+        price: 499,
+        currency: 'INR',
+        interests: ['Coffee', 'Cafe', 'Events'],
+        category: 'Coffee',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'COF004',
+        type: 'PROFILE',
+        user_id: 'usr_404',
+        name: 'Riya',
+        full_name: 'Riya Mehta',
+        age: 26,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/riya.jpg`,
+        image: `${baseUrl}/uploads/riya.jpg`,
+        avatar: `${baseUrl}/uploads/riya.jpg`,
+        rating: 4.8,
+        distance: '3.1 km',
+        price: 399,
+        currency: 'INR',
+        interests: ['Coffee', 'Art', 'Photography'],
+        category: 'Coffee',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'COF005',
+        type: 'PROFILE',
+        user_id: 'usr_405',
+        name: 'Neha',
+        full_name: 'Neha Kapoor',
+        age: 23,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/neha.jpg`,
+        image: `${baseUrl}/uploads/neha.jpg`,
+        avatar: `${baseUrl}/uploads/neha.jpg`,
+        rating: 4.9,
+        distance: '2.0 km',
+        price: 299,
+        currency: 'INR',
+        interests: ['Coffee', 'Music', 'Cafe'],
+        category: 'Coffee',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'COF006',
+        type: 'PROFILE',
+        user_id: 'usr_406',
+        name: 'Sneha',
+        full_name: 'Sneha Sharma',
+        age: 25,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/sneha.jpg`,
+        image: `${baseUrl}/uploads/sneha.jpg`,
+        avatar: `${baseUrl}/uploads/sneha.jpg`,
+        rating: 4.7,
+        distance: '2.7 km',
+        price: 349,
+        currency: 'INR',
+        interests: ['Coffee', 'Fitness', 'Gaming'],
+        category: 'Coffee',
+        is_verified: true,
+        is_favorite: false
+      }
+    ];
+
+    return {
+      category_id: 'cat_01',
+      category: 'Coffee',
+      title: 'Coffee WithMe',
+      image: `${baseUrl}/uploads/categories/coffee.png`,
+      count: coffeeItems.length,
+      items: coffeeItems
+    };
+  }
+
+  // 2. Dinner (cat_02, dinner, 2)
+  if (param === 'cat_02' || param === 'dinner' || param === '2' || param.includes('dinner')) {
+    const dinnerItems = [
+      {
+        id: 'DIN001',
+        type: 'PROFILE',
+        user_id: 'usr_102',
+        name: 'Anjali',
+        full_name: 'Anjali Sharma',
+        age: 24,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/anjali.jpg`,
+        image: `${baseUrl}/uploads/anjali.jpg`,
+        avatar: `${baseUrl}/uploads/anjali.jpg`,
+        rating: 4.9,
+        distance: '1.5 km',
+        price: 499,
+        currency: 'INR',
+        interests: ['Dinner', 'Fine Dining', 'Food'],
+        category: 'Dinner',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'DIN002',
+        type: 'PROFILE',
+        user_id: 'usr_203',
+        name: 'Priya',
+        full_name: 'Priya Sharma',
+        age: 23,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/priya.jpg`,
+        image: `${baseUrl}/uploads/priya.jpg`,
+        avatar: `${baseUrl}/uploads/priya.jpg`,
+        rating: 4.8,
+        distance: '1.2 km',
+        price: 499,
+        currency: 'INR',
+        interests: ['Dinner', 'Italian', 'Music'],
+        category: 'Dinner',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'DIN003',
+        type: 'PROFILE',
+        user_id: 'usr_406',
+        name: 'Sneha',
+        full_name: 'Sneha Sharma',
+        age: 25,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/sneha.jpg`,
+        image: `${baseUrl}/uploads/sneha.jpg`,
+        avatar: `${baseUrl}/uploads/sneha.jpg`,
+        rating: 4.7,
+        distance: '2.5 km',
+        price: 499,
+        currency: 'INR',
+        interests: ['Dinner', 'Buffet', 'Cafe'],
+        category: 'Dinner',
+        is_verified: true,
+        is_favorite: false
+      }
+    ];
+
+    return {
+      category_id: 'cat_02',
+      category: 'Dinner',
+      title: 'Dinner WithMe',
+      image: `${baseUrl}/uploads/categories/dinner.png`,
+      count: dinnerItems.length,
+      items: dinnerItems
+    };
+  }
+
+  // 3. Travel (cat_03, travel, 3)
+  if (param === 'cat_03' || param === 'travel' || param === '3' || param.includes('travel')) {
+    const travelItems = [
+      {
+        id: 'TRV001',
+        type: 'PROFILE',
+        user_id: 'usr_203',
+        name: 'Priya',
+        full_name: 'Priya Sharma',
+        age: 23,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/priya.jpg`,
+        image: `${baseUrl}/uploads/priya.jpg`,
+        avatar: `${baseUrl}/uploads/priya.jpg`,
+        rating: 4.8,
+        distance: '1.2 km',
+        price: 699,
+        currency: 'INR',
+        interests: ['Travel', 'Road Trips', 'Sightseeing'],
+        category: 'Travel',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'TRV002',
+        type: 'PROFILE',
+        user_id: 'usr_404',
+        name: 'Riya',
+        full_name: 'Riya Mehta',
+        age: 26,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/riya.jpg`,
+        image: `${baseUrl}/uploads/riya.jpg`,
+        avatar: `${baseUrl}/uploads/riya.jpg`,
+        rating: 4.8,
+        distance: '2.9 km',
+        price: 699,
+        currency: 'INR',
+        interests: ['Travel', 'Trekking', 'Mountains'],
+        category: 'Travel',
+        is_verified: true,
+        is_favorite: false
+      }
+    ];
+
+    return {
+      category_id: 'cat_03',
+      category: 'Travel',
+      title: 'Travel WithMe',
+      image: `${baseUrl}/uploads/categories/travel.png`,
+      count: travelItems.length,
+      items: travelItems
+    };
+  }
+
+  // 4. Movie (cat_04, movie, 4)
+  if (param === 'cat_04' || param === 'movie' || param === '4' || param.includes('movie')) {
+    const movieItems = [
+      {
+        id: 'MOV001',
+        type: 'PROFILE',
+        user_id: 'usr_405',
+        name: 'Neha',
+        full_name: 'Neha Kapoor',
+        age: 23,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/neha.jpg`,
+        image: `${baseUrl}/uploads/neha.jpg`,
+        avatar: `${baseUrl}/uploads/neha.jpg`,
+        rating: 4.9,
+        distance: '2.1 km',
+        price: 399,
+        currency: 'INR',
+        interests: ['Movie', 'Cinema', 'Popcorn'],
+        category: 'Movie',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'MOV002',
+        type: 'PROFILE',
+        user_id: 'usr_406',
+        name: 'Sneha',
+        full_name: 'Sneha Sharma',
+        age: 25,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/sneha.jpg`,
+        image: `${baseUrl}/uploads/sneha.jpg`,
+        avatar: `${baseUrl}/uploads/sneha.jpg`,
+        rating: 4.7,
+        distance: '2.6 km',
+        price: 399,
+        currency: 'INR',
+        interests: ['Movie', 'Sci-Fi', 'Gaming'],
+        category: 'Movie',
+        is_verified: true,
+        is_favorite: false
+      }
+    ];
+
+    return {
+      category_id: 'cat_04',
+      category: 'Movie',
+      title: 'Movie WithMe',
+      image: `${baseUrl}/uploads/categories/movie.png`,
+      count: movieItems.length,
+      items: movieItems
+    };
+  }
+
+  // 5. Event (cat_05, event, 5)
+  if (param === 'cat_05' || param === 'event' || param === '5' || param.includes('event')) {
+    const eventItems = [
+      {
+        id: 'EVT001',
+        type: 'PROFILE',
+        user_id: 'usr_102',
+        name: 'Anjali',
+        full_name: 'Anjali Sharma',
+        age: 24,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/anjali.jpg`,
+        image: `${baseUrl}/uploads/anjali.jpg`,
+        avatar: `${baseUrl}/uploads/anjali.jpg`,
+        rating: 4.9,
+        distance: '1.7 km',
+        price: 599,
+        currency: 'INR',
+        interests: ['Event', 'Live Music', 'Festivals'],
+        category: 'Event',
+        is_verified: true,
+        is_favorite: false
+      }
+    ];
+
+    return {
+      category_id: 'cat_05',
+      category: 'Event',
+      title: 'Event WithMe',
+      image: `${baseUrl}/uploads/categories/event.png`,
+      count: eventItems.length,
+      items: eventItems
+    };
+  }
+
+  // 6. Conversation (cat_06, conversation, 6)
+  if (param === 'cat_06' || param === 'conversation' || param === '6' || param.includes('conversation')) {
+    const convItems = [
+      {
+        id: 'CNV001',
+        type: 'PROFILE',
+        user_id: 'usr_203',
+        name: 'Priya',
+        full_name: 'Priya Sharma',
+        age: 23,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/priya.jpg`,
+        image: `${baseUrl}/uploads/priya.jpg`,
+        avatar: `${baseUrl}/uploads/priya.jpg`,
+        rating: 4.8,
+        distance: '1.2 km',
+        price: 299,
+        currency: 'INR',
+        interests: ['Conversation', 'Philosophy', 'Reading'],
+        category: 'Conversation',
+        is_verified: true,
+        is_favorite: false
+      }
+    ];
+
+    return {
+      category_id: 'cat_06',
+      category: 'Conversation',
+      title: 'Conversation WithMe',
+      image: `${baseUrl}/uploads/categories/conversation.png`,
+      count: convItems.length,
+      items: convItems
+    };
+  }
+
+  // Default fallback to Coffee
+  return getCategoryItemsData('cat_01', baseUrl);
+};
+
+// Category Items Handler for GET requests
+const handleCategoryDetailsOrList = (req, res) => {
+  const baseUrl = getBaseUrl(req);
+  const requestedCat = req.params.id || req.params.category || req.query.category || req.query.id || req.query.category_id || req.query.type || 'cat_01';
+  const data = getCategoryItemsData(requestedCat, baseUrl);
+
+  return res.status(200).json({
+    success: true,
+    message: `${data.category} activity profiles fetched successfully`,
+    category_id: data.category_id,
+    category: data.category,
+    title: data.title,
+    image: data.image,
+    count: data.count,
+    items: data.items,
+    data: {
+      category_id: data.category_id,
+      category: data.category,
+      title: data.title,
+      image: data.image,
+      count: data.count,
+      items: data.items
+    }
+  });
+};
+
 // 5.0 All-In-One Combined Activities API — GET (/api/v1/activities/all-in-one, /api/v1/activities/combined, /api/v1/activities/dashboard, /api/v1/activities)
 const handleCombinedActivities = (req, res) => {
+  // If client passes category filter e.g. /activities?category=Coffee or /activities?id=cat_01
+  if (req.query && (req.query.category || req.query.category_id)) {
+    return handleCategoryDetailsOrList(req, res);
+  }
+
   const combinedData = getCombinedActivitiesData(req);
   return res.status(200).json({
     success: true,
@@ -217,6 +646,44 @@ const handleCombinedActivities = (req, res) => {
     data: combinedData
   });
 };
+
+router.get('/category/:id/items', authenticateToken, handleCategoryDetailsOrList);
+router.get('/category/:id/partners', authenticateToken, handleCategoryDetailsOrList);
+router.get('/category/:id', authenticateToken, handleCategoryDetailsOrList);
+router.get('/category-details/:id', authenticateToken, handleCategoryDetailsOrList);
+router.get('/category-details', authenticateToken, handleCategoryDetailsOrList);
+router.get('/category', authenticateToken, handleCategoryDetailsOrList);
+router.get('/items', authenticateToken, handleCategoryDetailsOrList);
+router.get('/list', authenticateToken, (req, res) => {
+  if (req.query && (req.query.category || req.query.category_id || req.query.id || req.query.type)) {
+    return handleCategoryDetailsOrList(req, res);
+  }
+  return handleCombinedActivities(req, res);
+});
+router.get('/coffee', authenticateToken, (req, res) => {
+  req.params.id = 'cat_01';
+  return handleCategoryDetailsOrList(req, res);
+});
+router.get('/dinner', authenticateToken, (req, res) => {
+  req.params.id = 'cat_02';
+  return handleCategoryDetailsOrList(req, res);
+});
+router.get('/travel', authenticateToken, (req, res) => {
+  req.params.id = 'cat_03';
+  return handleCategoryDetailsOrList(req, res);
+});
+router.get('/movie', authenticateToken, (req, res) => {
+  req.params.id = 'cat_04';
+  return handleCategoryDetailsOrList(req, res);
+});
+router.get('/event', authenticateToken, (req, res) => {
+  req.params.id = 'cat_05';
+  return handleCategoryDetailsOrList(req, res);
+});
+router.get('/conversation', authenticateToken, (req, res) => {
+  req.params.id = 'cat_06';
+  return handleCategoryDetailsOrList(req, res);
+});
 
 router.get('/all-in-one', authenticateToken, handleCombinedActivities);
 router.get('/combined', authenticateToken, handleCombinedActivities);
