@@ -108,6 +108,7 @@ const exploreRoutes = require('./src/routes/exploreRoutes');
 const generalRoutes = require('./src/routes/generalRoutes');
 const bookingRoutes = require('./src/routes/bookingRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
+const uploadRoutes = require('./src/routes/uploadRoutes');
 
 // Bind Routes to Base API Path
 app.use('/api/v1/auth', authRoutes);
@@ -117,6 +118,10 @@ app.use('/kyc', profileKycRoutes);
 app.use('/profile', profileKycRoutes);
 app.use('/api/v1/aadhaar', aadhaarRoutes);
 app.use('/aadhaar', aadhaarRoutes);
+app.use('/api/v1/upload', uploadRoutes);
+app.use('/api/v1/uploads', uploadRoutes);
+app.use('/upload', uploadRoutes);
+app.use('/file-upload', uploadRoutes);
 app.use('/api/v1/profile-live', profileLiveRoutes);
 app.use('/api/v1/activities', activityRoutes);
 app.use('/activities', activityRoutes);

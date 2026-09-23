@@ -650,23 +650,98 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 - Headers: Authorization: Bearer <token>, Content-Type: application/json
 - Request Body (JSON):
   {
-    "payment_id": "PAY_8877123",
-    "order_id": "ORD_998823",
-    "signature": "razorpay_mock_signature_xyz"
+    "payment_id": "pay_LuEqPzYPfHgjL9",
+    "order_id": "order_cWygt697YYA5TA",
+    "signature": "razorpay_signature_xyz"
   }
 - Response (200 OK):
   {
     "success": true,
     "message": "Payment verified successfully",
     "data": {
-      "payment_id": "PAY_8877123",
-      "order_id": "ORD_998823",
+      "payment_id": "pay_LuEqPzYPfHgjL9",
+      "order_id": "order_cWygt697YYA5TA",
+      "razorpay_payment_id": "pay_LuEqPzYPfHgjL9",
+      "razorpay_order_id": "order_cWygt697YYA5TA",
       "booking_id": "BK197860",
       "payment_status": "PAID",
       "verification_status": "SUCCESS",
-      "transaction_id": "TXN_9988776655",
-      "paid_at": "2026-09-21T08:21:00Z"
+      "transaction_id": "txn_8877123456",
+      "amount": 299,
+      "amount_in_paise": 29900,
+      "currency": "INR",
+      "paid_at": "2026-09-23T09:58:00Z"
     }
+  }
+
+--------------------------------------------------------------------------------
+11. UNIVERSAL FILE & IMAGE UPLOAD APIs (/api/v1/upload, /upload)
+--------------------------------------------------------------------------------
+
+11.1 Universal Single/Multi-file Upload API
+- Endpoints:
+  * POST /api/v1/upload
+  * POST /upload
+  * POST /api/v1/upload/image
+  * POST /api/v1/upload/photo
+  * POST /api/v1/upload/file
+  * POST /api/v1/upload/document
+  * POST /api/v1/upload/avatar
+  * POST /api/v1/upload/profile-photo
+- Headers:
+  * Authorization: Bearer <token> (Optional/Supported)
+  * Content-Type: multipart/form-data
+- Form-Data Parameters:
+  * file / image / photo / document / avatar / aadhaar_front / aadhaar_back: <Binary File> (JPG, PNG, PDF, etc.)
+  * user_id (Optional): "usr_998877"
+  * folder / category (Optional): "profile" / "kyc" / "activities"
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "File uploaded successfully",
+    "url": "https://withmeapi-userapp.onrender.com/uploads/image-1790089200-123456789.jpg",
+    "file_url": "https://withmeapi-userapp.onrender.com/uploads/image-1790089200-123456789.jpg",
+    "image_url": "https://withmeapi-userapp.onrender.com/uploads/image-1790089200-123456789.jpg",
+    "photo_url": "https://withmeapi-userapp.onrender.com/uploads/image-1790089200-123456789.jpg",
+    "filename": "image-1790089200-123456789.jpg",
+    "original_name": "my_photo.jpg",
+    "mimetype": "image/jpeg",
+    "size": 154200,
+    "path": "/uploads/image-1790089200-123456789.jpg",
+    "files": [
+      {
+        "fieldname": "image",
+        "filename": "image-1790089200-123456789.jpg",
+        "original_name": "my_photo.jpg",
+        "mimetype": "image/jpeg",
+        "size": 154200,
+        "url": "https://withmeapi-userapp.onrender.com/uploads/image-1790089200-123456789.jpg",
+        "file_url": "https://withmeapi-userapp.onrender.com/uploads/image-1790089200-123456789.jpg"
+      }
+    ],
+    "data": {
+      "url": "https://withmeapi-userapp.onrender.com/uploads/image-1790089200-123456789.jpg",
+      "file_url": "https://withmeapi-userapp.onrender.com/uploads/image-1790089200-123456789.jpg",
+      "filename": "image-1790089200-123456789.jpg",
+      "size": 154200
+    }
+  }
+
+11.2 Base64 Image Upload API (JSON Body)
+- Endpoint: POST /api/v1/upload (or POST /upload)
+- Headers: Content-Type: application/json
+- Request Body (JSON):
+  {
+    "base64": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE...",
+    "category": "kyc"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "File uploaded successfully",
+    "url": "https://withmeapi-userapp.onrender.com/uploads/base64-1790089200-987654321.jpg",
+    "file_url": "https://withmeapi-userapp.onrender.com/uploads/base64-1790089200-987654321.jpg",
+    "filename": "base64-1790089200-987654321.jpg"
   }
 
 ================================================================================
