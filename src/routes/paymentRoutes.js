@@ -91,9 +91,15 @@ const handlePaymentInitiate = async (req, res) => {
   const paymentId = generateRazorpayId('pay');
   const createdAt = new Date().toISOString();
 
-  const userName = (req.user && req.user.name) || 'Amit';
-  const userEmail = (req.user && req.user.email) || 'amit@example.com';
-  const userPhone = (req.user && req.user.phone_number) || '9199953391';
+  const userName = (req.body && (req.body.name || req.body.user_name)) || (req.user && req.user.name) || 'WitMe User';
+  const userEmail = (req.body && (req.body.email || req.body.user_email)) || (req.user && req.user.email) || 'contact@witme.com';
+  const userPhone = (req.body && (req.body.phone || req.body.contact || req.body.phone_number)) || (req.user && req.user.phone_number) || '9199953391';
+
+  const prefill = {
+    name: userName,
+    email: userEmail,
+    contact: userPhone
+  };
 
   const razorpayOptions = {
     key: razorpayKey,
@@ -105,11 +111,7 @@ const handlePaymentInitiate = async (req, res) => {
     description: `Booking payment for ${booking_id}`,
     image: `${baseUrl}/uploads/priya.jpg`,
     order_id: orderId,
-    prefill: {
-      name: userName,
-      email: userEmail,
-      contact: userPhone
-    },
+    prefill: prefill,
     notes: {
       booking_id,
       payment_method
@@ -135,6 +137,8 @@ const handlePaymentInitiate = async (req, res) => {
     razorpay_key: razorpayKey,
     razorpay_key_id: razorpayKey,
     key_id: razorpayKey,
+    key: razorpayKey,
+    prefill: prefill,
     razorpay_options: razorpayOptions,
     options: razorpayOptions,
     upi_qr_code: `upi://pay?pa=witme@upi&pn=WitMe&am=${numericAmount}&cu=${currency}`,
@@ -147,20 +151,26 @@ const handlePaymentInitiate = async (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Payment initiated successfully',
-    data: paymentData,
     payment_id: paymentId,
     order_id: orderId,
     razorpay_payment_id: paymentId,
     razorpay_order_id: orderId,
+    booking_id,
     amount: numericAmount,
     amount_in_paise: amountInPaise,
     amount_paise: amountInPaise,
     currency,
+    key: razorpayKey,
     razorpay_key: razorpayKey,
     razorpay_key_id: razorpayKey,
     key_id: razorpayKey,
+    prefill: prefill,
+    name: 'WitMe App',
+    description: `Booking payment for ${booking_id}`,
+    theme: { color: '#6C5CE7' },
     razorpay_options: razorpayOptions,
-    options: razorpayOptions
+    options: razorpayOptions,
+    data: paymentData
   });
 };
 
@@ -182,9 +192,15 @@ const handleCheckout = async (req, res) => {
   const orderId = liveOrder && liveOrder.id ? liveOrder.id : generateRazorpayId('order');
   const createdAt = new Date().toISOString();
 
-  const userName = (req.user && req.user.name) || 'Amit';
-  const userEmail = (req.user && req.user.email) || 'amit@example.com';
-  const userPhone = (req.user && req.user.phone_number) || '9199953391';
+  const userName = (req.body && (req.body.name || req.body.user_name)) || (req.user && req.user.name) || 'WitMe User';
+  const userEmail = (req.body && (req.body.email || req.body.user_email)) || (req.user && req.user.email) || 'contact@witme.com';
+  const userPhone = (req.body && (req.body.phone || req.body.contact || req.body.phone_number)) || (req.user && req.user.phone_number) || '9199953391';
+
+  const prefill = {
+    name: userName,
+    email: userEmail,
+    contact: userPhone
+  };
 
   const razorpayOptions = {
     key: razorpayKey,
@@ -196,11 +212,7 @@ const handleCheckout = async (req, res) => {
     description: `Checkout for ${activity} (${booking_id})`,
     image: `${baseUrl}/uploads/priya.jpg`,
     order_id: orderId,
-    prefill: {
-      name: userName,
-      email: userEmail,
-      contact: userPhone
-    },
+    prefill: prefill,
     notes: {
       booking_id,
       activity
@@ -221,9 +233,11 @@ const handleCheckout = async (req, res) => {
     tax_amount: 0,
     total_amount: numericPrice,
     currency,
+    key: razorpayKey,
     razorpay_key: razorpayKey,
     razorpay_key_id: razorpayKey,
     key_id: razorpayKey,
+    prefill: prefill,
     razorpay_options: razorpayOptions,
     options: razorpayOptions,
     available_payment_methods: ['UPI', 'RAZORPAY', 'CARD', 'NET_BANKING', 'WALLET'],
@@ -233,18 +247,20 @@ const handleCheckout = async (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Checkout summary created successfully',
-    data: checkoutData,
     checkout_id: orderId,
     order_id: orderId,
     razorpay_order_id: orderId,
     total_amount: numericPrice,
     amount_in_paise: amountInPaise,
     currency,
+    key: razorpayKey,
     razorpay_key: razorpayKey,
     razorpay_key_id: razorpayKey,
     key_id: razorpayKey,
+    prefill: prefill,
     razorpay_options: razorpayOptions,
-    options: razorpayOptions
+    options: razorpayOptions,
+    data: checkoutData
   });
 };
 
