@@ -24,24 +24,26 @@ const generateRazorpayId = (prefix = 'pay') => {
   return `${prefix}_${result}`;
 };
 
+const crypto = require('crypto');
+
 // Razorpay Key Configuration
 const getRazorpayKey = (req) => {
   return (req && req.body && (req.body.razorpay_key || req.body.key_id || req.body.key)) ||
     process.env.RAZORPAY_KEY_ID ||
     process.env.RAZORPAY_KEY ||
-    'rzp_live_1DP5mmOlF5G5ag';
+    'rzp_live_SwFaJKQjU5ZOsH';
 };
 
 const getRazorpaySecret = (req) => {
   return (req && req.body && (req.body.razorpay_secret || req.body.secret)) ||
     process.env.RAZORPAY_KEY_SECRET ||
     process.env.RAZORPAY_SECRET ||
-    '';
+    'JY4Uup8xp2k1AvXXE2ezOje2';
 };
 
 // Helper to create live order on Razorpay API servers if credentials exist
 const createRazorpayLiveOrder = async (amountInPaise, currency, receipt, keyId, keySecret) => {
-  if (!keyId || !keySecret || keyId.includes('mock') || keyId.includes('1DP5mmOlF5G5ag')) {
+  if (!keyId || !keySecret || keyId.includes('mock')) {
     return null;
   }
   try {
@@ -55,13 +57,16 @@ const createRazorpayLiveOrder = async (amountInPaise, currency, receipt, keyId, 
       body: JSON.stringify({
         amount: amountInPaise,
         currency: currency || 'INR',
-        receipt: receipt || `rcpt_${Date.now()}`,
+        receipt: receipt ? String(receipt).substring(0, 40) : `rcpt_${Date.now()}`,
         payment_capture: 1
       })
     });
     if (response.ok) {
       const data = await response.json();
       return data;
+    } else {
+      const errorText = await response.text();
+      console.warn('Razorpay live order API returned non-200:', response.status, errorText);
     }
   } catch (err) {
     console.warn('Razorpay live order creation notice:', err.message);

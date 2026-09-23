@@ -772,16 +772,41 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
   {
     "success": true,
     "message": "Payment initiated successfully",
+    "payment_id": "pay_LuEqPzYPfHgjL9",
+    "order_id": "order_cWygt697YYA5TA",
+    "razorpay_payment_id": "pay_LuEqPzYPfHgjL9",
+    "razorpay_order_id": "order_cWygt697YYA5TA",
+    "amount": 299,
+    "amount_in_paise": 29900,
+    "currency": "INR",
+    "razorpay_key": "rzp_live_SwFaJKQjU5ZOsH",
+    "razorpay_key_id": "rzp_live_SwFaJKQjU5ZOsH",
+    "key_id": "rzp_live_SwFaJKQjU5ZOsH",
+    "razorpay_options": {
+      "key": "rzp_live_SwFaJKQjU5ZOsH",
+      "amount": 29900,
+      "currency": "INR",
+      "name": "WitMe App",
+      "description": "Booking payment for BK197860",
+      "order_id": "order_cWygt697YYA5TA",
+      "prefill": {
+        "name": "Amit",
+        "email": "amit@example.com",
+        "contact": "9199953391"
+      }
+    },
     "data": {
-      "payment_id": "PAY_8877123",
-      "order_id": "ORD_998823",
+      "payment_id": "pay_LuEqPzYPfHgjL9",
+      "order_id": "order_cWygt697YYA5TA",
       "booking_id": "BK197860",
       "amount": 299,
+      "amount_in_paise": 29900,
       "currency": "INR",
       "status": "INITIATED",
-      "razorpay_key": "rzp_test_mockKey123",
+      "razorpay_key": "rzp_live_SwFaJKQjU5ZOsH",
+      "razorpay_key_id": "rzp_live_SwFaJKQjU5ZOsH",
       "upi_qr_code": "upi://pay?pa=witme@upi&pn=WitMe&am=299&cu=INR",
-      "created_at": "2026-09-21T08:20:00Z"
+      "created_at": "2026-09-23T10:20:00Z"
     }
   }
 
@@ -799,16 +824,25 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
   {
     "success": true,
     "message": "Checkout summary created successfully",
+    "checkout_id": "order_cWygt697YYA5TA",
+    "order_id": "order_cWygt697YYA5TA",
+    "razorpay_key": "rzp_live_SwFaJKQjU5ZOsH",
+    "razorpay_key_id": "rzp_live_SwFaJKQjU5ZOsH",
+    "total_amount": 299,
+    "amount_in_paise": 29900,
+    "currency": "INR",
     "data": {
-      "checkout_id": "CHK_998811",
+      "checkout_id": "order_cWygt697YYA5TA",
       "booking_id": "BK197860",
       "activity": "Coffee",
       "amount_payable": 299,
       "tax_amount": 0,
       "total_amount": 299,
+      "amount_in_paise": 29900,
       "currency": "INR",
+      "razorpay_key": "rzp_live_SwFaJKQjU5ZOsH",
       "available_payment_methods": ["UPI", "RAZORPAY", "CARD", "NET_BANKING", "WALLET"],
-      "created_at": "2026-09-21T08:20:00Z"
+      "created_at": "2026-09-23T10:20:00Z"
     }
   }
 
