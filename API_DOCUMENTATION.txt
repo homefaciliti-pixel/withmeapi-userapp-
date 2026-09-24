@@ -132,7 +132,71 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 2.2 Detailed User Profile API: GET /api/v1/profile/details/:id
 2.3 Interest Selection API: POST /api/v1/profile/interest-selection
 2.4 Profile Edit API: POST / PUT /api/v1/profile/edit
-2.5 KYC Verification API: POST /api/v1/kyc/verify
+2.5 KYC Verification & Status API
+- Endpoints:
+  - POST /api/v1/kyc/verify (or POST /kyc/verify, POST /kyc, POST /api/v1/kyc/submit)
+  - GET /api/v1/kyc/verify (or GET /kyc/verify, GET /kyc/status, GET /api/v1/kyc/status)
+- Headers: Authorization: Bearer <token>
+- Description: Submit or check KYC verification details. KYC status is approved, with Aadhaar OTP verification status pending.
+- Request Body (JSON / multipart for POST):
+  {
+    "document_type": "AADHAAR",
+    "document_number": "123456789012",
+    "name": "Alex Sharma",
+    "dob": "1998-05-15",
+    "gender": "Male",
+    "city": "Mumbai"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "KYC verification approved successfully. Aadhaar OTP verification is pending.",
+    "status": "APPROVED",
+    "kyc_status": "APPROVED",
+    "approval_status": "APPROVED",
+    "is_approved": true,
+    "is_kyc_completed": true,
+    "is_verified": true,
+    "adhar_otp": "PENDING",
+    "aadhaar_otp": "PENDING",
+    "aadhaar_otp_status": "PENDING",
+    "adhar_otp_status": "PENDING",
+    "aadhaar_status": "PENDING",
+    "otp_status": "PENDING",
+    "kyc_id": "KYC_782910",
+    "data": {
+      "kyc_id": "KYC_782910",
+      "status": "APPROVED",
+      "kyc_status": "APPROVED",
+      "approval_status": "APPROVED",
+      "is_approved": true,
+      "is_kyc_completed": true,
+      "is_verified": true,
+      "adhar_otp": "PENDING",
+      "aadhaar_otp": "PENDING",
+      "aadhaar_otp_status": "PENDING",
+      "adhar_otp_status": "PENDING",
+      "aadhaar_status": "PENDING",
+      "otp_status": "PENDING",
+      "name": "Alex Sharma",
+      "full_name": "Alex Sharma",
+      "nick_name": "Alex",
+      "email": "alex.sharma@example.com",
+      "gender": "Male",
+      "dob": "1998-05-15",
+      "city": "Mumbai",
+      "document_type": "AADHAAR",
+      "document_number": "123456789012",
+      "aadhaar_number": "123456789012",
+      "document_number_masked": "XXXXXXXX9012",
+      "aadhaar_front_url": "https://withmeapi-userapp.onrender.com/uploads/mock_aadhaar_front.jpg",
+      "aadhaar_back_url": "https://withmeapi-userapp.onrender.com/uploads/mock_aadhaar_back.jpg",
+      "front_url": "https://withmeapi-userapp.onrender.com/uploads/mock_aadhaar_front.jpg",
+      "back_url": "https://withmeapi-userapp.onrender.com/uploads/mock_aadhaar_back.jpg",
+      "submitted_at": "2026-09-24T05:42:00.000Z",
+      "approved_at": "2026-09-24T05:42:00.000Z"
+    }
+  }
 
 --------------------------------------------------------------------------------
 3. AADHAAR KYC APIs (/api/v1/aadhaar)

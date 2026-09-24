@@ -103,8 +103,16 @@ const handleGetProfile = async (req, res) => {
     profile_images: imageList,
     is_photo_verified: true,
     photo_verification_status: 'VERIFIED',
-    is_kyc_completed: false,
-    kyc_status: 'NOT_VERIFIED'
+    is_kyc_completed: true,
+    is_approved: true,
+    approval_status: 'APPROVED',
+    kyc_status: 'APPROVED',
+    adhar_otp: 'PENDING',
+    aadhaar_otp: 'PENDING',
+    aadhaar_otp_status: 'PENDING',
+    adhar_otp_status: 'PENDING',
+    aadhaar_status: 'PENDING',
+    otp_status: 'PENDING'
   };
 
   let profileData = userProfilesStore[userId] || defaultProfile;
@@ -134,8 +142,16 @@ const handleGetProfile = async (req, res) => {
         profile_images: imageList,
         is_photo_verified: profileData.is_photo_verified !== undefined ? profileData.is_photo_verified : true,
         photo_verification_status: profileData.photo_verification_status || 'VERIFIED',
-        kyc_status: u.kyc_status || profileData.kyc_status,
-        is_kyc_completed: u.kyc_status === 'VERIFIED'
+        kyc_status: (u.kyc_status && u.kyc_status !== 'NOT_VERIFIED') ? u.kyc_status : 'APPROVED',
+        is_kyc_completed: true,
+        is_approved: true,
+        approval_status: 'APPROVED',
+        adhar_otp: 'PENDING',
+        aadhaar_otp: 'PENDING',
+        aadhaar_otp_status: 'PENDING',
+        adhar_otp_status: 'PENDING',
+        aadhaar_status: 'PENDING',
+        otp_status: 'PENDING'
       };
     }
   } catch (err) {
@@ -414,13 +430,24 @@ const handleProfileEditCombined = async (req, res) => {
       document_type,
       document_number_masked: document_number.slice(-4).padStart(document_number.length, '*'),
       full_name: full_name || name || existingProfile.name || 'User',
-      status: 'PENDING_VERIFICATION'
+      status: 'APPROVED',
+      kyc_status: 'APPROVED',
+      approval_status: 'APPROVED',
+      is_approved: true,
+      is_kyc_completed: true,
+      is_verified: true,
+      adhar_otp: 'PENDING',
+      aadhaar_otp: 'PENDING',
+      aadhaar_otp_status: 'PENDING',
+      adhar_otp_status: 'PENDING',
+      aadhaar_status: 'PENDING',
+      otp_status: 'PENDING'
     };
 
     try {
-      await query(`UPDATE users SET kyc_status = 'PENDING_VERIFICATION' WHERE id = ? OR phone_number = ?`, [userId, req.user.phone_number || '']);
+      await query(`UPDATE users SET kyc_status = 'APPROVED' WHERE id = ? OR phone_number = ?`, [userId, req.user.phone_number || '']);
       await query(
-        `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'PENDING_VERIFICATION')`,
+        `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'APPROVED')`,
         [userId, document_type, document_number, full_name || name || 'User']
       );
     } catch (err) {
@@ -438,7 +465,20 @@ const handleProfileEditCombined = async (req, res) => {
     ...(dob && { dob }),
     ...(bio && { bio }),
     ...(city && { city }),
-    ...(kycSubmitted && { kyc_status: 'PENDING_VERIFICATION', is_kyc_completed: false }),
+    ...(kycSubmitted && {
+      kyc_status: 'APPROVED',
+      status: 'APPROVED',
+      approval_status: 'APPROVED',
+      is_approved: true,
+      is_kyc_completed: true,
+      is_verified: true,
+      adhar_otp: 'PENDING',
+      aadhaar_otp: 'PENDING',
+      aadhaar_otp_status: 'PENDING',
+      adhar_otp_status: 'PENDING',
+      aadhaar_status: 'PENDING',
+      otp_status: 'PENDING'
+    }),
     updated_at: new Date().toISOString()
   };
 
@@ -447,7 +487,7 @@ const handleProfileEditCombined = async (req, res) => {
   // Update MySQL database if available
   try {
     await query(
-      `UPDATE users SET name = ?, email = ?, gender = ?, interested_in_gender = ?, city = ?, bio = ?${kycSubmitted ? ", kyc_status = 'PENDING_VERIFICATION'" : ''} WHERE id = ? OR phone_number = ?`,
+      `UPDATE users SET name = ?, email = ?, gender = ?, interested_in_gender = ?, city = ?, bio = ?${kycSubmitted ? ", kyc_status = 'APPROVED'" : ''} WHERE id = ? OR phone_number = ?`,
       [
         updatedProfile.name || 'User',
         updatedProfile.email || null,
@@ -482,10 +522,10 @@ router.put('/profile/edit', authenticateToken, handleProfileEditCombined);
 router.post('/profile/combined-update', authenticateToken, handleProfileEditCombined);
 router.post('/profile/update-all', authenticateToken, handleProfileEditCombined);
 
-// 5. KYC Verification & Submit API — POST (/kyc/verify, /kyc/submit, /kyc/post, /kyc)
+// 5. KYC Verification & Submit API — POST / GET (/kyc/verify, /kyc/status, /kyc/submit, /kyc/post, /kyc)
 const handleKycSubmit = async (req, res) => {
   const baseUrl = getBaseUrl(req);
-  const body = req.body || {};
+  const body = (req.method === 'GET' ? req.query : req.body) || {};
 
   // Extract all user profile & KYC fields
   const name = (body.name || body.full_name || body.fullName || (req.user && req.user.name) || 'Alex Sharma').toString();
@@ -553,7 +593,7 @@ const handleKycSubmit = async (req, res) => {
   const kycId = `KYC_${Math.floor(100000 + Math.random() * 900000)}`;
   const submittedAt = new Date().toISOString();
 
-  // Update in-memory user profile
+  // Update in-memory user profile with APPROVED status and PENDING adhar_otp
   if (userProfilesStore[userId]) {
     userProfilesStore[userId] = {
       ...userProfilesStore[userId],
@@ -563,8 +603,18 @@ const handleKycSubmit = async (req, res) => {
       dob,
       city,
       bio,
-      kyc_status: 'PENDING_VERIFICATION',
-      is_kyc_completed: false
+      kyc_status: 'APPROVED',
+      status: 'APPROVED',
+      approval_status: 'APPROVED',
+      is_approved: true,
+      is_kyc_completed: true,
+      is_verified: true,
+      adhar_otp: 'PENDING',
+      aadhaar_otp: 'PENDING',
+      aadhaar_otp_status: 'PENDING',
+      adhar_otp_status: 'PENDING',
+      aadhaar_status: 'PENDING',
+      otp_status: 'PENDING'
     };
   }
 
@@ -573,7 +623,7 @@ const handleKycSubmit = async (req, res) => {
     const effectivePhone = userPhone || '+919199953391';
     await query(
       `INSERT INTO users (phone_number, name, email, gender, dob, bio, city, kyc_status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING_VERIFICATION') 
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'APPROVED') 
        ON DUPLICATE KEY UPDATE 
          name = COALESCE(VALUES(name), name), 
          email = COALESCE(VALUES(email), email), 
@@ -581,11 +631,11 @@ const handleKycSubmit = async (req, res) => {
          dob = COALESCE(VALUES(dob), dob), 
          bio = COALESCE(VALUES(bio), bio), 
          city = COALESCE(VALUES(city), city), 
-         kyc_status = 'PENDING_VERIFICATION'`,
+         kyc_status = 'APPROVED'`,
       [effectivePhone, name, email, gender, dob, bio, city]
     );
     await query(
-      `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'PENDING_VERIFICATION')`,
+      `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'APPROVED')`,
       [userId, document_type, rawDocumentNumber, name]
     );
   } catch (err) {
@@ -598,8 +648,18 @@ const handleKycSubmit = async (req, res) => {
     request_body: body,
     received_body: body,
     kyc_id: kycId,
-    status: 'PENDING_VERIFICATION',
-    is_kyc_completed: false,
+    status: 'APPROVED',
+    kyc_status: 'APPROVED',
+    approval_status: 'APPROVED',
+    is_approved: true,
+    is_kyc_completed: true,
+    is_verified: true,
+    adhar_otp: 'PENDING',
+    aadhaar_otp: 'PENDING',
+    aadhaar_otp_status: 'PENDING',
+    adhar_otp_status: 'PENDING',
+    aadhaar_status: 'PENDING',
+    otp_status: 'PENDING',
     name,
     full_name: name,
     nick_name,
@@ -617,14 +677,25 @@ const handleKycSubmit = async (req, res) => {
     front_url: frontUrl,
     back_url: backUrl,
     document_files: uploadedFiles.length > 0 ? uploadedFiles : [frontUrl, backUrl],
-    submitted_at: submittedAt
+    submitted_at: submittedAt,
+    approved_at: submittedAt
   };
 
   return res.status(200).json({
     success: true,
-    message: 'KYC details submitted successfully for verification',
-    status: 'PENDING_VERIFICATION',
-    is_kyc_completed: false,
+    message: 'KYC verification approved successfully. Aadhaar OTP verification is pending.',
+    status: 'APPROVED',
+    kyc_status: 'APPROVED',
+    approval_status: 'APPROVED',
+    is_approved: true,
+    is_kyc_completed: true,
+    is_verified: true,
+    adhar_otp: 'PENDING',
+    aadhaar_otp: 'PENDING',
+    aadhaar_otp_status: 'PENDING',
+    adhar_otp_status: 'PENDING',
+    aadhaar_status: 'PENDING',
+    otp_status: 'PENDING',
     kyc_id: kycId,
     body: body,
     request_body: body,
@@ -651,13 +722,21 @@ const safeUpload = (req, res, next) => {
   }
 };
 
+// Route mappings for KYC verification & status (supporting both POST and GET)
 router.post('/kyc/verify', authenticateToken, safeUpload, handleKycSubmit);
+router.get('/kyc/verify', authenticateToken, handleKycSubmit);
+router.post('/kyc/status', authenticateToken, handleKycSubmit);
+router.get('/kyc/status', authenticateToken, handleKycSubmit);
 router.post('/kyc/submit', authenticateToken, safeUpload, handleKycSubmit);
+router.get('/kyc/submit', authenticateToken, handleKycSubmit);
 router.post('/kyc/post', authenticateToken, safeUpload, handleKycSubmit);
 router.post('/kyc', authenticateToken, safeUpload, handleKycSubmit);
+router.get('/kyc', authenticateToken, handleKycSubmit);
 router.post('/verify', authenticateToken, safeUpload, handleKycSubmit);
+router.get('/verify', authenticateToken, handleKycSubmit);
 router.post('/submit', authenticateToken, safeUpload, handleKycSubmit);
 router.post('/post', authenticateToken, safeUpload, handleKycSubmit);
 router.post('/', authenticateToken, safeUpload, handleKycSubmit);
+router.get('/', authenticateToken, handleKycSubmit);
 
 module.exports = router;

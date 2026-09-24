@@ -41,11 +41,11 @@ const handleAadhaarKycSubmit = async (req, res) => {
   // Save to MySQL DB
   try {
     await query(
-      `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, 'AADHAAR', ?, ?, 'PENDING_OTP_VERIFICATION')`,
+      `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, 'AADHAAR', ?, ?, 'APPROVED')`,
       [userId, cleanAadhaar, full_name]
     );
     await query(
-      `UPDATE users SET name = COALESCE(?, name), kyc_status = 'PENDING_OTP_VERIFICATION' WHERE id = ?`,
+      `UPDATE users SET name = COALESCE(?, name), kyc_status = 'APPROVED' WHERE id = ?`,
       [full_name || null, userId]
     );
   } catch (err) {
@@ -64,13 +64,36 @@ const handleAadhaarKycSubmit = async (req, res) => {
     age: age ? parseInt(age) : 25,
     front_url: frontUrl,
     back_url: backUrl,
-    kyc_status: 'PENDING_OTP_VERIFICATION'
+    status: 'APPROVED',
+    kyc_status: 'APPROVED',
+    approval_status: 'APPROVED',
+    is_approved: true,
+    is_kyc_completed: true,
+    is_verified: true,
+    adhar_otp: 'PENDING',
+    aadhaar_otp: 'PENDING',
+    aadhaar_otp_status: 'PENDING',
+    adhar_otp_status: 'PENDING',
+    aadhaar_status: 'PENDING',
+    otp_status: 'PENDING'
   };
 
   return res.status(200).json({
     success: true,
     api_name: 'aadhaarKycSubmit',
-    message: 'Aadhaar details and documents uploaded. OTP sent to Aadhaar-linked mobile number.',
+    message: 'KYC approved successfully. Aadhaar OTP verification is pending.',
+    status: 'APPROVED',
+    kyc_status: 'APPROVED',
+    approval_status: 'APPROVED',
+    is_approved: true,
+    is_kyc_completed: true,
+    is_verified: true,
+    adhar_otp: 'PENDING',
+    aadhaar_otp: 'PENDING',
+    aadhaar_otp_status: 'PENDING',
+    adhar_otp_status: 'PENDING',
+    aadhaar_status: 'PENDING',
+    otp_status: 'PENDING',
     ref_id: refId,
     expires_in_seconds: 300,
     body: body,
