@@ -116,17 +116,26 @@ const handleCreateBooking = async (req, res) => {
 
   bookingsStore.push(newBooking);
 
-  // 1. Save to MySQL table `partner_bookings`
+  // 1. Save to MySQL table `withme_partner_bookings`
   try {
     await query(
+      `INSERT INTO withme_partner_bookings (
+        booking_id, user_id, partner_id, customer_name, customer_phone, activity,
+        date, time, duration, location, price, currency, payment_status, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'PAID', 'CONFIRMED', NOW())
+      ON DUPLICATE KEY UPDATE status = 'CONFIRMED', updated_at = NOW()`,
+      [bookingId, userId, effectivePartnerId, userName, userPhone, activity, date, time, newBooking.duration, locationStr, price]
+    );
+    // Backward compatibility mirror
+    query(
       `INSERT INTO partner_bookings (
         booking_id, user_id, user_name, user_phone, partner_id, activity,
         date, time, location, price, currency, status, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'Upcoming', NOW())
       ON DUPLICATE KEY UPDATE status = 'Upcoming', updated_at = NOW()`,
       [bookingId, userId, userName, userPhone, effectivePartnerId, activity, date, time, locationStr, price]
-    );
-    console.log(`[Database] Booking ${bookingId} saved to MySQL partner_bookings table.`);
+    ).catch(() => {});
+    console.log(`[Database] Booking ${bookingId} saved to MySQL withme_partner_bookings table.`);
   } catch (err) {
     console.warn('MySQL booking insert notice:', err.message);
   }
@@ -165,16 +174,16 @@ router.get('/list', authenticateToken, async (req, res) => {
   let combinedBookings = [...bookingsStore];
 
   try {
-    const dbBookings = await query(`SELECT * FROM partner_bookings ORDER BY created_at DESC LIMIT 50`);
+    const dbBookings = await query(`SELECT * FROM withme_partner_bookings ORDER BY created_at DESC LIMIT 50`);
     if (dbBookings && dbBookings.length > 0) {
       dbBookings.forEach(db => {
         if (!combinedBookings.some(b => b.booking_id === db.booking_id)) {
           combinedBookings.push({
             booking_id: db.booking_id,
-            status: db.status,
+            status: db.status || 'Upcoming',
             activity_user_id: db.partner_id,
             partner_id: db.partner_id,
-            partner_name: db.partner_name,
+            partner_name: db.customer_name,
             activity: db.activity,
             date: db.date,
             time: db.time,

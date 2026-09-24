@@ -26,13 +26,13 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
   return `${baseUrl}/uploads/${photo}`;
 };
 
-// Fetch real registered partners from MySQL
+// Fetch real registered partners from dedicated MySQL table `withme_partners`
 const fetchExploreDbPartners = async (baseUrl) => {
   try {
     const rows = await query(`
-      SELECT id, name, email, mobile, phone_number, city, state, locality, address, image, gender, rating, totalReviews, category, subCategory, status, isApproved
-      FROM node_partners
-      WHERE name IS NOT NULL AND name != '' AND name != 'User'
+      SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, status, is_approved
+      FROM withme_partners
+      WHERE is_approved = 1 AND status = 'ACTIVE'
       ORDER BY id DESC
       LIMIT 100
     `);
@@ -40,24 +40,37 @@ const fetchExploreDbPartners = async (baseUrl) => {
     if (!rows || rows.length === 0) return [];
 
     return rows.map((r, index) => {
-      const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+      const photoUrl = formatPartnerPhoto(r.image || r.profile_photo_url, baseUrl);
       const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : 'Female';
       const city = r.city ? r.city.trim() : 'Jaipur';
-      const partnerCategory = r.category || 'Coffee';
+      const partnerCategory = r.category || r.activity || 'Coffee';
       const isCoffee = partnerCategory.toLowerCase().includes('coffee');
 
+      let parsedInterests = [partnerCategory, 'Music', 'Travel'];
+      try {
+        if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
+      } catch (e) {}
+
+      let parsedPhotos = [photoUrl, `${baseUrl}/uploads/priya.jpg`];
+      try {
+        if (r.photos) {
+          const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
+          parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : p.url, baseUrl));
+        }
+      } catch (e) {}
+
       return {
-        user_id: `usr_${r.id}`,
+        user_id: r.user_id || `usr_${r.id}`,
         id: `exp_db_${r.id}`,
         partner_id: r.id,
         type: index % 2 === 0 ? 'PROFILE' : 'ACTIVITY',
         title: `${partnerCategory} WithMe`,
         activity: partnerCategory,
-        name: r.name.trim(),
-        full_name: r.name.trim(),
-        age: 24,
+        name: (r.name || r.full_name || 'Partner').trim(),
+        full_name: (r.full_name || r.name || 'Partner').trim(),
+        age: r.age || 24,
         gender: gender,
-        interests: [partnerCategory, 'Music', 'Travel'],
+        interests: parsedInterests,
         rating: parseFloat(r.rating || 4.8),
         price: isCoffee ? 1 : 499,
         currency: 'INR',
@@ -67,8 +80,8 @@ const fetchExploreDbPartners = async (baseUrl) => {
         image: photoUrl,
         avatar: photoUrl,
         profile_image: photoUrl,
-        profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
-        photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`]
+        profile_images: parsedPhotos,
+        photos: parsedPhotos
       };
     });
   } catch (err) {

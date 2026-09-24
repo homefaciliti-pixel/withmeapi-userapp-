@@ -63,26 +63,26 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
 
   try {
     const rows = await query(`
-      SELECT id, name, email, mobile, phone_number, city, state, locality, address, image, gender, rating, totalReviews, category, subCategory, status, isApproved
-      FROM node_partners
-      WHERE name IS NOT NULL AND name != '' AND name != 'User'
+      SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, rating, total_reviews, category, activity, price, currency, status, is_approved
+      FROM withme_partners
+      WHERE is_approved = 1 AND status = 'ACTIVE'
       ORDER BY id DESC
       LIMIT 100
     `);
 
     if (rows && rows.length > 0) {
       dbPartners = rows.map(r => {
-        const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+        const photoUrl = formatPartnerPhoto(r.image || r.profile_photo_url, baseUrl);
         const city = r.city ? r.city.trim() : 'Jaipur';
-        const partnerCategory = r.category || 'Coffee';
+        const partnerCategory = r.category || r.activity || 'Coffee';
         return {
           id: r.id,
           booking_id: `${effectiveBookingId}_${r.id}`,
           request_id: `req_${r.id}`,
-          user_id: `usr_${r.id}`,
+          user_id: r.user_id || `usr_${r.id}`,
           partner_id: r.id,
-          name: r.name.trim(),
-          full_name: r.name.trim(),
+          name: (r.name || r.full_name || 'Partner').trim(),
+          full_name: (r.full_name || r.name || 'Partner').trim(),
           city: city,
           rating: parseFloat(r.rating || 4.8),
           price: 1,
@@ -289,6 +289,18 @@ const handleSendRequest = async (req, res) => {
   try {
     const locationStr = typeof location === 'string' ? location : JSON.stringify(location);
     await query(
+      `INSERT INTO withme_partner_requests (
+        id, request_id, booking_id, user_id, partner_id, sender_name, sender_phone, sender_avatar,
+        activity, date, time, location, message, price, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())
+      ON DUPLICATE KEY UPDATE status = 'PENDING', updated_at = NOW()`,
+      [
+        requestId, requestId, generatedBookingId, senderId, effectivePartnerId, senderName, senderPhone, senderAvatar,
+        actName, date, time, locationStr, message, newRequest.price
+      ]
+    );
+    // Backward compatibility mirror
+    query(
       `INSERT INTO partner_requests (
         id, request_id, booking_id, sender_id, sender_name, sender_phone, sender_avatar,
         receiver_id, partner_id, activity_id, activity_name, date, time, location,
@@ -300,8 +312,8 @@ const handleSendRequest = async (req, res) => {
         effectivePartnerId, effectivePartnerId, activity_id, actName, date, time, locationStr,
         message, newRequest.price, 'INR'
       ]
-    );
-    console.log(`[Database] Partner request ${requestId} saved to MySQL partner_requests table.`);
+    ).catch(() => {});
+    console.log(`[Database] Partner request ${requestId} saved to withme_partner_requests table.`);
   } catch (err) {
     console.warn('MySQL partner request insert notice:', err.message);
   }
@@ -356,10 +368,12 @@ router.post('/update-status', async (req, res) => {
 
   try {
     if (request_id) {
-      await query(`UPDATE partner_requests SET status = ?, updated_at = NOW() WHERE request_id = ? OR id = ?`, [effectiveStatus, request_id, request_id]);
+      await query(`UPDATE withme_partner_requests SET status = ?, updated_at = NOW() WHERE request_id = ? OR id = ?`, [effectiveStatus, request_id, request_id]);
+      query(`UPDATE partner_requests SET status = ?, updated_at = NOW() WHERE request_id = ? OR id = ?`, [effectiveStatus, request_id, request_id]).catch(() => {});
     }
     if (booking_id) {
-      await query(`UPDATE partner_requests SET status = ?, updated_at = NOW() WHERE booking_id = ?`, [effectiveStatus, booking_id]);
+      await query(`UPDATE withme_partner_requests SET status = ?, updated_at = NOW() WHERE booking_id = ?`, [effectiveStatus, booking_id]);
+      query(`UPDATE partner_requests SET status = ?, updated_at = NOW() WHERE booking_id = ?`, [effectiveStatus, booking_id]).catch(() => {});
     }
   } catch (err) {
     console.warn('MySQL partner status update notice:', err.message);
@@ -380,34 +394,56 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
   const effectiveBookingId = requestedBookingId || 'BK197860';
   const rawId = cleanId.replace(/^usr_/, '').replace(/^req_/, '').trim();
 
-  // Check DB node_partners first
+  // Check DB withme_partners first
   try {
     const isNum = !isNaN(rawId) && rawId !== '';
     let dbRows = [];
     if (isNum) {
-      dbRows = await query('SELECT * FROM node_partners WHERE id = ? LIMIT 1', [parseInt(rawId)]);
+      dbRows = await query('SELECT * FROM withme_partners WHERE id = ? OR partner_id = ? LIMIT 1', [parseInt(rawId), targetId]);
     }
     if (!dbRows || dbRows.length === 0) {
-      dbRows = await query('SELECT * FROM node_partners WHERE name LIKE ? LIMIT 1', [`%${targetId}%`]);
+      dbRows = await query('SELECT * FROM withme_partners WHERE partner_id = ? OR user_id = ? OR name LIKE ? LIMIT 1', [targetId, targetId, `%${targetId}%`]);
     }
 
     if (dbRows && dbRows.length > 0) {
       const r = dbRows[0];
-      const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+      const photoUrl = formatPartnerPhoto(r.image || r.profile_photo_url, baseUrl);
       const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : 'Female';
       const city = r.city ? r.city.trim() : 'Jaipur';
       const locality = r.locality ? r.locality.trim() : 'Vaishali Nagar';
-      const partnerCategory = r.category || 'Coffee';
+      const partnerCategory = r.category || r.activity || 'Coffee';
+
+      let parsedInterests = [partnerCategory, 'Travel', 'Music'];
+      try {
+        if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
+      } catch (e) {}
+
+      let parsedPhotos = [photoUrl, `${baseUrl}/uploads/priya.jpg`];
+      try {
+        if (r.photos) {
+          const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
+          parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : p.url, baseUrl));
+        }
+      } catch (e) {}
+
+      let parsedAvailableFor = [
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+        { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+      ];
+      try {
+        if (r.available_for) parsedAvailableFor = typeof r.available_for === 'string' ? JSON.parse(r.available_for) : r.available_for;
+      } catch (e) {}
 
       return {
         id: r.id,
         request_id: `req_${r.id}`,
         booking_id: effectiveBookingId,
-        user_id: `usr_${r.id}`,
+        user_id: r.user_id || `usr_${r.id}`,
         partner_id: r.id,
-        name: r.name.trim(),
-        full_name: r.name.trim(),
-        age: 24,
+        name: (r.name || r.full_name || 'Partner').trim(),
+        full_name: (r.full_name || r.name || 'Partner').trim(),
+        age: r.age || 24,
         gender: gender,
         city: city,
         location: {
@@ -417,13 +453,13 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
           address: r.address || `${locality}, ${city}`
         },
         rating: parseFloat(r.rating || 4.8),
-        total_reviews: parseInt(r.totalReviews || 120),
+        total_reviews: parseInt(r.total_reviews || 120),
         price: 1,
         currency: 'INR',
         price_type: 'session',
         activity: partnerCategory,
         activity_id: 'cat_01',
-        about: `Friendly partner available in ${city}. Loves social meetups and cafe conversations.`,
+        about: r.about || `Friendly partner available in ${city}. Loves social meetups and cafe conversations.`,
         is_verified: true,
         is_approved: true,
         approval_status: 'approved',
@@ -436,14 +472,10 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
         profile_image: photoUrl,
         image: photoUrl,
         avatar: photoUrl,
-        profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
-        photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
-        interests: [partnerCategory, 'Travel', 'Music'],
-        available_for: [
-          { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
-          { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
-          { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
-        ],
+        profile_images: parsedPhotos,
+        photos: parsedPhotos,
+        interests: parsedInterests,
+        available_for: parsedAvailableFor,
         sender: {
           user_id: 'usr_998877',
           name: 'Amit',

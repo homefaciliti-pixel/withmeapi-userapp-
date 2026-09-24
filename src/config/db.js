@@ -191,6 +191,9 @@ const initializeDatabaseTables = async () => {
       }
     }
 
+    const { initAllWithMeTables } = require('./dbInit');
+    await initAllWithMeTables();
+
     connection.release();
     console.log('✅ MySQL Database tables verified and initialized successfully.');
   } catch (error) {

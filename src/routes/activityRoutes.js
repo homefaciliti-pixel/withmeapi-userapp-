@@ -26,13 +26,13 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
   return `${baseUrl}/uploads/${photo}`;
 };
 
-// Helper to fetch all registered partners from MySQL database tables (`node_partners` and `partners`)
+// Helper to fetch all registered partners from dedicated MySQL table `withme_partners`
 const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userapp.onrender.com') => {
   try {
     const rows = await query(`
-      SELECT id, name, email, mobile, phone_number, city, state, locality, address, image, gender, rating, totalReviews, category, subCategory, status, isApproved
-      FROM node_partners
-      WHERE name IS NOT NULL AND name != '' AND name != 'User'
+      SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, status, is_approved
+      FROM withme_partners
+      WHERE is_approved = 1 AND status = 'ACTIVE'
       ORDER BY id DESC
       LIMIT 100
     `);
@@ -40,22 +40,44 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
     if (!rows || rows.length === 0) return [];
 
     return rows.map(r => {
-      const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+      const photoUrl = formatPartnerPhoto(r.image || r.profile_photo_url, baseUrl);
       const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : 'Female';
       const city = r.city ? r.city.trim() : 'Jaipur';
       const locality = r.locality ? r.locality.trim() : 'Vaishali Nagar';
-      const partnerCategory = r.category || 'Coffee';
+      const partnerCategory = r.category || r.activity || 'Coffee';
+
+      let parsedInterests = ['Coffee', 'Travel', 'Music'];
+      try {
+        if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
+      } catch (e) {}
+
+      let parsedPhotos = [photoUrl, `${baseUrl}/uploads/priya.jpg`];
+      try {
+        if (r.photos) {
+          const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
+          parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : p.url, baseUrl));
+        }
+      } catch (e) {}
+
+      let parsedAvailableFor = [
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+        { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+      ];
+      try {
+        if (r.available_for) parsedAvailableFor = typeof r.available_for === 'string' ? JSON.parse(r.available_for) : r.available_for;
+      } catch (e) {}
 
       return {
-        id: `usr_${r.id}`,
-        user_id: `usr_${r.id}`,
+        id: r.partner_id || `usr_${r.id}`,
+        user_id: r.user_id || `usr_${r.id}`,
         partner_id: r.id,
         db_id: r.id,
         type: 'partner',
-        name: r.name.trim(),
-        full_name: r.name.trim(),
+        name: (r.name || r.full_name || 'Partner').trim(),
+        full_name: (r.full_name || r.name || 'Partner').trim(),
         gender: gender,
-        age: 24,
+        age: r.age || 24,
         city: city,
         location: city,
         address: r.address || `${locality}, ${city}`,
@@ -66,7 +88,7 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
           address: r.address || `${locality}, ${city}`
         },
         rating: parseFloat(r.rating || 4.8),
-        total_reviews: parseInt(r.totalReviews || 120),
+        total_reviews: parseInt(r.total_reviews || 120),
         match_score: '93%',
         distance: '1.5 km away',
         price: 1,
@@ -74,12 +96,8 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
         price_type: 'session',
         activity: partnerCategory,
         category: partnerCategory,
-        interests: ['Coffee', 'Travel', 'Music'],
-        available_for: [
-          { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
-          { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
-          { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
-        ],
+        interests: parsedInterests,
+        available_for: parsedAvailableFor,
         is_verified: true,
         is_approved: true,
         approval_status: 'approved',
@@ -88,13 +106,13 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
         profile_image: photoUrl,
         image: photoUrl,
         avatar: photoUrl,
-        profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
-        photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
-        about: `Friendly partner available in ${city}. Loves cafes and social meetups.`
+        profile_images: parsedPhotos,
+        photos: parsedPhotos,
+        about: r.about || `Friendly partner available in ${city}. Loves cafes and social meetups.`
       };
     });
   } catch (err) {
-    console.warn('MySQL fetch registered partners notice:', err.message);
+    console.warn('MySQL fetch registered withme partners notice:', err.message);
     return [];
   }
 };
@@ -942,32 +960,61 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
   const cleanId = String(targetId).trim().toLowerCase();
   const rawId = cleanId.replace(/^usr_/, '').trim();
 
-  // Check MySQL node_partners first for real registered partner details
+  // Check MySQL withme_partners first for real registered partner details
   try {
     const isNum = !isNaN(rawId) && rawId !== '';
     let dbRows = [];
     if (isNum) {
-      dbRows = await query('SELECT * FROM node_partners WHERE id = ? LIMIT 1', [parseInt(rawId)]);
+      dbRows = await query('SELECT * FROM withme_partners WHERE id = ? OR partner_id = ? LIMIT 1', [parseInt(rawId), targetId]);
     }
     if (!dbRows || dbRows.length === 0) {
-      dbRows = await query('SELECT * FROM node_partners WHERE name LIKE ? LIMIT 1', [`%${targetId}%`]);
+      dbRows = await query('SELECT * FROM withme_partners WHERE partner_id = ? OR user_id = ? OR name LIKE ? LIMIT 1', [targetId, targetId, `%${targetId}%`]);
     }
 
     if (dbRows && dbRows.length > 0) {
       const r = dbRows[0];
-      const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+      const photoUrl = formatPartnerPhoto(r.image || r.profile_photo_url, baseUrl);
       const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : 'Female';
       const city = r.city ? r.city.trim() : 'Jaipur';
       const locality = r.locality ? r.locality.trim() : 'Vaishali Nagar';
-      const partnerCategory = r.category || 'Coffee';
+      const partnerCategory = r.category || r.activity || 'Coffee';
+
+      let parsedInterests = [
+        { name: partnerCategory, icon: 'coffee' },
+        { name: 'Travel', icon: 'flight' },
+        { name: 'Music', icon: 'music_note' }
+      ];
+      try {
+        if (r.interests) {
+          const rawI = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
+          parsedInterests = rawI.map(i => typeof i === 'string' ? { name: i, icon: 'coffee' } : i);
+        }
+      } catch (e) {}
+
+      let parsedPhotos = [photoUrl, `${baseUrl}/uploads/priya.jpg`];
+      try {
+        if (r.photos) {
+          const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
+          parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : p.url, baseUrl));
+        }
+      } catch (e) {}
+
+      let parsedAvailableFor = [
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+        { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+      ];
+      try {
+        if (r.available_for) parsedAvailableFor = typeof r.available_for === 'string' ? JSON.parse(r.available_for) : r.available_for;
+      } catch (e) {}
 
       return {
-        id: `usr_${r.id}`,
+        id: r.partner_id || `usr_${r.id}`,
         partner_id: r.id,
         db_id: r.id,
-        name: r.name.trim(),
-        full_name: r.name.trim(),
-        age: 24,
+        name: (r.name || r.full_name || 'Partner').trim(),
+        full_name: (r.full_name || r.name || 'Partner').trim(),
+        age: r.age || 24,
         gender: gender,
         verified: true,
         city: city,
@@ -978,23 +1025,15 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
           address: r.address || `${locality}, ${city}`
         },
         rating: parseFloat(r.rating || 4.8),
-        total_reviews: parseInt(r.totalReviews || 120),
-        about: `Friendly partner available in ${city}. Passionate about cafes, meetups, and activities.`,
+        total_reviews: parseInt(r.total_reviews || 120),
+        about: r.about || `Friendly partner available in ${city}. Passionate about cafes, meetups, and activities.`,
         profile_image: photoUrl,
         image: photoUrl,
         avatar: photoUrl,
-        profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
-        photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
-        interests: [
-          { name: partnerCategory, icon: 'coffee' },
-          { name: 'Travel', icon: 'flight' },
-          { name: 'Music', icon: 'music_note' }
-        ],
-        available_for: [
-          { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
-          { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
-          { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
-        ]
+        profile_images: parsedPhotos,
+        photos: parsedPhotos,
+        interests: parsedInterests,
+        available_for: parsedAvailableFor
       };
     }
   } catch (err) {
