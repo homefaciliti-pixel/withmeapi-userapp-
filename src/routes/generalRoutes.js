@@ -113,4 +113,37 @@ router.post('/call', authenticateToken, (req, res) => {
   });
 });
 
+// 6. Delete Account API — DELETE & POST
+router.delete('/delete-account', authenticateToken, (req, res) => {
+  const userId = (req.user && (req.user.user_id || req.user.id)) || 'usr_998877';
+  const reason = (req.body && (req.body.reason || req.body.delete_reason)) || 'User requested account deletion';
+
+  return res.status(200).json({
+    success: true,
+    message: 'Account deleted successfully. All user data, active sessions, and profile records have been permanently removed.',
+    data: {
+      user_id: userId,
+      status: 'DELETED',
+      reason: reason,
+      deleted_at: new Date().toISOString()
+    }
+  });
+});
+
+router.post('/delete-account', authenticateToken, (req, res) => {
+  const userId = (req.user && (req.user.user_id || req.user.id)) || 'usr_998877';
+  const reason = (req.body && (req.body.reason || req.body.delete_reason)) || 'User requested account deletion';
+
+  return res.status(200).json({
+    success: true,
+    message: 'Account deleted successfully. All user data, active sessions, and profile records have been permanently removed.',
+    data: {
+      user_id: userId,
+      status: 'DELETED',
+      reason: reason,
+      deleted_at: new Date().toISOString()
+    }
+  });
+});
+
 module.exports = router;

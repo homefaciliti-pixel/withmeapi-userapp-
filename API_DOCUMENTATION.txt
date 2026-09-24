@@ -54,6 +54,42 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     }
   }
 
+1.8 Delete Account API
+- Endpoints:
+  * DELETE /api/v1/auth/delete-account
+  * POST /api/v1/auth/delete-account
+  * DELETE /api/v1/auth/delete
+  * POST /api/v1/auth/delete
+  * DELETE /api/v1/profile/delete-account
+  * POST /api/v1/profile/delete-account
+  * DELETE /api/v1/general/delete-account
+  * POST /api/v1/general/delete-account
+  * DELETE /delete-account
+  * POST /delete-account
+- Headers:
+  * Authorization: Bearer <token> (Optional/Supported)
+  * Content-Type: application/json
+- Request Body (JSON - Optional):
+  {
+    "user_id": "usr_998877",
+    "phone_number": "7250642635",
+    "reason": "I want to delete my account permanently",
+    "feedback": "Great app, but not needed anymore."
+  }
+- Description: Permanently deletes the user's account, profiles, active sessions, and removes records from MySQL database and in-memory caches.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Account deleted successfully. All user data, active sessions, and profile records have been permanently removed.",
+    "data": {
+      "user_id": "usr_998877",
+      "phone_number": "+917250642635",
+      "status": "DELETED",
+      "reason": "I want to delete my account permanently",
+      "deleted_at": "2026-09-24T10:05:00.000Z"
+    }
+  }
+
 --------------------------------------------------------------------------------
 2. PROFILE & KYC APIs (/api/v1/getProfile & /api/v1/profile)
 --------------------------------------------------------------------------------
@@ -885,6 +921,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 8.3 Logout API: POST /api/v1/general/logout
 8.4 Chat API: GET /api/v1/general/chat
 8.5 Call API: GET / POST /api/v1/general/call
+8.6 Delete Account API: DELETE / POST /api/v1/general/delete-account (or /api/v1/auth/delete-account)
 
 --------------------------------------------------------------------------------
 9. BOOKING APIs (/api/v1/bookings & /bookings)

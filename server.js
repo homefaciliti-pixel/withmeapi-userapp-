@@ -112,6 +112,9 @@ const uploadRoutes = require('./src/routes/uploadRoutes');
 
 // Bind Routes to Base API Path
 app.use('/api/v1/auth', authRoutes);
+app.use('/auth', authRoutes);
+app.use('/api/v1/user', authRoutes);
+app.use('/user', authRoutes);
 app.use('/api/v1', profileKycRoutes);
 app.use('/api/v1/kyc', profileKycRoutes);
 app.use('/kyc', profileKycRoutes);
@@ -146,6 +149,7 @@ app.use('/payment', paymentRoutes);
 app.use('/checkout', paymentRoutes);
 app.use('/api/v1', exploreRoutes);
 app.use('/api/v1/general', generalRoutes);
+app.use('/general', generalRoutes);
 
 // Documentation Serve Endpoints
 const serveApiDocumentation = (req, res) => {
