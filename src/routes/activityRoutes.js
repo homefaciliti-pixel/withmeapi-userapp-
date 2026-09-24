@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
+const { query } = require('../config/db');
 
 const getBaseUrl = (req) => {
   if (req) {
@@ -11,10 +12,100 @@ const getBaseUrl = (req) => {
   return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
 
+// Helper to format partner image
+const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+  if (!photo || photo === '' || photo === 'null') {
+    return `${baseUrl}/uploads/priya.jpg`;
+  }
+  if (photo.startsWith('http://') || photo.startsWith('https://')) {
+    return photo;
+  }
+  if (photo.startsWith('/uploads')) {
+    return `${baseUrl}${photo}`;
+  }
+  return `${baseUrl}/uploads/${photo}`;
+};
+
+// Helper to fetch all registered partners from MySQL database tables (`node_partners` and `partners`)
+const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+  try {
+    const rows = await query(`
+      SELECT id, name, email, mobile, phone_number, city, state, locality, address, image, gender, rating, totalReviews, category, subCategory, status, isApproved
+      FROM node_partners
+      WHERE name IS NOT NULL AND name != '' AND name != 'User'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    if (!rows || rows.length === 0) return [];
+
+    return rows.map(r => {
+      const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+      const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : 'Female';
+      const city = r.city ? r.city.trim() : 'Jaipur';
+      const locality = r.locality ? r.locality.trim() : 'Vaishali Nagar';
+      const partnerCategory = r.category || 'Coffee';
+
+      return {
+        id: `usr_${r.id}`,
+        user_id: `usr_${r.id}`,
+        partner_id: r.id,
+        db_id: r.id,
+        type: 'partner',
+        name: r.name.trim(),
+        full_name: r.name.trim(),
+        gender: gender,
+        age: 24,
+        city: city,
+        location: city,
+        address: r.address || `${locality}, ${city}`,
+        detailed_location: {
+          city: city,
+          state: r.state || 'Rajasthan',
+          country: 'India',
+          address: r.address || `${locality}, ${city}`
+        },
+        rating: parseFloat(r.rating || 4.8),
+        total_reviews: parseInt(r.totalReviews || 120),
+        match_score: '93%',
+        distance: '1.5 km away',
+        price: 1,
+        currency: 'INR',
+        price_type: 'session',
+        activity: partnerCategory,
+        category: partnerCategory,
+        interests: ['Coffee', 'Travel', 'Music'],
+        available_for: [
+          { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+          { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+          { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+        ],
+        is_verified: true,
+        is_approved: true,
+        approval_status: 'approved',
+        status: 'available',
+        is_favorite: false,
+        profile_image: photoUrl,
+        image: photoUrl,
+        avatar: photoUrl,
+        profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+        photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+        about: `Friendly partner available in ${city}. Loves cafes and social meetups.`
+      };
+    });
+  } catch (err) {
+    console.warn('MySQL fetch registered partners notice:', err.message);
+    return [];
+  }
+};
+
 // Helper to get data for all sections
-const getCombinedActivitiesData = (req) => {
+const getCombinedActivitiesData = async (req) => {
   const baseUrl = getBaseUrl(req);
   const { q = '', location = '', category = '' } = req.query || {};
+
+  // Fetch real registered partners from MySQL
+  const dbPartners = await fetchRegisteredPartnersFromDb(baseUrl);
 
   const planning_today = [
     { id: 'cat_01', title: 'Coffee', image: `${baseUrl}/uploads/categories/coffee.png` },
@@ -25,7 +116,7 @@ const getCombinedActivitiesData = (req) => {
     { id: 'cat_06', title: 'Conversation', image: `${baseUrl}/uploads/categories/conversation.png` }
   ];
 
-  const search = [
+  const defaultSearch = [
     {
       type: 'partner',
       id: 'usr_301',
@@ -69,6 +160,25 @@ const getCombinedActivitiesData = (req) => {
       status: 'available'
     }
   ];
+
+  const dbSearch = dbPartners.map(p => ({
+    type: 'partner',
+    id: p.id,
+    user_id: p.user_id,
+    name: p.name,
+    city: p.city || location || 'Jaipur',
+    rating: p.rating,
+    price: 1,
+    currency: 'INR',
+    price_type: 'session',
+    image: p.image,
+    profile_image: p.profile_image,
+    is_verified: true,
+    interests: p.interests,
+    status: 'available'
+  }));
+
+  const search = [...dbSearch, ...defaultSearch];
 
   const popular_activities = [
     {
@@ -151,7 +261,7 @@ const getCombinedActivitiesData = (req) => {
     }
   ];
 
-  const recommended_partners = [
+  const defaultRecommended = [
     {
       user_id: 'usr_404',
       name: 'Riya Mehta',
@@ -196,6 +306,23 @@ const getCombinedActivitiesData = (req) => {
     }
   ];
 
+  const dbRecommended = dbPartners.map(p => ({
+    user_id: p.user_id,
+    name: p.name,
+    age: p.age,
+    rating: p.rating,
+    price: 1,
+    currency: 'INR',
+    match_score: p.match_score,
+    interests: p.interests,
+    location: p.city,
+    profile_image: p.profile_image,
+    image: p.image,
+    avatar: p.avatar
+  }));
+
+  const recommended_partners = [...dbRecommended, ...defaultRecommended];
+
   return {
     planning_today,
     search,
@@ -205,8 +332,32 @@ const getCombinedActivitiesData = (req) => {
 };
 
 // Category Items Data Generator
-const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'https://withmeapi-userapp.onrender.com') => {
   const param = String(categoryIdOrName || 'cat_01').trim().toLowerCase();
+  const dbPartners = await fetchRegisteredPartnersFromDb(baseUrl);
+
+  const mapDbPartnersToCategory = (catName, defaultPrice = 499) => {
+    return dbPartners.map(p => ({
+      id: p.id,
+      type: 'PROFILE',
+      user_id: p.user_id,
+      name: p.name,
+      full_name: p.full_name,
+      age: p.age,
+      gender: p.gender,
+      profile_image: p.profile_image,
+      image: p.image,
+      avatar: p.avatar,
+      rating: p.rating,
+      distance: p.distance,
+      price: (catName.toLowerCase() === 'coffee') ? 1 : defaultPrice,
+      currency: 'INR',
+      interests: p.interests,
+      category: catName,
+      is_verified: true,
+      is_favorite: false
+    }));
+  };
 
   // 1. Coffee (cat_01, coffee, 1)
   if (param === 'cat_01' || param === 'coffee' || param === '1' || param.includes('coffee') || param.includes('cof')) {
@@ -333,13 +484,15 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
       }
     ];
 
+    const allItems = [...mapDbPartnersToCategory('Coffee', 1), ...coffeeItems];
+
     return {
       category_id: 'cat_01',
       category: 'Coffee',
       title: 'Coffee WithMe',
       image: `${baseUrl}/uploads/categories/coffee.png`,
-      count: coffeeItems.length,
-      items: coffeeItems
+      count: allItems.length,
+      items: allItems
     };
   }
 
@@ -408,13 +561,15 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
       }
     ];
 
+    const allItems = [...mapDbPartnersToCategory('Dinner', 499), ...dinnerItems];
+
     return {
       category_id: 'cat_02',
       category: 'Dinner',
       title: 'Dinner WithMe',
       image: `${baseUrl}/uploads/categories/dinner.png`,
-      count: dinnerItems.length,
-      items: dinnerItems
+      count: allItems.length,
+      items: allItems
     };
   }
 
@@ -463,13 +618,15 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
       }
     ];
 
+    const allItems = [...mapDbPartnersToCategory('Travel', 699), ...travelItems];
+
     return {
       category_id: 'cat_03',
       category: 'Travel',
       title: 'Travel WithMe',
       image: `${baseUrl}/uploads/categories/travel.png`,
-      count: travelItems.length,
-      items: travelItems
+      count: allItems.length,
+      items: allItems
     };
   }
 
@@ -518,13 +675,15 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
       }
     ];
 
+    const allItems = [...mapDbPartnersToCategory('Movie', 399), ...movieItems];
+
     return {
       category_id: 'cat_04',
       category: 'Movie',
       title: 'Movie WithMe',
       image: `${baseUrl}/uploads/categories/movie.png`,
-      count: movieItems.length,
-      items: movieItems
+      count: allItems.length,
+      items: allItems
     };
   }
 
@@ -553,13 +712,15 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
       }
     ];
 
+    const allItems = [...mapDbPartnersToCategory('Event', 499), ...eventItems];
+
     return {
       category_id: 'cat_05',
       category: 'Event',
       title: 'Event WithMe',
       image: `${baseUrl}/uploads/categories/event.png`,
-      count: eventItems.length,
-      items: eventItems
+      count: allItems.length,
+      items: allItems
     };
   }
 
@@ -579,7 +740,7 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
         avatar: `${baseUrl}/uploads/priya.jpg`,
         rating: 4.8,
         distance: '1.2 km',
-        price: 299,
+        price: 199,
         currency: 'INR',
         interests: ['Conversation', 'Philosophy', 'Reading'],
         category: 'Conversation',
@@ -588,25 +749,27 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
       }
     ];
 
+    const allItems = [...mapDbPartnersToCategory('Conversation', 199), ...convItems];
+
     return {
       category_id: 'cat_06',
       category: 'Conversation',
       title: 'Conversation WithMe',
       image: `${baseUrl}/uploads/categories/conversation.png`,
-      count: convItems.length,
-      items: convItems
+      count: allItems.length,
+      items: allItems
     };
   }
 
   // Default fallback to Coffee
-  return getCategoryItemsData('cat_01', baseUrl);
+  return await getCategoryItemsData('cat_01', baseUrl);
 };
 
 // Category Items Handler for GET requests
-const handleCategoryDetailsOrList = (req, res) => {
+const handleCategoryDetailsOrList = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const requestedCat = req.params.id || req.params.category || req.query.category || req.query.id || req.query.category_id || req.query.type || 'cat_01';
-  const data = getCategoryItemsData(requestedCat, baseUrl);
+  const data = await getCategoryItemsData(requestedCat, baseUrl);
 
   return res.status(200).json({
     success: true,
@@ -629,13 +792,13 @@ const handleCategoryDetailsOrList = (req, res) => {
 };
 
 // 5.0 All-In-One Combined Activities API — GET (/api/v1/activities/all-in-one, /api/v1/activities/combined, /api/v1/activities/dashboard, /api/v1/activities)
-const handleCombinedActivities = (req, res) => {
+const handleCombinedActivities = async (req, res) => {
   // If client passes category filter e.g. /activities?category=Coffee or /activities?id=cat_01
   if (req.query && (req.query.category || req.query.category_id)) {
     return handleCategoryDetailsOrList(req, res);
   }
 
-  const combinedData = getCombinedActivitiesData(req);
+  const combinedData = await getCombinedActivitiesData(req);
   return res.status(200).json({
     success: true,
     message: 'Combined activities data fetched successfully',
@@ -654,33 +817,33 @@ router.get('/category-details/:id', authenticateToken, handleCategoryDetailsOrLi
 router.get('/category-details', authenticateToken, handleCategoryDetailsOrList);
 router.get('/category', authenticateToken, handleCategoryDetailsOrList);
 router.get('/items', authenticateToken, handleCategoryDetailsOrList);
-router.get('/list', authenticateToken, (req, res) => {
+router.get('/list', authenticateToken, async (req, res) => {
   if (req.query && (req.query.category || req.query.category_id || req.query.id || req.query.type)) {
     return handleCategoryDetailsOrList(req, res);
   }
   return handleCombinedActivities(req, res);
 });
-router.get('/coffee', authenticateToken, (req, res) => {
+router.get('/coffee', authenticateToken, async (req, res) => {
   req.params.id = 'cat_01';
   return handleCategoryDetailsOrList(req, res);
 });
-router.get('/dinner', authenticateToken, (req, res) => {
+router.get('/dinner', authenticateToken, async (req, res) => {
   req.params.id = 'cat_02';
   return handleCategoryDetailsOrList(req, res);
 });
-router.get('/travel', authenticateToken, (req, res) => {
+router.get('/travel', authenticateToken, async (req, res) => {
   req.params.id = 'cat_03';
   return handleCategoryDetailsOrList(req, res);
 });
-router.get('/movie', authenticateToken, (req, res) => {
+router.get('/movie', authenticateToken, async (req, res) => {
   req.params.id = 'cat_04';
   return handleCategoryDetailsOrList(req, res);
 });
-router.get('/event', authenticateToken, (req, res) => {
+router.get('/event', authenticateToken, async (req, res) => {
   req.params.id = 'cat_05';
   return handleCategoryDetailsOrList(req, res);
 });
-router.get('/conversation', authenticateToken, (req, res) => {
+router.get('/conversation', authenticateToken, async (req, res) => {
   req.params.id = 'cat_06';
   return handleCategoryDetailsOrList(req, res);
 });
@@ -735,9 +898,9 @@ router.get('/planning-today', authenticateToken, (req, res) => {
 });
 
 // 2. Search API — GET
-router.get('/search', authenticateToken, (req, res) => {
+router.get('/search', authenticateToken, async (req, res) => {
   const { q = '', location = '', category = '' } = req.query;
-  const combinedData = getCombinedActivitiesData(req);
+  const combinedData = await getCombinedActivitiesData(req);
 
   return res.status(200).json({
     success: true,
@@ -753,8 +916,8 @@ router.get('/search', authenticateToken, (req, res) => {
 });
 
 // 3. Popular Activities List API — GET
-router.get('/popular-activities', authenticateToken, (req, res) => {
-  const combinedData = getCombinedActivitiesData(req);
+router.get('/popular-activities', authenticateToken, async (req, res) => {
+  const combinedData = await getCombinedActivitiesData(req);
 
   return res.status(200).json({
     success: true,
@@ -764,8 +927,8 @@ router.get('/popular-activities', authenticateToken, (req, res) => {
 });
 
 // 4. Recommended Partner List API — GET
-router.get('/recommended-partners', authenticateToken, (req, res) => {
-  const combinedData = getCombinedActivitiesData(req);
+router.get('/recommended-partners', authenticateToken, async (req, res) => {
+  const combinedData = await getCombinedActivitiesData(req);
 
   return res.status(200).json({
     success: true,
@@ -775,8 +938,68 @@ router.get('/recommended-partners', authenticateToken, (req, res) => {
 
 // Mock detailed user profile catalog for product-details endpoint
 // Dynamic helper to resolve partner details by ID or Name
-const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withmeapi-userapp.onrender.com') => {
   const cleanId = String(targetId).trim().toLowerCase();
+  const rawId = cleanId.replace(/^usr_/, '').trim();
+
+  // Check MySQL node_partners first for real registered partner details
+  try {
+    const isNum = !isNaN(rawId) && rawId !== '';
+    let dbRows = [];
+    if (isNum) {
+      dbRows = await query('SELECT * FROM node_partners WHERE id = ? LIMIT 1', [parseInt(rawId)]);
+    }
+    if (!dbRows || dbRows.length === 0) {
+      dbRows = await query('SELECT * FROM node_partners WHERE name LIKE ? LIMIT 1', [`%${targetId}%`]);
+    }
+
+    if (dbRows && dbRows.length > 0) {
+      const r = dbRows[0];
+      const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+      const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : 'Female';
+      const city = r.city ? r.city.trim() : 'Jaipur';
+      const locality = r.locality ? r.locality.trim() : 'Vaishali Nagar';
+      const partnerCategory = r.category || 'Coffee';
+
+      return {
+        id: `usr_${r.id}`,
+        partner_id: r.id,
+        db_id: r.id,
+        name: r.name.trim(),
+        full_name: r.name.trim(),
+        age: 24,
+        gender: gender,
+        verified: true,
+        city: city,
+        location: {
+          city: city,
+          state: r.state || 'Rajasthan',
+          country: 'India',
+          address: r.address || `${locality}, ${city}`
+        },
+        rating: parseFloat(r.rating || 4.8),
+        total_reviews: parseInt(r.totalReviews || 120),
+        about: `Friendly partner available in ${city}. Passionate about cafes, meetups, and activities.`,
+        profile_image: photoUrl,
+        image: photoUrl,
+        avatar: photoUrl,
+        profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+        photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+        interests: [
+          { name: partnerCategory, icon: 'coffee' },
+          { name: 'Travel', icon: 'flight' },
+          { name: 'Music', icon: 'music_note' }
+        ],
+        available_for: [
+          { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+          { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+          { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+        ]
+      };
+    }
+  } catch (err) {
+    console.warn('DB getPartnerProfileById notice:', err.message);
+  }
 
   // 1. Priya (IDs: 101, usr_101, usr_203, usr_301, priya)
   if (cleanId === '101' || cleanId === 'usr_101' || cleanId === 'usr_203' || cleanId === 'usr_301' || cleanId.includes('priya')) {
@@ -1046,10 +1269,10 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
 };
 
 // 5. Product Details API — GET (/activities/product-details/:id, /activities/product-details, /activities/available-for/:id, /activities/available-for)
-const handleProductDetails = (req, res) => {
+const handleProductDetails = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const targetId = req.params.id || req.query.id || req.query.userId || 'usr_203';
-  const partnerProfile = getPartnerProfileById(targetId, baseUrl);
+  const partnerProfile = await getPartnerProfileById(targetId, baseUrl);
 
   return res.status(200).json({
     success: true,
@@ -1072,10 +1295,10 @@ const handleProductDetails = (req, res) => {
   });
 };
 
-const handleAvailableForOnly = (req, res) => {
+const handleAvailableForOnly = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const targetId = req.params.id || req.query.id || req.query.userId || 'usr_203';
-  const partnerProfile = getPartnerProfileById(targetId, baseUrl);
+  const partnerProfile = await getPartnerProfileById(targetId, baseUrl);
 
   return res.status(200).json({
     success: true,

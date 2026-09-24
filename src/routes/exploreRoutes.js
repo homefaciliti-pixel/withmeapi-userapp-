@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
+const { query } = require('../config/db');
 
 const getBaseUrl = (req) => {
   if (req) {
@@ -11,14 +12,81 @@ const getBaseUrl = (req) => {
   return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
 
+// Helper to format partner image
+const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+  if (!photo || photo === '' || photo === 'null') {
+    return `${baseUrl}/uploads/priya.jpg`;
+  }
+  if (photo.startsWith('http://') || photo.startsWith('https://')) {
+    return photo;
+  }
+  if (photo.startsWith('/uploads')) {
+    return `${baseUrl}${photo}`;
+  }
+  return `${baseUrl}/uploads/${photo}`;
+};
+
+// Fetch real registered partners from MySQL
+const fetchExploreDbPartners = async (baseUrl) => {
+  try {
+    const rows = await query(`
+      SELECT id, name, email, mobile, phone_number, city, state, locality, address, image, gender, rating, totalReviews, category, subCategory, status, isApproved
+      FROM node_partners
+      WHERE name IS NOT NULL AND name != '' AND name != 'User'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    if (!rows || rows.length === 0) return [];
+
+    return rows.map((r, index) => {
+      const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+      const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : 'Female';
+      const city = r.city ? r.city.trim() : 'Jaipur';
+      const partnerCategory = r.category || 'Coffee';
+      const isCoffee = partnerCategory.toLowerCase().includes('coffee');
+
+      return {
+        user_id: `usr_${r.id}`,
+        id: `exp_db_${r.id}`,
+        partner_id: r.id,
+        type: index % 2 === 0 ? 'PROFILE' : 'ACTIVITY',
+        title: `${partnerCategory} WithMe`,
+        activity: partnerCategory,
+        name: r.name.trim(),
+        full_name: r.name.trim(),
+        age: 24,
+        gender: gender,
+        interests: [partnerCategory, 'Music', 'Travel'],
+        rating: parseFloat(r.rating || 4.8),
+        price: isCoffee ? 1 : 499,
+        currency: 'INR',
+        category: partnerCategory,
+        distance: '1.5 km away',
+        location: city,
+        image: photoUrl,
+        avatar: photoUrl,
+        profile_image: photoUrl,
+        profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+        photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`]
+      };
+    });
+  } catch (err) {
+    console.warn('DB explore partners notice:', err.message);
+    return [];
+  }
+};
+
 // 1. Explore API — GET
-router.get('/explore', authenticateToken, (req, res) => {
+router.get('/explore', authenticateToken, async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const page = parseInt(req.query.page || '1');
   const limit = parseInt(req.query.limit || '10');
   const categoryFilter = (req.query.category || req.query.activity || req.query.type || '').trim().toLowerCase();
 
-  const exploreFeed = [
+  const dbPartners = await fetchExploreDbPartners(baseUrl);
+
+  const defaultExploreFeed = [
     {
       user_id: 'usr_201',
       id: 'exp_1',
@@ -91,6 +159,8 @@ router.get('/explore', authenticateToken, (req, res) => {
     }
   ];
 
+  const exploreFeed = [...dbPartners, ...defaultExploreFeed];
+
   let items = exploreFeed;
   if (categoryFilter) {
     items = exploreFeed.filter(item => {
@@ -115,11 +185,13 @@ router.get('/explore', authenticateToken, (req, res) => {
 });
 
 // 2. Filter API — POST
-router.post('/filter', authenticateToken, (req, res) => {
+router.post('/filter', authenticateToken, async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const { gender, min_age = 18, max_age = 50, max_distance_km = 20, interests = [] } = req.body;
 
-  const exploreFeed = [
+  const dbPartners = await fetchExploreDbPartners(baseUrl);
+
+  const defaultExploreFeed = [
     {
       user_id: 'usr_201',
       id: 'exp_1',
@@ -179,9 +251,11 @@ router.post('/filter', authenticateToken, (req, res) => {
     }
   ];
 
+  const exploreFeed = [...dbPartners, ...defaultExploreFeed];
+
   let filtered = exploreFeed;
   if (gender) {
-    filtered = filtered.filter(item => item.gender === gender);
+    filtered = filtered.filter(item => item.gender && item.gender.toLowerCase() === gender.toLowerCase());
   }
 
   return res.status(200).json({

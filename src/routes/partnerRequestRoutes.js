@@ -42,121 +42,192 @@ const syncRequestToPartnerApp = async (requestPayload) => {
   return false;
 };
 
-// Approved partners list generator
-const getApprovedPartnersList = (baseUrl, requestedBookingId) => [
-  {
-    id: 101,
-    booking_id: requestedBookingId || 'BK197860',
-    request_id: 'req_101',
-    user_id: 'usr_101',
-    partner_id: 101,
-    name: 'Priya',
-    full_name: 'Priya Sharma',
-    city: 'Jaipur',
-    rating: 4.8,
-    price: 1,
-    currency: 'INR',
-    price_type: 'session',
-    activity: 'Coffee',
-    profile_image: `${baseUrl}/uploads/priya.jpg`,
-    image: `${baseUrl}/uploads/priya.jpg`,
-    avatar: `${baseUrl}/uploads/priya.jpg`,
-    profile_images: [
-      `${baseUrl}/uploads/priya.jpg`,
-      `${baseUrl}/uploads/priya2.jpg`,
-      `${baseUrl}/uploads/priya3.jpg`,
-      `${baseUrl}/uploads/priya4.jpg`
-    ],
-    photos: [
-      `${baseUrl}/uploads/priya.jpg`,
-      `${baseUrl}/uploads/priya2.jpg`,
-      `${baseUrl}/uploads/priya3.jpg`,
-      `${baseUrl}/uploads/priya4.jpg`
-    ],
-    is_verified: true,
-    is_approved: true,
-    approval_status: 'approved',
-    interests: ['Coffee', 'Travel'],
-    status: 'approved',
-    is_accepted: true,
-    request_accepted: true,
-    is_request_accepted: true,
-    accepted: true,
-    request_status: 'accepted'
-  },
-  {
-    id: 102,
-    booking_id: requestedBookingId ? `${requestedBookingId}_102` : 'BK197861',
-    request_id: 'req_102',
-    user_id: 'usr_102',
-    partner_id: 102,
-    name: 'Anjali',
-    full_name: 'Anjali Sharma',
-    city: 'Jaipur',
-    rating: 4.9,
-    price: 1199,
-    currency: 'INR',
-    price_type: 'session',
-    activity: 'Dinner',
-    profile_image: `${baseUrl}/uploads/anjali.jpg`,
-    image: `${baseUrl}/uploads/anjali.jpg`,
-    avatar: `${baseUrl}/uploads/anjali.jpg`,
-    profile_images: [
-      `${baseUrl}/uploads/anjali.jpg`,
-      `${baseUrl}/uploads/ananya.jpg`
-    ],
-    photos: [
-      `${baseUrl}/uploads/anjali.jpg`,
-      `${baseUrl}/uploads/ananya.jpg`
-    ],
-    is_verified: true,
-    is_approved: true,
-    approval_status: 'approved',
-    interests: ['Coffee', 'Events'],
-    status: 'approved',
-    is_accepted: true,
-    request_accepted: true,
-    is_request_accepted: true,
-    accepted: true,
-    request_status: 'accepted'
-  },
-  {
-    id: 103,
-    booking_id: requestedBookingId ? `${requestedBookingId}_103` : 'BK197862',
-    request_id: 'req_103',
-    user_id: 'usr_103',
-    partner_id: 103,
-    name: 'Riya',
-    full_name: 'Riya Mehta',
-    city: 'Mumbai',
-    rating: 4.8,
-    price: 999,
-    currency: 'INR',
-    price_type: 'session',
-    activity: 'Music & Coffee',
-    profile_image: `${baseUrl}/uploads/riya.jpg`,
-    image: `${baseUrl}/uploads/riya.jpg`,
-    avatar: `${baseUrl}/uploads/riya.jpg`,
-    profile_images: [
-      `${baseUrl}/uploads/riya.jpg`,
-      `${baseUrl}/uploads/sneha.jpg`
-    ],
-    photos: [
-      `${baseUrl}/uploads/riya.jpg`,
-      `${baseUrl}/uploads/sneha.jpg`
-    ],
-    is_verified: true,
-    is_approved: true,
-    approval_status: 'approved',
-    interests: ['Music', 'Coffee'],
-    status: 'approved',
-    is_accepted: true,
-    request_accepted: true,
-    is_request_accepted: true,
-    accepted: true,
-    request_status: 'accepted'
+// Helper to format partner image
+const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+  if (!photo || photo === '' || photo === 'null') {
+    return `${baseUrl}/uploads/priya.jpg`;
   }
-];
+  if (photo.startsWith('http://') || photo.startsWith('https://')) {
+    return photo;
+  }
+  if (photo.startsWith('/uploads')) {
+    return `${baseUrl}${photo}`;
+  }
+  return `${baseUrl}/uploads/${photo}`;
+};
+
+// Approved partners list generator
+const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
+  const effectiveBookingId = requestedBookingId || 'BK197860';
+  let dbPartners = [];
+
+  try {
+    const rows = await query(`
+      SELECT id, name, email, mobile, phone_number, city, state, locality, address, image, gender, rating, totalReviews, category, subCategory, status, isApproved
+      FROM node_partners
+      WHERE name IS NOT NULL AND name != '' AND name != 'User'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    if (rows && rows.length > 0) {
+      dbPartners = rows.map(r => {
+        const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+        const city = r.city ? r.city.trim() : 'Jaipur';
+        const partnerCategory = r.category || 'Coffee';
+        return {
+          id: r.id,
+          booking_id: `${effectiveBookingId}_${r.id}`,
+          request_id: `req_${r.id}`,
+          user_id: `usr_${r.id}`,
+          partner_id: r.id,
+          name: r.name.trim(),
+          full_name: r.name.trim(),
+          city: city,
+          rating: parseFloat(r.rating || 4.8),
+          price: 1,
+          currency: 'INR',
+          price_type: 'session',
+          activity: partnerCategory,
+          profile_image: photoUrl,
+          image: photoUrl,
+          avatar: photoUrl,
+          profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+          photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+          is_verified: true,
+          is_approved: true,
+          approval_status: 'approved',
+          interests: [partnerCategory, 'Travel'],
+          status: 'approved',
+          is_accepted: true,
+          request_accepted: true,
+          is_request_accepted: true,
+          accepted: true,
+          request_status: 'accepted'
+        };
+      });
+    }
+  } catch (err) {
+    console.warn('DB getApprovedPartnersList notice:', err.message);
+  }
+
+  const defaultApproved = [
+    {
+      id: 101,
+      booking_id: effectiveBookingId,
+      request_id: 'req_101',
+      user_id: 'usr_101',
+      partner_id: 101,
+      name: 'Priya',
+      full_name: 'Priya Sharma',
+      city: 'Jaipur',
+      rating: 4.8,
+      price: 1,
+      currency: 'INR',
+      price_type: 'session',
+      activity: 'Coffee',
+      profile_image: `${baseUrl}/uploads/priya.jpg`,
+      image: `${baseUrl}/uploads/priya.jpg`,
+      avatar: `${baseUrl}/uploads/priya.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya2.jpg`,
+        `${baseUrl}/uploads/priya3.jpg`,
+        `${baseUrl}/uploads/priya4.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya2.jpg`,
+        `${baseUrl}/uploads/priya3.jpg`,
+        `${baseUrl}/uploads/priya4.jpg`
+      ],
+      is_verified: true,
+      is_approved: true,
+      approval_status: 'approved',
+      interests: ['Coffee', 'Travel'],
+      status: 'approved',
+      is_accepted: true,
+      request_accepted: true,
+      is_request_accepted: true,
+      accepted: true,
+      request_status: 'accepted'
+    },
+    {
+      id: 102,
+      booking_id: `${effectiveBookingId}_102`,
+      request_id: 'req_102',
+      user_id: 'usr_102',
+      partner_id: 102,
+      name: 'Anjali',
+      full_name: 'Anjali Sharma',
+      city: 'Jaipur',
+      rating: 4.9,
+      price: 1199,
+      currency: 'INR',
+      price_type: 'session',
+      activity: 'Dinner',
+      profile_image: `${baseUrl}/uploads/anjali.jpg`,
+      image: `${baseUrl}/uploads/anjali.jpg`,
+      avatar: `${baseUrl}/uploads/anjali.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/anjali.jpg`,
+        `${baseUrl}/uploads/ananya.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/anjali.jpg`,
+        `${baseUrl}/uploads/ananya.jpg`
+      ],
+      is_verified: true,
+      is_approved: true,
+      approval_status: 'approved',
+      interests: ['Coffee', 'Events'],
+      status: 'approved',
+      is_accepted: true,
+      request_accepted: true,
+      is_request_accepted: true,
+      accepted: true,
+      request_status: 'accepted'
+    },
+    {
+      id: 103,
+      booking_id: `${effectiveBookingId}_103`,
+      request_id: 'req_103',
+      user_id: 'usr_103',
+      partner_id: 103,
+      name: 'Riya',
+      full_name: 'Riya Mehta',
+      city: 'Mumbai',
+      rating: 4.8,
+      price: 999,
+      currency: 'INR',
+      price_type: 'session',
+      activity: 'Music & Coffee',
+      profile_image: `${baseUrl}/uploads/riya.jpg`,
+      image: `${baseUrl}/uploads/riya.jpg`,
+      avatar: `${baseUrl}/uploads/riya.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/riya.jpg`,
+        `${baseUrl}/uploads/sneha.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/riya.jpg`,
+        `${baseUrl}/uploads/sneha.jpg`
+      ],
+      is_verified: true,
+      is_approved: true,
+      approval_status: 'approved',
+      interests: ['Music', 'Coffee'],
+      status: 'approved',
+      is_accepted: true,
+      request_accepted: true,
+      is_request_accepted: true,
+      accepted: true,
+      request_status: 'accepted'
+    }
+  ];
+
+  return [...dbPartners, ...defaultApproved];
+};
 
 // 1. Send Request API — POST (/partner-request/send, /partner-requests/send, /partner/send)
 const handleSendRequest = async (req, res) => {
@@ -304,9 +375,88 @@ router.post('/update-status', async (req, res) => {
 });
 
 // Partner Request Details Resolver
-const getPartnerRequestDetails = (targetId = '101', baseUrl = 'https://withmeapi-userapp.onrender.com', requestedBookingId) => {
+const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://withmeapi-userapp.onrender.com', requestedBookingId) => {
   const cleanId = String(targetId || '101').trim().toLowerCase();
   const effectiveBookingId = requestedBookingId || 'BK197860';
+  const rawId = cleanId.replace(/^usr_/, '').replace(/^req_/, '').trim();
+
+  // Check DB node_partners first
+  try {
+    const isNum = !isNaN(rawId) && rawId !== '';
+    let dbRows = [];
+    if (isNum) {
+      dbRows = await query('SELECT * FROM node_partners WHERE id = ? LIMIT 1', [parseInt(rawId)]);
+    }
+    if (!dbRows || dbRows.length === 0) {
+      dbRows = await query('SELECT * FROM node_partners WHERE name LIKE ? LIMIT 1', [`%${targetId}%`]);
+    }
+
+    if (dbRows && dbRows.length > 0) {
+      const r = dbRows[0];
+      const photoUrl = formatPartnerPhoto(r.image, baseUrl);
+      const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : 'Female';
+      const city = r.city ? r.city.trim() : 'Jaipur';
+      const locality = r.locality ? r.locality.trim() : 'Vaishali Nagar';
+      const partnerCategory = r.category || 'Coffee';
+
+      return {
+        id: r.id,
+        request_id: `req_${r.id}`,
+        booking_id: effectiveBookingId,
+        user_id: `usr_${r.id}`,
+        partner_id: r.id,
+        name: r.name.trim(),
+        full_name: r.name.trim(),
+        age: 24,
+        gender: gender,
+        city: city,
+        location: {
+          city: city,
+          state: r.state || 'Rajasthan',
+          country: 'India',
+          address: r.address || `${locality}, ${city}`
+        },
+        rating: parseFloat(r.rating || 4.8),
+        total_reviews: parseInt(r.totalReviews || 120),
+        price: 1,
+        currency: 'INR',
+        price_type: 'session',
+        activity: partnerCategory,
+        activity_id: 'cat_01',
+        about: `Friendly partner available in ${city}. Loves social meetups and cafe conversations.`,
+        is_verified: true,
+        is_approved: true,
+        approval_status: 'approved',
+        status: 'approved',
+        is_accepted: true,
+        request_accepted: true,
+        is_request_accepted: true,
+        accepted: true,
+        request_status: 'accepted',
+        profile_image: photoUrl,
+        image: photoUrl,
+        avatar: photoUrl,
+        profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+        photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+        interests: [partnerCategory, 'Travel', 'Music'],
+        available_for: [
+          { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+          { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+          { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+        ],
+        sender: {
+          user_id: 'usr_998877',
+          name: 'Amit',
+          avatar: `${baseUrl}/uploads/profile.jpg`
+        },
+        message: 'Hello, I want to connect for a coffee meetup!',
+        created_at: new Date(Date.now() - 3600000).toISOString(),
+        updated_at: new Date().toISOString()
+      };
+    }
+  } catch (err) {
+    console.warn('DB getPartnerRequestDetails notice:', err.message);
+  }
 
   // 1. Priya (101, req_101, usr_101, usr_203, priya, BK197860)
   if (cleanId === '101' || cleanId === 'req_101' || cleanId === 'usr_101' || cleanId === 'usr_203' || cleanId.includes('priya') || cleanId.includes('197860')) {
@@ -505,15 +655,15 @@ const getPartnerRequestDetails = (targetId = '101', baseUrl = 'https://withmeapi
   }
 
   // Default fallback to Priya (101)
-  return getPartnerRequestDetails('101', baseUrl, requestedBookingId);
+  return await getPartnerRequestDetails('101', baseUrl, requestedBookingId);
 };
 
 // 4. Partner Request Details API — GET (/details/:id, /details, /:id, /request-details/:id, /view/:id)
-const handlePartnerRequestDetails = (req, res) => {
+const handlePartnerRequestDetails = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const targetId = req.params.id || req.query.id || req.query.request_id || req.query.partner_id || req.query.user_id || req.query.booking_id || 'req_101';
   const requestedBookingId = req.query.booking_id || req.query.bookingId || 'BK197860';
-  const details = getPartnerRequestDetails(targetId, baseUrl, requestedBookingId);
+  const details = await getPartnerRequestDetails(targetId, baseUrl, requestedBookingId);
 
   return res.status(200).json({
     success: true,
@@ -566,11 +716,11 @@ router.get('/:id', authenticateToken, (req, res, next) => {
 });
 
 // 2. Request Partner List API — GET (/list, /, /approved, /pending)
-const handlePartnerList = (req, res) => {
+const handlePartnerList = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const type = (req.query.type || req.query.status || req.query.filter || '').toLowerCase();
   const requestedBookingId = req.query.booking_id || req.query.bookingId || 'BK197860';
-  const approvedPartners = getApprovedPartnersList(baseUrl, requestedBookingId);
+  const approvedPartners = await getApprovedPartnersList(baseUrl, requestedBookingId);
 
   // If client specifically requests pending list after all have been approved
   if (type === 'pending' || type === 'unapproved') {
@@ -618,10 +768,10 @@ router.get('/pending', authenticateToken, handlePartnerList);
 router.get('/pending-partners', authenticateToken, handlePartnerList);
 
 // 3. Approve All / Partner Action API — POST (/action, /approve-all, /approve)
-const handlePartnerAction = (req, res) => {
+const handlePartnerAction = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const { request_id, action = 'APPROVE' } = req.body;
-  const approvedPartners = getApprovedPartnersList(baseUrl);
+  const approvedPartners = await getApprovedPartnersList(baseUrl);
 
   return res.status(200).json({
     success: true,
