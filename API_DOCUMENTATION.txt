@@ -728,7 +728,142 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     }
   }
 
-6.3 Approve All / Partner Action API
+6.3 Partner Request Details API
+- Endpoints:
+  - GET /api/v1/partner-request/details/:id (e.g. /partner-request/details/req_101, /partner-request/details/101, /partner-request/details/BK197860)
+  - GET /api/v1/partner-request/details
+  - GET /api/v1/partner-request/:id
+  - GET /api/v1/partner-request/request-details/:id
+  - GET /api/v1/partner-request/view/:id
+  - GET /partner-request/details/:id
+  - GET /partner-request/details
+  - GET /partner-request/:id
+- Headers: Authorization: Bearer <token>
+- Description: Retrieve comprehensive details for an individual partner request by request_id, partner_id, user_id, or booking_id.
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Partner request details fetched successfully",
+    "request_id": "req_101",
+    "booking_id": "BK197860",
+    "partner_id": 101,
+    "user_id": "usr_203",
+    "status": "approved",
+    "approval_status": "approved",
+    "is_approved": true,
+    "is_accepted": true,
+    "request_status": "accepted",
+    "name": "Priya",
+    "full_name": "Priya Sharma",
+    "age": 23,
+    "gender": "Female",
+    "rating": 4.8,
+    "price": 999,
+    "currency": "INR",
+    "activity": "Coffee",
+    "city": "Jaipur",
+    "location": {
+      "city": "Jaipur",
+      "state": "Rajasthan",
+      "country": "India",
+      "address": "Malviya Nagar, Jaipur, Rajasthan"
+    },
+    "profile_image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+    "profile_images": [
+      "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+      "https://withmeapi-userapp.onrender.com/uploads/priya2.jpg",
+      "https://withmeapi-userapp.onrender.com/uploads/priya3.jpg",
+      "https://withmeapi-userapp.onrender.com/uploads/priya4.jpg"
+    ],
+    "photos": [
+      "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+      "https://withmeapi-userapp.onrender.com/uploads/priya2.jpg",
+      "https://withmeapi-userapp.onrender.com/uploads/priya3.jpg",
+      "https://withmeapi-userapp.onrender.com/uploads/priya4.jpg"
+    ],
+    "interests": [
+      "Coffee",
+      "Travel",
+      "Music"
+    ],
+    "available_for": [
+      { "name": "Coffee", "icon": "coffee", "price": 999, "currency": "INR" },
+      { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
+      { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
+    ],
+    "about": "Friendly, outgoing and loves exploring new places, coffee meetups, and meeting people.",
+    "sender": {
+      "user_id": "usr_998877",
+      "name": "Amit",
+      "avatar": "https://withmeapi-userapp.onrender.com/uploads/profile.jpg"
+    },
+    "data": {
+      "id": 101,
+      "request_id": "req_101",
+      "booking_id": "BK197860",
+      "user_id": "usr_203",
+      "partner_id": 101,
+      "name": "Priya",
+      "full_name": "Priya Sharma",
+      "age": 23,
+      "gender": "Female",
+      "city": "Jaipur",
+      "location": {
+        "city": "Jaipur",
+        "state": "Rajasthan",
+        "country": "India",
+        "address": "Malviya Nagar, Jaipur, Rajasthan"
+      },
+      "rating": 4.8,
+      "total_reviews": 120,
+      "price": 999,
+      "currency": "INR",
+      "price_type": "session",
+      "activity": "Coffee",
+      "activity_id": "cat_01",
+      "about": "Friendly, outgoing and loves exploring new places, coffee meetups, and meeting people.",
+      "is_verified": true,
+      "is_approved": true,
+      "approval_status": "approved",
+      "status": "approved",
+      "is_accepted": true,
+      "request_accepted": true,
+      "is_request_accepted": true,
+      "accepted": true,
+      "request_status": "accepted",
+      "profile_image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+      "image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+      "avatar": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+      "profile_images": [
+        "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/priya2.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/priya3.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/priya4.jpg"
+      ],
+      "photos": [
+        "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/priya2.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/priya3.jpg",
+        "https://withmeapi-userapp.onrender.com/uploads/priya4.jpg"
+      ],
+      "interests": ["Coffee", "Travel", "Music"],
+      "available_for": [
+        { "name": "Coffee", "icon": "coffee", "price": 999, "currency": "INR" },
+        { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
+        { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
+      ],
+      "sender": {
+        "user_id": "usr_998877",
+        "name": "Amit",
+        "avatar": "https://withmeapi-userapp.onrender.com/uploads/profile.jpg"
+      },
+      "message": "Hello, I want to connect for a coffee meetup!",
+      "created_at": "2026-09-24T05:00:00.000Z",
+      "updated_at": "2026-09-24T06:00:00.000Z"
+    }
+  }
+
+6.4 Approve All / Partner Action API
 - Endpoints:
   - POST /api/v1/partner-request/action
   - POST /api/v1/partner-request/approve-all
