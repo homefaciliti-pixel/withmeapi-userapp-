@@ -116,45 +116,66 @@ const handleGetProfile = async (req, res) => {
     otp_status: 'PENDING'
   };
 
-  let profileData = userProfilesStore[userId] || defaultProfile;
+  let profileData = { ...defaultProfile };
 
-  // Query MySQL Database for latest user details strictly for this user
+  // Query MySQL Database strictly for THIS user
   try {
-    const dbUsers = await query(
-      `SELECT * FROM users WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ? LIMIT 1`,
-      [userId, userFullPhone, userPhone, `%${cleanDigits}`]
-    );
+    const queryConditions = [];
+    const queryParams = [];
 
-    if (dbUsers && dbUsers.length > 0) {
-      const u = dbUsers[0];
-      const dbPhone = (u.phone_number || userPhone || '').replace(/^\+91/, '').replace(/^\+/, '');
-      profileData = {
-        user_id: u.id || userId,
-        name: u.name || req.user.name || 'User',
-        country_code: userCountryCode,
-        phone_number: dbPhone || userPhone,
-        full_phone_number: u.phone_number ? (u.phone_number.startsWith('+') ? u.phone_number : `${userCountryCode}${dbPhone}`) : userFullPhone,
-        email: u.email || `${dbPhone || userPhone}@withme.app`,
-        gender: u.gender || profileData.gender || 'Male',
-        interested_in_gender: u.interested_in_gender || profileData.interested_in_gender || 'Female',
-        dob: u.dob || profileData.dob || '1998-05-15',
-        bio: u.bio || profileData.bio || 'Enthusiastic explorer',
-        city: u.city || profileData.city || 'Jaipur',
-        profile_image: u.profile_image ? u.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl) : profileData.profile_image,
-        profile_images: imageList,
-        is_photo_verified: profileData.is_photo_verified !== undefined ? profileData.is_photo_verified : true,
-        photo_verification_status: profileData.photo_verification_status || 'VERIFIED',
-        kyc_status: (u.kyc_status && u.kyc_status !== 'NOT_VERIFIED') ? u.kyc_status : 'APPROVED',
-        is_kyc_completed: true,
-        is_approved: true,
-        approval_status: 'APPROVED',
-        adhar_otp: 'PENDING',
-        aadhaar_otp: 'PENDING',
-        aadhaar_otp_status: 'PENDING',
-        adhar_otp_status: 'PENDING',
-        aadhaar_status: 'PENDING',
-        otp_status: 'PENDING'
-      };
+    if (userId && !String(userId).startsWith('usr_guest') && !String(userId).startsWith('usr_17')) {
+      queryConditions.push('id = ?');
+      queryParams.push(userId);
+    }
+    if (userFullPhone) {
+      queryConditions.push('phone_number = ?');
+      queryParams.push(userFullPhone);
+    }
+    if (userPhone) {
+      queryConditions.push('phone_number = ?');
+      queryParams.push(userPhone);
+    }
+    if (cleanDigits && cleanDigits.length >= 8) {
+      queryConditions.push('phone_number LIKE ?');
+      queryParams.push(`%${cleanDigits}`);
+    }
+
+    if (queryConditions.length > 0) {
+      const sql = `SELECT * FROM users WHERE ${queryConditions.join(' OR ')} ORDER BY id DESC LIMIT 1`;
+      const dbUsers = await query(sql, queryParams);
+
+      if (dbUsers && dbUsers.length > 0) {
+        const u = dbUsers[0];
+        const dbPhone = (u.phone_number || userPhone || '').replace(/^\+91/, '').replace(/^\+/, '');
+        profileData = {
+          ...profileData,
+          user_id: u.id || userId,
+          name: u.name || req.user.name || 'User',
+          country_code: userCountryCode,
+          phone_number: dbPhone || userPhone,
+          full_phone_number: u.phone_number ? (u.phone_number.startsWith('+') ? u.phone_number : `${userCountryCode}${dbPhone}`) : userFullPhone,
+          email: u.email || `${dbPhone || userPhone}@withme.app`,
+          gender: u.gender || profileData.gender || 'Male',
+          interested_in_gender: u.interested_in_gender || profileData.interested_in_gender || 'Female',
+          dob: u.dob || profileData.dob || '1998-05-15',
+          bio: u.bio || profileData.bio || 'Enthusiastic explorer',
+          city: u.city || profileData.city || 'Jaipur',
+          profile_image: u.profile_image ? u.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl) : profileData.profile_image,
+          profile_images: imageList,
+          is_photo_verified: true,
+          photo_verification_status: 'VERIFIED',
+          kyc_status: (u.kyc_status && u.kyc_status !== 'NOT_VERIFIED') ? u.kyc_status : 'APPROVED',
+          is_kyc_completed: true,
+          is_approved: true,
+          approval_status: 'APPROVED',
+          adhar_otp: 'PENDING',
+          aadhaar_otp: 'PENDING',
+          aadhaar_otp_status: 'PENDING',
+          adhar_otp_status: 'PENDING',
+          aadhaar_status: 'PENDING',
+          otp_status: 'PENDING'
+        };
+      }
     }
   } catch (err) {
     console.warn('MySQL getProfile query notice:', err.message);
