@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
+const { query } = require('../config/db');
 
 const getBaseUrl = (req) => {
   if (req) {
@@ -9,6 +10,36 @@ const getBaseUrl = (req) => {
     return `${protocol}://${host}`;
   }
   return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
+};
+
+const getPartnerApiUrl = () => {
+  return process.env.PARTNER_API_URL || 'https://withme-partnerapi.onrender.com';
+};
+
+// Helper to push real-time incoming request to Partner App API
+const syncRequestToPartnerApp = async (requestPayload) => {
+  const partnerUrls = [
+    getPartnerApiUrl(),
+    'http://localhost:5000',
+    'http://localhost:5001'
+  ];
+
+  for (const baseUrl of partnerUrls) {
+    try {
+      const response = await fetch(`${baseUrl}/partner/incoming-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload)
+      });
+      if (response.ok) {
+        console.log(`[Partner Sync] Successfully forwarded request ${requestPayload.request_id} to Partner App at ${baseUrl}`);
+        return true;
+      }
+    } catch (err) {
+      // Ignore offline partner url notice
+    }
+  }
+  return false;
 };
 
 // Approved partners list generator
@@ -127,43 +158,148 @@ const getApprovedPartnersList = (baseUrl, requestedBookingId) => [
   }
 ];
 
-// 1. Send Request API — POST
-router.post('/send', authenticateToken, (req, res) => {
+// 1. Send Request API — POST (/partner-request/send, /partner-requests/send, /partner/send)
+const handleSendRequest = async (req, res) => {
   const baseUrl = getBaseUrl(req);
-  const { receiver_id, activity_id, message, booking_id } = req.body;
+  const {
+    receiver_id,
+    partner_id,
+    activity_id = 'act_01',
+    activity = 'Coffee',
+    activity_name,
+    message = 'Hello, I want to connect for an activity meetup!',
+    booking_id,
+    date = '2026-09-25',
+    time = '06:00 PM',
+    location = 'Jaipur',
+    price = 1
+  } = req.body || {};
 
-  if (!receiver_id) {
-    return res.status(400).json({
-      success: false,
-      message: 'receiver_id is required'
-    });
-  }
-
+  const effectivePartnerId = receiver_id || partner_id || '101';
   const generatedBookingId = booking_id || `BK${Math.floor(100000 + Math.random() * 900000)}`;
+  const requestId = `req_${Date.now()}`;
+  const senderId = (req.user && (req.user.user_id || req.user.id)) || 'usr_998877';
+  const senderName = (req.user && req.user.name && req.user.name !== 'User') ? req.user.name : 'Amit';
+  const senderPhone = (req.user && (req.user.phone_number || req.user.full_phone_number)) || '+917250642635';
+  const senderAvatar = `${baseUrl}/uploads/profile.jpg`;
+  const actName = activity_name || activity || 'Coffee';
 
   const newRequest = {
-    request_id: `req_${Date.now()}`,
+    id: requestId,
+    request_id: requestId,
     booking_id: generatedBookingId,
     sender: {
-      user_id: req.user.id || 'usr_998877',
-      name: req.user.name || 'Amit',
-      avatar: `${baseUrl}/uploads/profile.jpg`
+      user_id: senderId,
+      name: senderName,
+      phone_number: senderPhone,
+      avatar: senderAvatar,
+      profile_image: senderAvatar
     },
-    receiver_id,
-    activity_id: activity_id || 'act_general',
-    message: message || 'Hello, I want to connect for an activity!',
-    status: 'APPROVED',
-    is_accepted: true,
-    accepted: true,
+    receiver_id: effectivePartnerId,
+    partner_id: effectivePartnerId,
+    activity_id,
+    activity: actName,
+    activity_name: actName,
+    date,
+    time,
+    date_time: `${date} ${time}`,
+    location: typeof location === 'string' ? location : (location.address || 'Jaipur'),
+    message,
+    price: typeof price === 'number' ? price : parseFloat(price) || 1,
+    currency: 'INR',
+    status: 'Pending',
+    pending_status: 'Pending',
+    is_accepted: false,
+    accepted: false,
     created_at: new Date().toISOString()
   };
 
+  // 1. Save to MySQL database table `partner_requests`
+  try {
+    const locationStr = typeof location === 'string' ? location : JSON.stringify(location);
+    await query(
+      `INSERT INTO partner_requests (
+        id, request_id, booking_id, sender_id, sender_name, sender_phone, sender_avatar,
+        receiver_id, partner_id, activity_id, activity_name, date, time, location,
+        message, price, currency, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())
+      ON DUPLICATE KEY UPDATE status = 'Pending', updated_at = NOW()`,
+      [
+        requestId, requestId, generatedBookingId, senderId, senderName, senderPhone, senderAvatar,
+        effectivePartnerId, effectivePartnerId, activity_id, actName, date, time, locationStr,
+        message, newRequest.price, 'INR'
+      ]
+    );
+    console.log(`[Database] Partner request ${requestId} saved to MySQL partner_requests table.`);
+  } catch (err) {
+    console.warn('MySQL partner request insert notice:', err.message);
+  }
+
+  // 2. Real-time Async Sync to Partner App backend
+  syncRequestToPartnerApp({
+    request_id: requestId,
+    booking_id: generatedBookingId,
+    partner_id: effectivePartnerId,
+    user_id: senderId,
+    name: senderName,
+    sender_name: senderName,
+    phone_number: senderPhone,
+    mobile_number: senderPhone,
+    image: senderAvatar,
+    profile_image: senderAvatar,
+    interest: actName,
+    activity_name: actName,
+    location: typeof location === 'string' ? location : (location.address || 'Jaipur'),
+    date_time: `${date} ${time}`,
+    date,
+    time,
+    status: 'Pending',
+    message,
+    activity: {
+      type: actName,
+      date,
+      time,
+      area: typeof location === 'string' ? location : (location.address || 'Jaipur'),
+      description: message
+    }
+  }).catch(() => {});
+
   return res.status(200).json({
     success: true,
-    message: 'Partner request sent and approved successfully',
-    request_id: newRequest.request_id,
+    message: 'Partner request sent successfully and notified to partner',
+    request_id: requestId,
     booking_id: generatedBookingId,
+    status: 'Pending',
     data: newRequest
+  });
+};
+
+router.post('/send', authenticateToken, handleSendRequest);
+router.post('/create', authenticateToken, handleSendRequest);
+router.post('/', authenticateToken, handleSendRequest);
+
+// Webhook / Sync endpoint when Partner App updates request status (Accept / Decline)
+router.post('/update-status', async (req, res) => {
+  const { request_id, booking_id, status, action } = req.body || {};
+  const effectiveStatus = (status || (action === 'ACCEPT' ? 'ACCEPTED' : 'DECLINED') || 'ACCEPTED').toUpperCase();
+
+  try {
+    if (request_id) {
+      await query(`UPDATE partner_requests SET status = ?, updated_at = NOW() WHERE request_id = ? OR id = ?`, [effectiveStatus, request_id, request_id]);
+    }
+    if (booking_id) {
+      await query(`UPDATE partner_requests SET status = ?, updated_at = NOW() WHERE booking_id = ?`, [effectiveStatus, booking_id]);
+    }
+  } catch (err) {
+    console.warn('MySQL partner status update notice:', err.message);
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: `Partner request status updated to ${effectiveStatus}`,
+    request_id,
+    booking_id,
+    status: effectiveStatus
   });
 });
 

@@ -87,18 +87,109 @@ const initializeDatabaseTables = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // 4. Partner Requests Table
+    // 4. Partner Requests Table (Shared between User App & Partner App)
     await connection.query(`
       CREATE TABLE IF NOT EXISTS partner_requests (
         id VARCHAR(64) PRIMARY KEY,
+        request_id VARCHAR(64),
+        booking_id VARCHAR(64),
         sender_id VARCHAR(64) NOT NULL,
+        sender_name VARCHAR(100),
+        sender_phone VARCHAR(20),
+        sender_avatar VARCHAR(255),
         receiver_id VARCHAR(64) NOT NULL,
+        partner_id VARCHAR(64),
+        partner_name VARCHAR(100),
         activity_id VARCHAR(64) DEFAULT NULL,
+        activity_name VARCHAR(100) DEFAULT 'Coffee',
+        date VARCHAR(50) DEFAULT NULL,
+        time VARCHAR(50) DEFAULT NULL,
+        location VARCHAR(255) DEFAULT NULL,
         message TEXT,
-        status VARCHAR(20) DEFAULT 'PENDING',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        price DECIMAL(10,2) DEFAULT 1.00,
+        currency VARCHAR(10) DEFAULT 'INR',
+        status VARCHAR(20) DEFAULT 'Pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+
+    // Ensure partner_requests columns exist if table was previously created with fewer columns
+    const requestAlterStatements = [
+      'ALTER TABLE partner_requests ADD COLUMN request_id VARCHAR(64) DEFAULT NULL',
+      'ALTER TABLE partner_requests ADD COLUMN booking_id VARCHAR(64) DEFAULT NULL',
+      'ALTER TABLE partner_requests ADD COLUMN sender_name VARCHAR(100) DEFAULT NULL',
+      'ALTER TABLE partner_requests ADD COLUMN sender_phone VARCHAR(20) DEFAULT NULL',
+      'ALTER TABLE partner_requests ADD COLUMN sender_avatar VARCHAR(255) DEFAULT NULL',
+      'ALTER TABLE partner_requests ADD COLUMN partner_id VARCHAR(64) DEFAULT NULL',
+      'ALTER TABLE partner_requests ADD COLUMN partner_name VARCHAR(100) DEFAULT NULL',
+      "ALTER TABLE partner_requests ADD COLUMN activity_name VARCHAR(100) DEFAULT 'Coffee'",
+      'ALTER TABLE partner_requests ADD COLUMN date VARCHAR(50) DEFAULT NULL',
+      'ALTER TABLE partner_requests ADD COLUMN time VARCHAR(50) DEFAULT NULL',
+      'ALTER TABLE partner_requests ADD COLUMN location VARCHAR(255) DEFAULT NULL',
+      'ALTER TABLE partner_requests ADD COLUMN price DECIMAL(10,2) DEFAULT 1.00',
+      "ALTER TABLE partner_requests ADD COLUMN currency VARCHAR(10) DEFAULT 'INR'",
+      "ALTER TABLE partner_requests ADD COLUMN status VARCHAR(20) DEFAULT 'Pending'",
+      'ALTER TABLE partner_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
+    ];
+
+    for (const sql of requestAlterStatements) {
+      try {
+        await connection.query(sql);
+      } catch (err) {
+        // Ignore column already exists
+      }
+    }
+
+    // 5. Partner Bookings Table (Shared between User App & Partner App)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS partner_bookings (
+        booking_id VARCHAR(64) PRIMARY KEY,
+        request_id VARCHAR(64),
+        user_id VARCHAR(64) NOT NULL,
+        user_name VARCHAR(100),
+        user_image VARCHAR(255),
+        user_phone VARCHAR(20),
+        partner_id VARCHAR(64) NOT NULL,
+        partner_name VARCHAR(100),
+        partner_image VARCHAR(255),
+        activity VARCHAR(100) DEFAULT 'Coffee',
+        date VARCHAR(50),
+        time VARCHAR(50),
+        location VARCHAR(255),
+        price DECIMAL(10,2) DEFAULT 1.00,
+        currency VARCHAR(10) DEFAULT 'INR',
+        status VARCHAR(20) DEFAULT 'Upcoming',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Ensure partner_bookings columns exist
+    const bookingAlterStatements = [
+      'ALTER TABLE partner_bookings ADD COLUMN request_id VARCHAR(64) DEFAULT NULL',
+      'ALTER TABLE partner_bookings ADD COLUMN user_name VARCHAR(100) DEFAULT NULL',
+      'ALTER TABLE partner_bookings ADD COLUMN user_image VARCHAR(255) DEFAULT NULL',
+      'ALTER TABLE partner_bookings ADD COLUMN user_phone VARCHAR(20) DEFAULT NULL',
+      'ALTER TABLE partner_bookings ADD COLUMN partner_name VARCHAR(100) DEFAULT NULL',
+      'ALTER TABLE partner_bookings ADD COLUMN partner_image VARCHAR(255) DEFAULT NULL',
+      "ALTER TABLE partner_bookings ADD COLUMN activity VARCHAR(100) DEFAULT 'Coffee'",
+      'ALTER TABLE partner_bookings ADD COLUMN date VARCHAR(50) DEFAULT NULL',
+      'ALTER TABLE partner_bookings ADD COLUMN time VARCHAR(50) DEFAULT NULL',
+      'ALTER TABLE partner_bookings ADD COLUMN location VARCHAR(255) DEFAULT NULL',
+      'ALTER TABLE partner_bookings ADD COLUMN price DECIMAL(10,2) DEFAULT 1.00',
+      "ALTER TABLE partner_bookings ADD COLUMN currency VARCHAR(10) DEFAULT 'INR'",
+      "ALTER TABLE partner_bookings ADD COLUMN status VARCHAR(20) DEFAULT 'Upcoming'",
+      'ALTER TABLE partner_bookings ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
+    ];
+
+    for (const sql of bookingAlterStatements) {
+      try {
+        await connection.query(sql);
+      } catch (err) {
+        // Ignore column already exists
+      }
+    }
 
     connection.release();
     console.log('✅ MySQL Database tables verified and initialized successfully.');
