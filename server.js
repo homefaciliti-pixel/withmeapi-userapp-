@@ -147,6 +147,27 @@ app.use('/checkout', paymentRoutes);
 app.use('/api/v1', exploreRoutes);
 app.use('/api/v1/general', generalRoutes);
 
+// Documentation Serve Endpoints
+const serveApiDocumentation = (req, res) => {
+  const docPath = path.join(__dirname, 'API_DOCUMENTATION.txt');
+  if (fs.existsSync(docPath)) {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.sendFile(docPath);
+  }
+  return res.status(404).send('Documentation file not found.');
+};
+
+app.get('/API_DOCUMENTATION.txt', serveApiDocumentation);
+app.get('/api_documentation.txt', serveApiDocumentation);
+app.get('/API_DOCUMENTATION', serveApiDocumentation);
+app.get('/api_documentation', serveApiDocumentation);
+app.get('/documentation.txt', serveApiDocumentation);
+app.get('/documentation', serveApiDocumentation);
+app.get('/docs', serveApiDocumentation);
+app.get('/txt', serveApiDocumentation);
+app.get('/api/v1/documentation', serveApiDocumentation);
+app.get('/api/v1/docs', serveApiDocumentation);
+
 // Health Check Endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
@@ -155,7 +176,8 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     database: process.env.MYSQL_DATABASE || 'homef4fw_homefaci',
     sms_sender_id: process.env.SMS_SENDER_ID || 'HMFCLI',
-    documentation: 'See API_DOCUMENTATION.txt in root folder',
+    documentation_url: 'https://withmeapi-userapp.onrender.com/API_DOCUMENTATION.txt',
+    documentation: 'See API_DOCUMENTATION.txt in root folder or visit /API_DOCUMENTATION.txt',
     timestamp: new Date().toISOString()
   });
 });
