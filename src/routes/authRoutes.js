@@ -156,35 +156,36 @@ router.post('/verify-otp', async (req, res) => {
   }
 
   const userId = `usr_${Date.now()}`;
-  const userName = 'Amit';
+  const defaultName = isFixed ? 'Amit' : 'User';
 
   let userPayload = {
-    user_id: 'usr_998877',
+    user_id: userId,
     country_code,
     phone_number,
     full_phone_number,
-    name: userName
+    name: defaultName
   };
 
   // MySQL User Lookup / Registration
   try {
     const existingUsers = await query(
-      `SELECT * FROM users WHERE phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
-      [full_phone_number, phone_number, `%${cleanDigits}%`]
+      `SELECT * FROM users WHERE phone_number = ? OR phone_number = ? OR phone_number LIKE ? LIMIT 1`,
+      [full_phone_number, phone_number, `%${cleanDigits}`]
     );
     if (existingUsers && existingUsers.length > 0) {
-      await query(`UPDATE users SET name = 'Amit' WHERE id = ?`, [existingUsers[0].id]);
+      const existing = existingUsers[0];
+      const existingPhone = (existing.phone_number || phone_number).replace(/^\+91/, '').replace(/^\+/, '');
       userPayload = {
-        user_id: existingUsers[0].id,
+        user_id: existing.id || userId,
         country_code,
-        phone_number: existingUsers[0].phone_number.replace(country_code, ''),
-        full_phone_number: existingUsers[0].phone_number.startsWith('+') ? existingUsers[0].phone_number : `${country_code}${existingUsers[0].phone_number}`,
-        name: existingUsers[0].name && existingUsers[0].name !== 'User' ? existingUsers[0].name : 'Amit'
+        phone_number: existingPhone,
+        full_phone_number: existing.phone_number && existing.phone_number.startsWith('+') ? existing.phone_number : `${country_code}${existingPhone}`,
+        name: existing.name && existing.name !== 'User' ? existing.name : defaultName
       };
     } else {
       await query(
-        `INSERT INTO users (id, phone_number, name) VALUES (?, ?, 'Amit')`,
-        [userId, full_phone_number]
+        `INSERT INTO users (id, phone_number, name) VALUES (?, ?, ?)`,
+        [userId, full_phone_number, defaultName]
       );
       userPayload.user_id = userId;
     }

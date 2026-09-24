@@ -248,10 +248,9 @@ const handleSendRequest = async (req, res) => {
 
   const effectivePartnerId = receiver_id || partner_id || '101';
   const generatedBookingId = booking_id || `BK${Math.floor(100000 + Math.random() * 900000)}`;
-  const requestId = `req_${Date.now()}`;
-  const senderId = (req.user && (req.user.user_id || req.user.id)) || 'usr_998877';
-  const senderName = (req.user && req.user.name && req.user.name !== 'User') ? req.user.name : 'Amit';
-  const senderPhone = (req.user && (req.user.phone_number || req.user.full_phone_number)) || '+917250642635';
+  const senderId = (req.user && (req.user.user_id || req.user.id)) || `usr_${Date.now()}`;
+  const senderName = (req.user && req.user.name) ? req.user.name : 'User';
+  const senderPhone = (req.user && (req.user.phone_number || req.user.full_phone_number)) || '';
   const senderAvatar = `${baseUrl}/uploads/profile.jpg`;
   const actName = activity_name || activity || 'Coffee';
 

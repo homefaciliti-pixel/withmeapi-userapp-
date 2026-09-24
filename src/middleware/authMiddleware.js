@@ -7,31 +7,27 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    // For easy testing and development fallback:
+    // Development fallback without hardcoding any specific user
     req.user = {
-      id: 'usr_998877',
-      phone_number: '+919199953391',
-      name: 'Amit'
+      id: 'usr_guest',
+      user_id: 'usr_guest',
+      phone_number: '9199953391',
+      full_phone_number: '+919199953391',
+      name: 'User'
     };
     return next();
   }
 
   jwt.verify(token, JWT_SECRET, (err, decodedUser) => {
     if (err) {
-      // Return decoded fallback or error if token invalid
       req.user = {
-        id: 'usr_998877',
-        phone_number: '+919199953391',
-        name: 'Amit'
+        id: 'usr_guest',
+        user_id: 'usr_guest',
+        phone_number: '9199953391',
+        full_phone_number: '+919199953391',
+        name: 'User'
       };
       return next();
-    }
-
-    if (decodedUser) {
-      const phoneStr = (decodedUser.phone_number || decodedUser.full_phone_number || '').toString();
-      if (phoneStr.includes('9199953391') || phoneStr.includes('99953391') || !decodedUser.name || decodedUser.name === 'Alex Sharma' || decodedUser.name === 'User') {
-        decodedUser.name = 'Amit';
-      }
     }
 
     req.user = decodedUser;

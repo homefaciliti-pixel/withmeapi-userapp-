@@ -72,13 +72,14 @@ const detailedProfilesCatalog = {
 const handleGetProfile = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1] ? authHeader.split(' ')[1] : 'mock_token_active';
+  const token = authHeader && authHeader.split(' ')[1] ? authHeader.split(' ')[1] : '';
 
-  const userId = req.user.user_id || req.user.id || 'usr_998877';
-  const rawPhone = (req.user.phone_number || '7250642635').toString();
-  const userPhone = rawPhone.replace(/^\+91/, '');
+  const userId = req.user.user_id || req.user.id || `usr_${Date.now()}`;
+  const rawPhone = (req.user.phone_number || req.user.full_phone_number || '').toString();
   const userCountryCode = req.user.country_code || '+91';
-  const userFullPhone = rawPhone.startsWith('+') ? rawPhone : `${userCountryCode}${userPhone}`;
+  let userPhone = rawPhone.replace(/^\+91/, '').replace(/^\+/, '');
+  const userFullPhone = rawPhone.startsWith('+') ? rawPhone : (userPhone ? `${userCountryCode}${userPhone}` : '');
+  const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
 
   const imageList = [
     `${baseUrl}/uploads/profile1.jpg`,
@@ -89,16 +90,16 @@ const handleGetProfile = async (req, res) => {
   // Default Base Profile Template with full details
   let defaultProfile = {
     user_id: userId,
-    name: (req.user.name && req.user.name !== 'User' && req.user.name !== 'Alex Sharma') ? req.user.name : 'Amit',
+    name: req.user.name || 'User',
     country_code: userCountryCode,
     phone_number: userPhone,
     full_phone_number: userFullPhone,
-    email: 'amit@example.com',
+    email: `${userPhone || 'user'}@withme.app`,
     gender: 'Male',
     interested_in_gender: 'Female',
     dob: '1998-05-15',
     bio: 'Enthusiastic explorer and tech lover',
-    city: 'Mumbai',
+    city: 'Jaipur',
     profile_image: imageList[0],
     profile_images: imageList,
     is_photo_verified: true,
@@ -117,27 +118,28 @@ const handleGetProfile = async (req, res) => {
 
   let profileData = userProfilesStore[userId] || defaultProfile;
 
-  // Query MySQL Database for latest user details
+  // Query MySQL Database for latest user details strictly for this user
   try {
     const dbUsers = await query(
-      `SELECT * FROM users WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE '%9953391%' LIMIT 1`,
-      [userId, userFullPhone, userPhone]
+      `SELECT * FROM users WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ? LIMIT 1`,
+      [userId, userFullPhone, userPhone, `%${cleanDigits}`]
     );
 
     if (dbUsers && dbUsers.length > 0) {
       const u = dbUsers[0];
+      const dbPhone = (u.phone_number || userPhone || '').replace(/^\+91/, '').replace(/^\+/, '');
       profileData = {
         user_id: u.id || userId,
-        name: (u.name && u.name !== 'User' && u.name !== 'Alex Sharma') ? u.name : 'Amit',
+        name: u.name || req.user.name || 'User',
         country_code: userCountryCode,
-        phone_number: userPhone,
-        full_phone_number: userFullPhone,
-        email: u.email || profileData.email,
-        gender: u.gender || profileData.gender,
-        interested_in_gender: u.interested_in_gender || profileData.interested_in_gender,
-        dob: u.dob || profileData.dob,
-        bio: u.bio || profileData.bio,
-        city: u.city || profileData.city,
+        phone_number: dbPhone || userPhone,
+        full_phone_number: u.phone_number ? (u.phone_number.startsWith('+') ? u.phone_number : `${userCountryCode}${dbPhone}`) : userFullPhone,
+        email: u.email || `${dbPhone || userPhone}@withme.app`,
+        gender: u.gender || profileData.gender || 'Male',
+        interested_in_gender: u.interested_in_gender || profileData.interested_in_gender || 'Female',
+        dob: u.dob || profileData.dob || '1998-05-15',
+        bio: u.bio || profileData.bio || 'Enthusiastic explorer',
+        city: u.city || profileData.city || 'Jaipur',
         profile_image: u.profile_image ? u.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl) : profileData.profile_image,
         profile_images: imageList,
         is_photo_verified: profileData.is_photo_verified !== undefined ? profileData.is_photo_verified : true,
@@ -485,9 +487,14 @@ const handleProfileEditCombined = async (req, res) => {
   userProfilesStore[userId] = updatedProfile;
 
   // Update MySQL database if available
+  const userFullPhone = (req.user.full_phone_number || req.user.phone_number || '').toString();
+  const userPhone = (req.user.phone_number || '').toString().replace(/^\+91/, '').replace(/^\+/, '');
+  const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
+
   try {
     await query(
-      `UPDATE users SET name = ?, email = ?, gender = ?, interested_in_gender = ?, city = ?, bio = ?${kycSubmitted ? ", kyc_status = 'APPROVED'" : ''} WHERE id = ? OR phone_number = ?`,
+      `UPDATE users SET name = ?, email = ?, gender = ?, interested_in_gender = ?, city = ?, bio = ?${kycSubmitted ? ", kyc_status = 'APPROVED'" : ''} 
+       WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
       [
         updatedProfile.name || 'User',
         updatedProfile.email || null,
@@ -496,7 +503,9 @@ const handleProfileEditCombined = async (req, res) => {
         updatedProfile.city || null,
         updatedProfile.bio || null,
         userId,
-        req.user.phone_number || ''
+        userFullPhone,
+        userPhone,
+        `%${cleanDigits}`
       ]
     );
   } catch (err) {

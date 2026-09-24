@@ -92,9 +92,9 @@ const handleCreateBooking = async (req, res) => {
     price = 1;
   }
 
-  const userId = (req.user && (req.user.user_id || req.user.id)) || 'usr_998877';
-  const userName = (req.user && req.user.name && req.user.name !== 'User') ? req.user.name : 'Amit';
-  const userPhone = (req.user && (req.user.phone_number || req.user.full_phone_number)) || '+917250642635';
+  const userId = (req.user && (req.user.user_id || req.user.id)) || `usr_${Date.now()}`;
+  const userName = (req.user && req.user.name) ? req.user.name : 'User';
+  const userPhone = (req.user && (req.user.phone_number || req.user.full_phone_number)) || '';
   const locationStr = typeof location === 'string' ? location : (location.address || 'Jaipur');
 
   const newBooking = {
