@@ -23,7 +23,7 @@ const getApprovedPartnersList = (baseUrl, requestedBookingId) => [
     full_name: 'Priya Sharma',
     city: 'Jaipur',
     rating: 4.8,
-    price: 999,
+    price: 1,
     currency: 'INR',
     price_type: 'session',
     activity: 'Coffee',
@@ -193,7 +193,7 @@ const getPartnerRequestDetails = (targetId = '101', baseUrl = 'https://withmeapi
       },
       rating: 4.8,
       total_reviews: 120,
-      price: 999,
+      price: 1,
       currency: 'INR',
       price_type: 'session',
       activity: 'Coffee',
@@ -225,7 +225,7 @@ const getPartnerRequestDetails = (targetId = '101', baseUrl = 'https://withmeapi
       ],
       interests: ['Coffee', 'Travel', 'Music'],
       available_for: [
-        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ],
@@ -290,7 +290,7 @@ const getPartnerRequestDetails = (targetId = '101', baseUrl = 'https://withmeapi
       interests: ['Coffee', 'Events', 'Dinner'],
       available_for: [
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
-        { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
         { name: 'Event', icon: 'event', price: 599, currency: 'INR' }
       ],
       sender: {
@@ -353,7 +353,7 @@ const getPartnerRequestDetails = (targetId = '101', baseUrl = 'https://withmeapi
       ],
       interests: ['Music', 'Coffee', 'Trekking'],
       available_for: [
-        { name: 'Coffee & Code', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Coffee & Code', icon: 'coffee', price: 1, currency: 'INR' },
         { name: 'Trekking', icon: 'hiking', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ],

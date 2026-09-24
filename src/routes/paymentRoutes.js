@@ -77,11 +77,11 @@ const createRazorpayLiveOrder = async (amountInPaise, currency, receipt, keyId, 
 // 1. Payment Create / Initiate API — POST (/payments/create, /payments/initiate, /payments, /payment)
 const handlePaymentInitiate = async (req, res) => {
   const baseUrl = getBaseUrl(req);
-  const { booking_id = 'BK197860', amount = 299, currency = 'INR', payment_method = 'UPI' } = req.body || {};
+  const { booking_id = 'BK197860', amount = 1, currency = 'INR', payment_method = 'UPI' } = req.body || {};
   const razorpayKey = getRazorpayKey(req);
   const razorpaySecret = getRazorpaySecret(req);
 
-  const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 299;
+  const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 1;
   const amountInPaise = Math.round(numericAmount * 100);
 
   // Try creating official order from Razorpay server if live secret is available

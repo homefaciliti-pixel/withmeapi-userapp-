@@ -97,7 +97,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         { "name": "Music", "icon": "music_note" }
       ],
       "available_for": [
-        { "name": "Coffee", "icon": "coffee", "price": 299, "currency": "INR" },
+        { "name": "Coffee", "icon": "coffee", "price": 1, "currency": "INR" },
         { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
         { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
       ],
@@ -343,7 +343,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         "name": "Priya",
         "city": "Jaipur",
         "rating": 4.8,
-        "price": 999,
+        "price": 1,
         "currency": "INR",
         "price_type": "session",
         "image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
@@ -407,7 +407,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         "category": "Social",
         "participants_count": 1420,
         "rating": 4.9,
-        "price": 299,
+        "price": 1,
         "currency": "INR",
         "banner": "https://withmeapi-userapp.onrender.com/uploads/categories/coffee.png",
         "image": "https://withmeapi-userapp.onrender.com/uploads/categories/coffee.png",
@@ -479,7 +479,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         { "name": "Music", "icon": "music_note" }
       ],
       "available_for": [
-        { "name": "Coffee", "icon": "coffee", "price": 299, "currency": "INR" },
+        { "name": "Coffee", "icon": "coffee", "price": 1, "currency": "INR" },
         { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
         { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
       ]
@@ -519,7 +519,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         "avatar": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
         "rating": 4.8,
         "distance": "1.2 km",
-        "price": 999,
+        "price": 1,
         "currency": "INR",
         "interests": [
           "Coffee",
@@ -543,7 +543,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         "avatar": "https://withmeapi-userapp.onrender.com/uploads/ananya.jpg",
         "rating": 4.9,
         "distance": "2.4 km",
-        "price": 349,
+        "price": 1,
         "currency": "INR",
         "interests": [
           "Coffee",
@@ -567,7 +567,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         "avatar": "https://withmeapi-userapp.onrender.com/uploads/anjali.jpg",
         "rating": 4.9,
         "distance": "1.8 km",
-        "price": 499,
+        "price": 1,
         "currency": "INR",
         "interests": [
           "Coffee",
@@ -591,7 +591,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         "avatar": "https://withmeapi-userapp.onrender.com/uploads/riya.jpg",
         "rating": 4.8,
         "distance": "3.1 km",
-        "price": 399,
+        "price": 1,
         "currency": "INR",
         "interests": [
           "Coffee",
@@ -615,7 +615,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         "avatar": "https://withmeapi-userapp.onrender.com/uploads/neha.jpg",
         "rating": 4.9,
         "distance": "2.0 km",
-        "price": 299,
+        "price": 1,
         "currency": "INR",
         "interests": [
           "Coffee",
@@ -639,7 +639,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         "avatar": "https://withmeapi-userapp.onrender.com/uploads/sneha.jpg",
         "rating": 4.7,
         "distance": "2.7 km",
-        "price": 349,
+        "price": 1,
         "currency": "INR",
         "interests": [
           "Coffee",
@@ -677,7 +677,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
           "name": "Priya",
           "city": "Jaipur",
           "rating": 4.8,
-          "price": 999,
+          "price": 1,
           "currency": "INR",
           "price_type": "session",
           "profile_image": "https://withmeapi-userapp.onrender.com/uploads/priya.jpg",
@@ -758,7 +758,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     "age": 23,
     "gender": "Female",
     "rating": 4.8,
-    "price": 999,
+    "price": 1,
     "currency": "INR",
     "activity": "Coffee",
     "city": "Jaipur",
@@ -787,7 +787,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
       "Music"
     ],
     "available_for": [
-      { "name": "Coffee", "icon": "coffee", "price": 999, "currency": "INR" },
+      { "name": "Coffee", "icon": "coffee", "price": 1, "currency": "INR" },
       { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
       { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
     ],
@@ -816,7 +816,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
       },
       "rating": 4.8,
       "total_reviews": 120,
-      "price": 999,
+      "price": 1,
       "currency": "INR",
       "price_type": "session",
       "activity": "Coffee",
@@ -848,7 +848,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
       ],
       "interests": ["Coffee", "Travel", "Music"],
       "available_for": [
-        { "name": "Coffee", "icon": "coffee", "price": 999, "currency": "INR" },
+        { "name": "Coffee", "icon": "coffee", "price": 1, "currency": "INR" },
         { "name": "Dinner", "icon": "restaurant", "price": 499, "currency": "INR" },
         { "name": "Travel", "icon": "flight", "price": 699, "currency": "INR" }
       ],
@@ -947,7 +947,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
         "latitude": 26.9124,
         "longitude": 75.7873
       },
-      "price": 299,
+      "price": 1,
       "currency": "INR",
       "created_at": "2026-09-19T15:20:00Z"
     }
@@ -963,7 +963,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 - Request Body (JSON):
   {
     "booking_id": "BK197860",
-    "amount": 299,
+    "amount": 1,
     "currency": "INR",
     "payment_method": "UPI"
   }
@@ -975,15 +975,15 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     "order_id": "order_cWygt697YYA5TA",
     "razorpay_payment_id": "pay_LuEqPzYPfHgjL9",
     "razorpay_order_id": "order_cWygt697YYA5TA",
-    "amount": 299,
-    "amount_in_paise": 29900,
+    "amount": 1,
+    "amount_in_paise": 100,
     "currency": "INR",
     "razorpay_key": "rzp_live_SwFaJKQjU5ZOsH",
     "razorpay_key_id": "rzp_live_SwFaJKQjU5ZOsH",
     "key_id": "rzp_live_SwFaJKQjU5ZOsH",
     "razorpay_options": {
       "key": "rzp_live_SwFaJKQjU5ZOsH",
-      "amount": 29900,
+      "amount": 100,
       "currency": "INR",
       "name": "WitMe App",
       "description": "Booking payment for BK197860",
@@ -998,13 +998,13 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
       "payment_id": "pay_LuEqPzYPfHgjL9",
       "order_id": "order_cWygt697YYA5TA",
       "booking_id": "BK197860",
-      "amount": 299,
-      "amount_in_paise": 29900,
+      "amount": 1,
+      "amount_in_paise": 100,
       "currency": "INR",
       "status": "INITIATED",
       "razorpay_key": "rzp_live_SwFaJKQjU5ZOsH",
       "razorpay_key_id": "rzp_live_SwFaJKQjU5ZOsH",
-      "upi_qr_code": "upi://pay?pa=witme@upi&pn=WitMe&am=299&cu=INR",
+      "upi_qr_code": "upi://pay?pa=witme@upi&pn=WitMe&am=1&cu=INR",
       "created_at": "2026-09-23T10:20:00Z"
     }
   }
@@ -1016,7 +1016,7 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
   {
     "booking_id": "BK197860",
     "activity": "Coffee",
-    "price": 299,
+    "price": 1,
     "currency": "INR"
   }
 - Response (200 OK):
@@ -1027,17 +1027,17 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     "order_id": "order_cWygt697YYA5TA",
     "razorpay_key": "rzp_live_SwFaJKQjU5ZOsH",
     "razorpay_key_id": "rzp_live_SwFaJKQjU5ZOsH",
-    "total_amount": 299,
-    "amount_in_paise": 29900,
+    "total_amount": 1,
+    "amount_in_paise": 100,
     "currency": "INR",
     "data": {
       "checkout_id": "order_cWygt697YYA5TA",
       "booking_id": "BK197860",
       "activity": "Coffee",
-      "amount_payable": 299,
+      "amount_payable": 1,
       "tax_amount": 0,
-      "total_amount": 299,
-      "amount_in_paise": 29900,
+      "total_amount": 1,
+      "amount_in_paise": 100,
       "currency": "INR",
       "razorpay_key": "rzp_live_SwFaJKQjU5ZOsH",
       "available_payment_methods": ["UPI", "RAZORPAY", "CARD", "NET_BANKING", "WALLET"],
@@ -1067,8 +1067,8 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
       "payment_status": "PAID",
       "verification_status": "SUCCESS",
       "transaction_id": "txn_8877123456",
-      "amount": 299,
-      "amount_in_paise": 29900,
+      "amount": 1,
+      "amount_in_paise": 100,
       "currency": "INR",
       "paid_at": "2026-09-23T09:58:00Z"
     }

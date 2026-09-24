@@ -4,7 +4,7 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 
 // Price map by activity name
 const activityPriceMap = {
-  'Coffee': 299,
+  'Coffee': 1,
   'Dinner': 499,
   'Travel': 699,
   'Movie': 399,
@@ -55,9 +55,9 @@ const handleCreateBooking = (req, res) => {
   } = req.body || {};
 
   const bookingId = `BK${Math.floor(100000 + Math.random() * 900000)}`;
-  let price = (req.body && req.body.price) ? parseInt(req.body.price) : (activityPriceMap[activity] || 299);
-  if (activity === 'Coffee' && (activity_user_id === 'usr_203' || activity_user_id === '101' || activity_user_id === 'usr_101' || activity_user_id === 'usr_301' || String(activity_user_id).toLowerCase().includes('priya'))) {
-    price = 999;
+  let price = (req.body && req.body.price) ? parseInt(req.body.price) : (activityPriceMap[activity] || 1);
+  if (activity === 'Coffee' || String(activity).toLowerCase().includes('coffee')) {
+    price = 1;
   }
 
   const newBooking = {

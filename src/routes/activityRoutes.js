@@ -32,7 +32,7 @@ const getCombinedActivitiesData = (req) => {
       name: 'Priya',
       city: location || 'Jaipur',
       rating: 4.8,
-      price: 999,
+      price: 1,
       currency: 'INR',
       price_type: 'session',
       image: `${baseUrl}/uploads/priya.jpg`,
@@ -46,7 +46,7 @@ const getCombinedActivitiesData = (req) => {
       name: 'Anjali',
       city: location || 'Jaipur',
       rating: 4.9,
-      price: 1199,
+      price: 1,
       currency: 'INR',
       price_type: 'session',
       image: `${baseUrl}/uploads/ananya.jpg`,
@@ -60,7 +60,7 @@ const getCombinedActivitiesData = (req) => {
       name: 'Riya',
       city: location || 'Mumbai',
       rating: 4.7,
-      price: 899,
+      price: 1,
       currency: 'INR',
       price_type: 'session',
       image: `${baseUrl}/uploads/riya.jpg`,
@@ -78,7 +78,7 @@ const getCombinedActivitiesData = (req) => {
       category: 'Social',
       participants_count: 1420,
       rating: 4.9,
-      price: 299,
+      price: 1,
       currency: 'INR',
       banner: `${baseUrl}/uploads/categories/coffee.png`,
       image: `${baseUrl}/uploads/categories/coffee.png`,
@@ -224,7 +224,7 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
         avatar: `${baseUrl}/uploads/priya.jpg`,
         rating: 4.8,
         distance: '1.2 km',
-        price: 999,
+        price: 1,
         currency: 'INR',
         interests: ['Coffee', 'Cafe', 'Travel'],
         category: 'Coffee',
@@ -244,7 +244,7 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
         avatar: `${baseUrl}/uploads/ananya.jpg`,
         rating: 4.9,
         distance: '2.4 km',
-        price: 349,
+        price: 1,
         currency: 'INR',
         interests: ['Coffee', 'Music', 'Books'],
         category: 'Coffee',
@@ -264,7 +264,7 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
         avatar: `${baseUrl}/uploads/anjali.jpg`,
         rating: 4.9,
         distance: '1.8 km',
-        price: 499,
+        price: 1,
         currency: 'INR',
         interests: ['Coffee', 'Cafe', 'Events'],
         category: 'Coffee',
@@ -284,7 +284,7 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
         avatar: `${baseUrl}/uploads/riya.jpg`,
         rating: 4.8,
         distance: '3.1 km',
-        price: 399,
+        price: 1,
         currency: 'INR',
         interests: ['Coffee', 'Art', 'Photography'],
         category: 'Coffee',
@@ -304,7 +304,7 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
         avatar: `${baseUrl}/uploads/neha.jpg`,
         rating: 4.9,
         distance: '2.0 km',
-        price: 299,
+        price: 1,
         currency: 'INR',
         interests: ['Coffee', 'Music', 'Cafe'],
         category: 'Coffee',
@@ -324,7 +324,7 @@ const getCategoryItemsData = (categoryIdOrName = 'cat_01', baseUrl = 'https://wi
         avatar: `${baseUrl}/uploads/sneha.jpg`,
         rating: 4.7,
         distance: '2.7 km',
-        price: 349,
+        price: 1,
         currency: 'INR',
         interests: ['Coffee', 'Fitness', 'Gaming'],
         category: 'Coffee',
@@ -813,7 +813,7 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
         { name: 'Music', icon: 'music_note' }
       ],
       available_for: [
-        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ]
@@ -851,7 +851,7 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
         { name: 'Dinner', icon: 'restaurant' }
       ],
       available_for: [
-        { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Event', icon: 'event', price: 599, currency: 'INR' }
       ]
@@ -889,7 +889,7 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
         { name: 'Guitar', icon: 'music_note' }
       ],
       available_for: [
-        { name: 'Coffee & Code', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Coffee & Code', icon: 'coffee', price: 1, currency: 'INR' },
         { name: 'Trekking', icon: 'hiking', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ]
@@ -926,7 +926,7 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
         { name: 'Coffee', icon: 'coffee' }
       ],
       available_for: [
-        { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
         { name: 'Movie', icon: 'movie', price: 399, currency: 'INR' }
       ]
     };
@@ -998,7 +998,7 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
         { name: 'Trekking', icon: 'hiking' }
       ],
       available_for: [
-        { name: 'Coffee', icon: 'coffee', price: 299, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }
       ]
     };
@@ -1038,7 +1038,7 @@ const getPartnerProfileById = (targetId = '101', baseUrl = 'https://withmeapi-us
       { name: 'Music', icon: 'music_note' }
     ],
     available_for: [
-      { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
+      { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
       { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
       { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
     ]
