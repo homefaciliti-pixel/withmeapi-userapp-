@@ -769,10 +769,10 @@ router.post('/post', authenticateToken, safeUpload, handleKycSubmit);
 router.post('/', authenticateToken, safeUpload, handleKycSubmit);
 router.get('/', authenticateToken, handleKycSubmit);
 
-// Delete Account API — DELETE / POST (/profile/delete-account, /profile/delete, /delete-account)
+// Delete Account API — GET / DELETE / POST (/profile/delete-account, /profile/delete, /delete-account)
 const handleDeleteUserAccount = async (req, res) => {
-  const userId = (req.user && (req.user.user_id || req.user.id)) || (req.body && (req.body.user_id || req.body.id)) || 'usr_998877';
-  const reason = (req.body && (req.body.reason || req.body.delete_reason)) || 'User requested account deletion';
+  const userId = (req.user && (req.user.user_id || req.user.id)) || (req.query && (req.query.user_id || req.query.id)) || (req.body && (req.body.user_id || req.body.id)) || 'usr_998877';
+  const reason = (req.query && (req.query.reason || req.query.delete_reason)) || (req.body && (req.body.reason || req.body.delete_reason)) || 'User requested account deletion';
 
   // Clear memory cache
   if (userProfilesStore[userId]) {
@@ -800,10 +800,13 @@ const handleDeleteUserAccount = async (req, res) => {
   });
 };
 
+router.get('/profile/delete-account', authenticateToken, handleDeleteUserAccount);
 router.delete('/profile/delete-account', authenticateToken, handleDeleteUserAccount);
 router.post('/profile/delete-account', authenticateToken, handleDeleteUserAccount);
+router.get('/profile/delete', authenticateToken, handleDeleteUserAccount);
 router.delete('/profile/delete', authenticateToken, handleDeleteUserAccount);
 router.post('/profile/delete', authenticateToken, handleDeleteUserAccount);
+router.get('/delete-account', authenticateToken, handleDeleteUserAccount);
 router.delete('/delete-account', authenticateToken, handleDeleteUserAccount);
 router.post('/delete-account', authenticateToken, handleDeleteUserAccount);
 

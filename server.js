@@ -150,6 +150,8 @@ app.use('/checkout', paymentRoutes);
 app.use('/api/v1', exploreRoutes);
 app.use('/api/v1/general', generalRoutes);
 app.use('/general', generalRoutes);
+app.use('/', authRoutes);
+app.use('/', generalRoutes);
 
 // Documentation Serve Endpoints
 const serveApiDocumentation = (req, res) => {

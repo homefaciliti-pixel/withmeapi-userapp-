@@ -56,26 +56,31 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
 
 1.8 Delete Account API
 - Endpoints:
+  * GET /api/v1/auth/delete-account
   * DELETE /api/v1/auth/delete-account
   * POST /api/v1/auth/delete-account
+  * GET /api/v1/auth/delete
   * DELETE /api/v1/auth/delete
   * POST /api/v1/auth/delete
+  * GET /api/v1/profile/delete-account
   * DELETE /api/v1/profile/delete-account
   * POST /api/v1/profile/delete-account
+  * GET /api/v1/general/delete-account
   * DELETE /api/v1/general/delete-account
   * POST /api/v1/general/delete-account
+  * GET /delete-account
   * DELETE /delete-account
   * POST /delete-account
+  * GET /delete
+  * DELETE /delete
+  * POST /delete
 - Headers:
   * Authorization: Bearer <token> (Optional/Supported)
   * Content-Type: application/json
-- Request Body (JSON - Optional):
-  {
-    "user_id": "usr_998877",
-    "phone_number": "7250642635",
-    "reason": "I want to delete my account permanently",
-    "feedback": "Great app, but not needed anymore."
-  }
+- Query Parameters / Request Body (GET / JSON - Optional):
+  * user_id: "usr_998877"
+  * phone_number: "7250642635"
+  * reason: "I want to delete my account permanently"
 - Description: Permanently deletes the user's account, profiles, active sessions, and removes records from MySQL database and in-memory caches.
 - Response (200 OK):
   {

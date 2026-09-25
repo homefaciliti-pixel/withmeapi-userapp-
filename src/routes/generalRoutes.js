@@ -113,10 +113,10 @@ router.post('/call', authenticateToken, (req, res) => {
   });
 });
 
-// 6. Delete Account API — DELETE & POST
-router.delete('/delete-account', authenticateToken, (req, res) => {
-  const userId = (req.user && (req.user.user_id || req.user.id)) || 'usr_998877';
-  const reason = (req.body && (req.body.reason || req.body.delete_reason)) || 'User requested account deletion';
+// 6. Delete Account API — GET, DELETE & POST
+const handleDeleteGeneralAccount = (req, res) => {
+  const userId = (req.user && (req.user.user_id || req.user.id)) || (req.query && (req.query.user_id || req.query.id)) || (req.body && (req.body.user_id || req.body.id)) || 'usr_998877';
+  const reason = (req.query && (req.query.reason || req.query.delete_reason)) || (req.body && (req.body.reason || req.body.delete_reason)) || 'User requested account deletion';
 
   return res.status(200).json({
     success: true,
@@ -128,22 +128,13 @@ router.delete('/delete-account', authenticateToken, (req, res) => {
       deleted_at: new Date().toISOString()
     }
   });
-});
+};
 
-router.post('/delete-account', authenticateToken, (req, res) => {
-  const userId = (req.user && (req.user.user_id || req.user.id)) || 'usr_998877';
-  const reason = (req.body && (req.body.reason || req.body.delete_reason)) || 'User requested account deletion';
-
-  return res.status(200).json({
-    success: true,
-    message: 'Account deleted successfully. All user data, active sessions, and profile records have been permanently removed.',
-    data: {
-      user_id: userId,
-      status: 'DELETED',
-      reason: reason,
-      deleted_at: new Date().toISOString()
-    }
-  });
-});
+router.get('/delete-account', authenticateToken, handleDeleteGeneralAccount);
+router.delete('/delete-account', authenticateToken, handleDeleteGeneralAccount);
+router.post('/delete-account', authenticateToken, handleDeleteGeneralAccount);
+router.get('/delete', authenticateToken, handleDeleteGeneralAccount);
+router.delete('/delete', authenticateToken, handleDeleteGeneralAccount);
+router.post('/delete', authenticateToken, handleDeleteGeneralAccount);
 
 module.exports = router;

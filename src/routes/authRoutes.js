@@ -376,15 +376,15 @@ router.post('/apple-sso', (req, res) => {
   return handleSsoLogin(req, res);
 });
 
-// 8. Delete Account API — DELETE / POST (/auth/delete-account, /auth/delete, /auth/account/delete)
+// 8. Delete Account API — GET / DELETE / POST (/auth/delete-account, /auth/delete, /auth/account/delete)
 const handleDeleteAccount = async (req, res) => {
-  const userId = (req.user && (req.user.user_id || req.user.id)) || (req.body && (req.body.user_id || req.body.id)) || 'usr_998877';
-  const rawPhone = (req.body && (req.body.phone_number || req.body.phone)) || (req.user && (req.user.phone_number || req.user.full_phone_number)) || '';
-  const reason = (req.body && (req.body.reason || req.body.delete_reason)) || 'User requested account deletion';
+  const userId = (req.user && (req.user.user_id || req.user.id)) || (req.query && (req.query.user_id || req.query.id)) || (req.body && (req.body.user_id || req.body.id)) || 'usr_998877';
+  const rawPhone = (req.query && (req.query.phone_number || req.query.phone || req.query.mobile)) || (req.body && (req.body.phone_number || req.body.phone || req.body.mobile)) || (req.user && (req.user.phone_number || req.user.full_phone_number)) || '';
+  const reason = (req.query && (req.query.reason || req.query.delete_reason)) || (req.body && (req.body.reason || req.body.delete_reason)) || 'User requested account deletion';
 
   let fullPhone = '';
   if (rawPhone) {
-    const { full_phone_number } = parsePhoneAndCountry(req.body.country_code || '+91', rawPhone);
+    const { full_phone_number } = parsePhoneAndCountry((req.body && req.body.country_code) || (req.query && req.query.country_code) || '+91', rawPhone);
     fullPhone = full_phone_number;
   }
 
@@ -416,11 +416,15 @@ const handleDeleteAccount = async (req, res) => {
   });
 };
 
+router.get('/delete-account', authenticateToken, handleDeleteAccount);
 router.delete('/delete-account', authenticateToken, handleDeleteAccount);
 router.post('/delete-account', authenticateToken, handleDeleteAccount);
+router.get('/delete', authenticateToken, handleDeleteAccount);
 router.delete('/delete', authenticateToken, handleDeleteAccount);
 router.post('/delete', authenticateToken, handleDeleteAccount);
+router.get('/account', authenticateToken, handleDeleteAccount);
 router.delete('/account', authenticateToken, handleDeleteAccount);
+router.get('/account/delete', authenticateToken, handleDeleteAccount);
 router.post('/account/delete', authenticateToken, handleDeleteAccount);
 
 module.exports = router;
