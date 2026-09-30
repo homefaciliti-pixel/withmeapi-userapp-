@@ -392,8 +392,98 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
   const cleanId = String(targetId || '101').trim().toLowerCase();
   const effectiveBookingId = requestedBookingId || 'BK197860';
   const rawId = cleanId.replace(/^usr_/, '').replace(/^req_/, '').trim();
+  const currentDateStr = new Date().toISOString().split('T')[0];
 
-  // Check DB withme_partners first
+  // 0. Check DB withme_partner_requests / partner_requests first
+  try {
+    let reqRows = await query('SELECT * FROM withme_partner_requests WHERE request_id = ? OR id = ? OR booking_id = ? LIMIT 1', [targetId, targetId, targetId]);
+    if (!reqRows || reqRows.length === 0) {
+      reqRows = await query('SELECT * FROM partner_requests WHERE request_id = ? OR id = ? OR booking_id = ? LIMIT 1', [targetId, targetId, targetId]).catch(() => []);
+    }
+
+    if (reqRows && reqRows.length > 0) {
+      const reqData = reqRows[0];
+      const categoryName = reqData.activity || reqData.activity_name || 'Coffee';
+      const meetupLoc = reqData.location || 'Malviya Nagar, Jaipur, Rajasthan';
+      const timeVal = reqData.time || '06:00 PM';
+      const dateVal = reqData.date || currentDateStr;
+      const timeSlotStr = `${timeVal} - 07:00 PM`;
+      const priceVal = reqData.price !== undefined && reqData.price !== null ? parseFloat(reqData.price) : 1;
+      const photoUrl = formatPartnerPhoto(reqData.sender_avatar, baseUrl);
+
+      return {
+        id: reqData.id || targetId,
+        request_id: reqData.request_id || targetId,
+        booking_id: reqData.booking_id || effectiveBookingId,
+        user_id: reqData.user_id || reqData.sender_id || 'usr_203',
+        partner_id: reqData.partner_id || reqData.receiver_id || 101,
+        name: reqData.sender_name || 'Priya Sharma',
+        full_name: reqData.sender_name || 'Priya Sharma',
+        age: 24,
+        gender: 'Female',
+        city: 'Jaipur',
+        location: {
+          city: 'Jaipur',
+          state: 'Rajasthan',
+          country: 'India',
+          address: meetupLoc
+        },
+        meetup_location: meetupLoc,
+        meetup_address: meetupLoc,
+        address: meetupLoc,
+        rating: 4.8,
+        total_reviews: 120,
+        price: priceVal,
+        booking_price: priceVal,
+        total_price: priceVal,
+        amount: priceVal,
+        currency: 'INR',
+        price_type: 'session',
+        activity: categoryName,
+        activity_name: categoryName,
+        category: categoryName,
+        activity_category: categoryName,
+        activity_id: reqData.activity_id || 'cat_01',
+        time_slot: timeSlotStr,
+        time: timeVal,
+        booking_time: timeVal,
+        date: dateVal,
+        booking_date: dateVal,
+        date_time: reqData.date && reqData.time ? `${reqData.date} ${reqData.time}` : `${dateVal} ${timeVal}`,
+        about: 'Friendly partner available for meetups.',
+        is_verified: true,
+        is_approved: true,
+        approval_status: 'approved',
+        status: (reqData.status || 'APPROVED').toLowerCase(),
+        is_accepted: true,
+        request_accepted: true,
+        is_request_accepted: true,
+        accepted: true,
+        request_status: (reqData.status || 'APPROVED').toLowerCase(),
+        profile_image: photoUrl,
+        image: photoUrl,
+        avatar: photoUrl,
+        profile_images: [photoUrl],
+        photos: [photoUrl],
+        interests: [categoryName, 'Travel', 'Music'],
+        available_for: [
+          { name: categoryName, icon: 'coffee', price: priceVal, currency: 'INR' }
+        ],
+        sender: {
+          user_id: reqData.user_id || reqData.sender_id || 'usr_998877',
+          name: reqData.sender_name || 'Amit',
+          avatar: photoUrl
+        },
+        message: reqData.message || 'Hello, I want to connect for a meetup!',
+        created_at: reqData.created_at || new Date().toISOString(),
+        updated_at: reqData.updated_at || new Date().toISOString()
+      };
+    }
+  } catch (err) {
+    console.warn('DB withme_partner_requests notice:', err.message);
+  }
+
+  // Check DB withme_partners
   try {
     const isNum = !isNaN(rawId) && rawId !== '';
     let dbRows = [];
@@ -411,6 +501,7 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
       const city = r.city ? r.city.trim() : 'Jaipur';
       const locality = r.locality ? r.locality.trim() : 'Vaishali Nagar';
       const partnerCategory = r.category || r.activity || 'Coffee';
+      const meetupLoc = r.address || `${locality}, ${city}, Rajasthan`;
 
       let parsedInterests = [partnerCategory, 'Travel', 'Music'];
       try {
@@ -449,15 +540,30 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
           city: city,
           state: r.state || 'Rajasthan',
           country: 'India',
-          address: r.address || `${locality}, ${city}`
+          address: meetupLoc
         },
+        meetup_location: meetupLoc,
+        meetup_address: meetupLoc,
+        address: meetupLoc,
         rating: parseFloat(r.rating || 4.8),
         total_reviews: parseInt(r.total_reviews || 120),
         price: 1,
+        booking_price: 1,
+        total_price: 1,
+        amount: 1,
         currency: 'INR',
         price_type: 'session',
         activity: partnerCategory,
+        activity_name: partnerCategory,
+        category: partnerCategory,
+        activity_category: partnerCategory,
         activity_id: 'cat_01',
+        time_slot: '06:00 PM - 07:00 PM',
+        time: '06:00 PM',
+        booking_time: '06:00 PM',
+        date: currentDateStr,
+        booking_date: currentDateStr,
+        date_time: `${currentDateStr} 06:00 PM`,
         about: r.about || `Friendly partner available in ${city}. Loves social meetups and cafe conversations.`,
         is_verified: true,
         is_approved: true,
@@ -508,13 +614,28 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
         country: 'India',
         address: 'Malviya Nagar, Jaipur, Rajasthan'
       },
+      meetup_location: 'Malviya Nagar, Jaipur, Rajasthan',
+      meetup_address: 'Malviya Nagar, Jaipur, Rajasthan',
+      address: 'Malviya Nagar, Jaipur, Rajasthan',
       rating: 4.8,
       total_reviews: 120,
       price: 1,
+      booking_price: 1,
+      total_price: 1,
+      amount: 1,
       currency: 'INR',
       price_type: 'session',
       activity: 'Coffee',
+      activity_name: 'Coffee',
+      category: 'Coffee',
+      activity_category: 'Coffee',
       activity_id: 'cat_01',
+      time_slot: '06:00 PM - 07:00 PM',
+      time: '06:00 PM',
+      booking_time: '06:00 PM',
+      date: currentDateStr,
+      booking_date: currentDateStr,
+      date_time: `${currentDateStr} 06:00 PM`,
       about: 'Friendly, outgoing and loves exploring new places, coffee meetups, and meeting people.',
       is_verified: true,
       is_approved: true,
@@ -576,13 +697,28 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
         country: 'India',
         address: 'Vaishali Nagar, Jaipur, Rajasthan'
       },
+      meetup_location: 'Vaishali Nagar, Jaipur, Rajasthan',
+      meetup_address: 'Vaishali Nagar, Jaipur, Rajasthan',
+      address: 'Vaishali Nagar, Jaipur, Rajasthan',
       rating: 4.9,
       total_reviews: 135,
       price: 1199,
+      booking_price: 1199,
+      total_price: 1199,
+      amount: 1199,
       currency: 'INR',
       price_type: 'session',
       activity: 'Dinner',
+      activity_name: 'Dinner',
+      category: 'Dinner',
+      activity_category: 'Dinner',
       activity_id: 'cat_02',
+      time_slot: '08:00 PM - 09:30 PM',
+      time: '08:00 PM',
+      booking_time: '08:00 PM',
+      date: currentDateStr,
+      booking_date: currentDateStr,
+      date_time: `${currentDateStr} 08:00 PM`,
       about: 'Loves social gatherings, food dates, and music events.',
       is_verified: true,
       is_approved: true,
@@ -640,13 +776,28 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
         country: 'India',
         address: 'Bandra West, Mumbai, Maharashtra'
       },
+      meetup_location: 'Bandra West, Mumbai, Maharashtra',
+      meetup_address: 'Bandra West, Mumbai, Maharashtra',
+      address: 'Bandra West, Mumbai, Maharashtra',
       rating: 4.8,
       total_reviews: 145,
       price: 999,
+      booking_price: 999,
+      total_price: 999,
+      amount: 999,
       currency: 'INR',
       price_type: 'session',
       activity: 'Music & Coffee',
+      activity_name: 'Music & Coffee',
+      category: 'Music & Coffee',
+      activity_category: 'Music & Coffee',
       activity_id: 'cat_01',
+      time_slot: '05:00 PM - 06:30 PM',
+      time: '05:00 PM',
+      booking_time: '05:00 PM',
+      date: currentDateStr,
+      booking_date: currentDateStr,
+      date_time: `${currentDateStr} 05:00 PM`,
       about: 'Tech enthusiast, guitarist, and outdoor trekking partner.',
       is_verified: true,
       is_approved: true,
@@ -696,6 +847,8 @@ const handlePartnerRequestDetails = async (req, res) => {
   const requestedBookingId = req.query.booking_id || req.query.bookingId || 'BK197860';
   const details = await getPartnerRequestDetails(targetId, baseUrl, requestedBookingId);
 
+  const meetupLoc = (typeof details.location === 'string' ? details.location : (details.location && details.location.address)) || details.meetup_location || details.address || 'Malviya Nagar, Jaipur, Rajasthan';
+
   return res.status(200).json({
     success: true,
     message: 'Partner request details fetched successfully',
@@ -714,10 +867,25 @@ const handlePartnerRequestDetails = async (req, res) => {
     gender: details.gender,
     rating: details.rating,
     price: details.price,
+    booking_price: details.booking_price || details.price,
+    total_price: details.total_price || details.price,
+    amount: details.amount || details.price,
     currency: details.currency,
     activity: details.activity,
+    activity_name: details.activity_name || details.activity,
+    category: details.category || details.activity,
+    activity_category: details.activity_category || details.activity,
+    time_slot: details.time_slot || '06:00 PM - 07:00 PM',
+    time: details.time || '06:00 PM',
+    booking_time: details.booking_time || details.time || '06:00 PM',
+    date: details.date || new Date().toISOString().split('T')[0],
+    booking_date: details.booking_date || details.date || new Date().toISOString().split('T')[0],
+    date_time: details.date_time || `${details.date || new Date().toISOString().split('T')[0]} ${details.time || '06:00 PM'}`,
     city: details.city,
     location: details.location,
+    meetup_location: meetupLoc,
+    meetup_address: meetupLoc,
+    address: meetupLoc,
     profile_image: details.profile_image,
     profile_images: details.profile_images,
     photos: details.photos,
@@ -725,7 +893,16 @@ const handlePartnerRequestDetails = async (req, res) => {
     available_for: details.available_for,
     about: details.about,
     sender: details.sender,
-    data: details,
+    data: {
+      ...details,
+      time_slot: details.time_slot || '06:00 PM - 07:00 PM',
+      booking_price: details.booking_price || details.price,
+      total_price: details.total_price || details.price,
+      category: details.category || details.activity,
+      activity_category: details.activity_category || details.activity,
+      meetup_location: meetupLoc,
+      meetup_address: meetupLoc
+    },
     partner_details: details,
     request_details: details
   });
