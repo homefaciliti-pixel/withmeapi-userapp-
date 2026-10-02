@@ -109,6 +109,7 @@ const generalRoutes = require('./src/routes/generalRoutes');
 const bookingRoutes = require('./src/routes/bookingRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
 const uploadRoutes = require('./src/routes/uploadRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
 
 // Bind Routes to Base API Path
 app.use('/api/v1/auth', authRoutes);
@@ -147,6 +148,10 @@ app.use('/api/v1/payment', paymentRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/payment', paymentRoutes);
 app.use('/checkout', paymentRoutes);
+app.use('/api/v1/notification', notificationRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/notification', notificationRoutes);
+app.use('/notifications', notificationRoutes);
 app.use('/api/v1', exploreRoutes);
 app.use('/api/v1/general', generalRoutes);
 app.use('/general', generalRoutes);

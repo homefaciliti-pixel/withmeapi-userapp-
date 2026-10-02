@@ -1188,6 +1188,181 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
     "filename": "base64-1790089200-987654321.jpg"
   }
 
+--------------------------------------------------------------------------------
+12. FIREBASE PUSH NOTIFICATION APIs (/api/v1/notification, /notification)
+--------------------------------------------------------------------------------
+
+12.1 Register / Update Device FCM Token
+- Endpoints:
+  * POST /api/v1/notification/fcm-token
+  * POST /api/v1/notification/token
+  * POST /notification/fcm-token
+- Headers:
+  * Authorization: Bearer <token>
+  * Content-Type: application/json
+- Request Body:
+  {
+    "fcm_token": "eXamPle_FCM_Device_Token_String_123456789",
+    "device_type": "android"  // Optional: "android", "ios", "web"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "FCM token updated successfully",
+    "data": {
+      "user_id": "usr_7250642635",
+      "fcm_token": "eXamPle_FCM_Device_Token_String_123456789",
+      "device_type": "android"
+    }
+  }
+
+12.2 Send Custom Push Notification
+- Endpoint: POST /api/v1/notification/send (or /notification/send)
+- Headers: Authorization: Bearer <token>, Content-Type: application/json
+- Request Body:
+  {
+    "user_id": "usr_7250642635",
+    "title": "New Booking Request",
+    "body": "You have received a new date request from Priya!",
+    "data": {
+      "type": "booking_request",
+      "request_id": "req_001"
+    }
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Notification sent successfully",
+    "data": {
+      "notification_id": "ntf_1790829102",
+      "target_user_id": "usr_7250642635",
+      "title": "New Booking Request",
+      "body": "You have received a new date request from Priya!",
+      "data": {
+        "type": "booking_request",
+        "request_id": "req_001"
+      },
+      "fcm_sent": true,
+      "sent_at": "2026-10-02T14:25:04.000Z"
+    }
+  }
+
+12.3 Get Notifications History & Unread Count
+- Endpoints:
+  * GET /api/v1/notification
+  * GET /api/v1/notification/list
+  * GET /notification
+- Headers: Authorization: Bearer <token>
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Notifications retrieved successfully",
+    "data": {
+      "notifications": [
+        {
+          "notification_id": "ntf_1790829102",
+          "title": "Booking Confirmed! ✅",
+          "body": "Your booking BK197860 with Priya for Coffee is confirmed for 2026-10-02 06:00 PM!",
+          "data": {
+            "type": "booking_confirmed",
+            "booking_id": "BK197860"
+          },
+          "is_read": false,
+          "created_at": "2026-10-02T14:25:04.000Z"
+        }
+      ],
+      "unread_count": 1
+    }
+  }
+
+12.4 Mark Notification as Read
+- Endpoint: POST /api/v1/notification/:notification_id/read
+- Headers: Authorization: Bearer <token>
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Notification marked as read",
+    "data": {
+      "success": true
+    }
+  }
+
+12.5 Trigger Business Event Push Notification (12 Business Events)
+- Endpoints:
+  * POST /api/v1/notification/event
+  * POST /api/v1/notification/trigger
+  * POST /notification/event
+- Headers: Authorization: Bearer <token>, Content-Type: application/json
+- Supported Events (`event_type`):
+  1. booking_request        - New booking request received
+  2. booking_confirmed      - Booking confirmed/accepted
+  3. booking_cancelled      - Booking cancelled
+  4. booking_completed      - Booking completed
+  5. request_cancelled      - Booking request cancelled/declined
+  6. booking_reminder       - Upcoming booking reminder
+  7. safe_meet_alert        - Safe Meet mode active/alert
+  8. wallet_credit          - Earnings wallet credited
+  9. withdraw_success       - Bank withdrawal payout successful
+ 10. withdraw_failed        - Bank withdrawal payout failed
+ 11. chat_message           - New chat message received
+ 12. review_rating          - New review / rating received
+
+- Event Request Body Examples:
+
+  * 1. Booking Request (`booking_request`):
+    { "event_type": "booking_request", "user_id": "usr_7250642635", "sender_name": "Amit", "activity": "Coffee", "location": "Jaipur", "request_id": "req_101" }
+
+  * 2. Booking Confirm (`booking_confirmed`):
+    { "event_type": "booking_confirmed", "user_id": "usr_7250642635", "name": "Priya", "activity": "Dinner", "booking_id": "BK197860", "date": "2026-10-02", "time": "07:00 PM" }
+
+  * 3. Booking Cancel (`booking_cancelled` / `cancle`):
+    { "event_type": "booking_cancelled", "user_id": "usr_7250642635", "name": "Priya", "booking_id": "BK197860" }
+
+  * 4. Booking Complete (`booking_completed`):
+    { "event_type": "booking_completed", "user_id": "usr_7250642635", "name": "Priya", "booking_id": "BK197860" }
+
+  * 5. Request Cancel (`request_cancelled`):
+    { "event_type": "request_cancelled", "user_id": "usr_7250642635", "request_id": "req_101" }
+
+  * 6. Remind Booking Details (`booking_reminder`):
+    { "event_type": "booking_reminder", "user_id": "usr_7250642635", "name": "Priya", "date": "2026-10-02", "time": "06:00 PM", "location": "Jaipur", "booking_id": "BK197860" }
+
+  * 7. Safe Meet (`safe_meet_alert`):
+    { "event_type": "safe_meet_alert", "user_id": "usr_7250642635", "booking_id": "BK197860" }
+
+  * 8. Wallet Credit (`wallet_credit`):
+    { "event_type": "wallet_credit", "user_id": "usr_7250642635", "amount": 500, "booking_id": "BK197860" }
+
+  * 9. Withdraw Success (`withdraw_success`):
+    { "event_type": "withdraw_success", "user_id": "usr_7250642635", "amount": 1200 }
+
+  * 10. Withdraw Failed (`withdraw_failed`):
+    { "event_type": "withdraw_failed", "user_id": "usr_7250642635", "amount": 1200, "reason": "Invalid IFSC code" }
+
+  * 11. Chat Message (`chat_message`):
+    { "event_type": "chat_message", "user_id": "usr_7250642635", "sender_name": "Priya", "message": "See you at 6 PM!" }
+
+  * 12. Review Rating (`review_rating`):
+    { "event_type": "review_rating", "user_id": "usr_7250642635", "name": "Amit", "rating": 5, "review": "Great experience!" }
+
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Event notification 'booking_request' triggered successfully",
+    "data": {
+      "notification_id": "ntf_1790829988",
+      "target_user_id": "usr_7250642635",
+      "title": "New Booking Request 💌",
+      "body": "You received a new booking request from Amit for Coffee at Jaipur!",
+      "data": {
+        "type": "booking_request",
+        "request_id": "req_101"
+      },
+      "fcm_sent": true,
+      "sent_at": "2026-10-02T14:25:04.000Z"
+    }
+  }
+
 ================================================================================
                               END OF DOCUMENTATION
 ================================================================================
