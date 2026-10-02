@@ -110,6 +110,12 @@ const bookingRoutes = require('./src/routes/bookingRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
 const uploadRoutes = require('./src/routes/uploadRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
+const chatRoutes = require('./src/routes/chatRoutes');
+const { initChatSocket } = require('./src/sockets/chatSocket');
+
+const http = require('http');
+const server = http.createServer(app);
+const io = initChatSocket(server);
 
 // Bind Routes to Base API Path
 app.use('/api/v1/auth', authRoutes);
@@ -152,6 +158,9 @@ app.use('/api/v1/notification', notificationRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/notification', notificationRoutes);
 app.use('/notifications', notificationRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/v1/chat', chatRoutes);
+app.use('/chat', chatRoutes);
 app.use('/api/v1', exploreRoutes);
 app.use('/api/v1/general', generalRoutes);
 app.use('/general', generalRoutes);
@@ -203,7 +212,7 @@ app.use((req, res) => {
 
 // Start Server with Port Fallback and DB Init
 const startServer = (portToTry) => {
-  const server = app.listen(portToTry, async () => {
+  server.listen(portToTry, async () => {
     console.log(`=======================================================`);
     console.log(`🚀 WitMe User App API Server running on port ${portToTry}`);
     console.log(`📍 Base URL: http://localhost:${portToTry}/api/v1`);

@@ -125,7 +125,73 @@ async function initAllWithMeTables() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  console.log('[WithMe DB] All separate withme_* tables verified/created successfully!');
+  // 6. conversations
+  await query(`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      type ENUM('private') DEFAULT 'private',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // 7. conversation_members
+  await query(`
+    CREATE TABLE IF NOT EXISTS conversation_members (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      conversation_id BIGINT UNSIGNED NOT NULL,
+      user_id VARCHAR(64) NOT NULL,
+      joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_member (conversation_id, user_id),
+      INDEX idx_user (user_id),
+      INDEX idx_conversation (conversation_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // 8. messages
+  await query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      conversation_id BIGINT UNSIGNED NOT NULL,
+      sender_id VARCHAR(64) NOT NULL,
+      receiver_id VARCHAR(64) NOT NULL,
+      message_type ENUM('text') DEFAULT 'text',
+      message TEXT NOT NULL,
+      is_delivered TINYINT(1) DEFAULT 0,
+      is_read TINYINT(1) DEFAULT 0,
+      is_deleted TINYINT(1) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_conversation_created (conversation_id, created_at),
+      INDEX idx_receiver_read (receiver_id, is_read)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // 9. user_blocks
+  await query(`
+    CREATE TABLE IF NOT EXISTS user_blocks (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      blocker_id VARCHAR(64) NOT NULL,
+      blocked_id VARCHAR(64) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_block (blocker_id, blocked_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // 10. withme_notifications
+  await query(`
+    CREATE TABLE IF NOT EXISTS withme_notifications (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      notification_id VARCHAR(64) UNIQUE,
+      user_id VARCHAR(64) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      body TEXT NOT NULL,
+      data_payload TEXT,
+      is_read TINYINT(1) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  console.log('[WithMe DB] All separate withme_* and chat tables verified/created successfully!');
 }
 
 module.exports = { initAllWithMeTables };
