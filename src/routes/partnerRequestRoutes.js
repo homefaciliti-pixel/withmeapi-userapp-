@@ -103,7 +103,12 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
           request_accepted: true,
           is_request_accepted: true,
           accepted: true,
-          request_status: 'accepted'
+          request_status: 'accepted',
+          is_paid: true,
+          payment_status: 'COMPLETED',
+          is_payment_completed: true,
+          payment_id: `pay_${r.id}_${effectiveBookingId}`,
+          payment_status_text: 'Paid'
         };
       });
     }
@@ -150,7 +155,12 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
       request_accepted: true,
       is_request_accepted: true,
       accepted: true,
-      request_status: 'accepted'
+      request_status: 'accepted',
+      is_paid: true,
+      payment_status: 'COMPLETED',
+      is_payment_completed: true,
+      payment_id: `pay_101_${effectiveBookingId}`,
+      payment_status_text: 'Paid'
     },
     {
       id: 102,
@@ -186,7 +196,12 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
       request_accepted: true,
       is_request_accepted: true,
       accepted: true,
-      request_status: 'accepted'
+      request_status: 'accepted',
+      is_paid: true,
+      payment_status: 'COMPLETED',
+      is_payment_completed: true,
+      payment_id: `pay_102_${effectiveBookingId}`,
+      payment_status_text: 'Paid'
     },
     {
       id: 103,
@@ -222,7 +237,12 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
       request_accepted: true,
       is_request_accepted: true,
       accepted: true,
-      request_status: 'accepted'
+      request_status: 'accepted',
+      is_paid: true,
+      payment_status: 'COMPLETED',
+      is_payment_completed: true,
+      payment_id: `pay_103_${effectiveBookingId}`,
+      payment_status_text: 'Paid'
     }
   ];
 
@@ -849,6 +869,8 @@ const handlePartnerRequestDetails = async (req, res) => {
 
   const meetupLoc = (typeof details.location === 'string' ? details.location : (details.location && details.location.address)) || details.meetup_location || details.address || 'Malviya Nagar, Jaipur, Rajasthan';
 
+  const paymentId = details.payment_id || `pay_${details.id || details.request_id || '101'}_${requestedBookingId}`;
+
   return res.status(200).json({
     success: true,
     message: 'Partner request details fetched successfully',
@@ -861,6 +883,11 @@ const handlePartnerRequestDetails = async (req, res) => {
     is_approved: details.is_approved,
     is_accepted: details.is_accepted,
     request_status: details.request_status,
+    is_paid: details.is_paid !== undefined ? details.is_paid : true,
+    payment_status: details.payment_status || 'COMPLETED',
+    is_payment_completed: details.is_payment_completed !== undefined ? details.is_payment_completed : true,
+    payment_id: paymentId,
+    payment_status_text: details.payment_status_text || 'Paid',
     name: details.name,
     full_name: details.full_name,
     age: details.age,
@@ -895,6 +922,11 @@ const handlePartnerRequestDetails = async (req, res) => {
     sender: details.sender,
     data: {
       ...details,
+      is_paid: details.is_paid !== undefined ? details.is_paid : true,
+      payment_status: details.payment_status || 'COMPLETED',
+      is_payment_completed: details.is_payment_completed !== undefined ? details.is_payment_completed : true,
+      payment_id: paymentId,
+      payment_status_text: details.payment_status_text || 'Paid',
       time_slot: details.time_slot || '06:00 PM - 07:00 PM',
       booking_price: details.booking_price || details.price,
       total_price: details.total_price || details.price,
@@ -903,8 +935,22 @@ const handlePartnerRequestDetails = async (req, res) => {
       meetup_location: meetupLoc,
       meetup_address: meetupLoc
     },
-    partner_details: details,
-    request_details: details
+    partner_details: {
+      ...details,
+      is_paid: details.is_paid !== undefined ? details.is_paid : true,
+      payment_status: details.payment_status || 'COMPLETED',
+      is_payment_completed: details.is_payment_completed !== undefined ? details.is_payment_completed : true,
+      payment_id: paymentId,
+      payment_status_text: details.payment_status_text || 'Paid'
+    },
+    request_details: {
+      ...details,
+      is_paid: details.is_paid !== undefined ? details.is_paid : true,
+      payment_status: details.payment_status || 'COMPLETED',
+      is_payment_completed: details.is_payment_completed !== undefined ? details.is_payment_completed : true,
+      payment_id: paymentId,
+      payment_status_text: details.payment_status_text || 'Paid'
+    }
   });
 };
 
