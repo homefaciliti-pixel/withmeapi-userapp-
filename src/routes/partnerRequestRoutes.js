@@ -56,6 +56,31 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
   return `${baseUrl}/uploads/${photo}`;
 };
 
+const synchedPartnersMap = new Map();
+
+const fetchLivePartnerAppPartners = async (baseUrl) => {
+  const partnerApiUrls = [
+    process.env.PARTNER_API_URL || 'https://withmepartner.onrender.com',
+    'http://localhost:5001',
+    'http://localhost:5000'
+  ];
+
+  for (const pUrl of partnerApiUrls) {
+    try {
+      const resp = await fetch(`${pUrl}/partner/all`, { signal: AbortSignal.timeout(2500) });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json && (json.status || json.success) && Array.isArray(json.data)) {
+          return json.data;
+        }
+      }
+    } catch (e) {
+      // Ignore offline partner API host
+    }
+  }
+  return [];
+};
+
 // Approved partners list generator
 const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
   const effectiveBookingId = requestedBookingId || 'BK197860';
@@ -75,12 +100,16 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
         const photoUrl = formatPartnerPhoto(r.image || r.profile_photo_url, baseUrl);
         const city = r.city ? r.city.trim() : 'Jaipur';
         const partnerCategory = r.category || r.activity || 'Coffee';
+        const pId = formatNumericUserId(r.partner_id || r.user_id || r.id);
+
         return {
-          id: r.id,
-          booking_id: `${effectiveBookingId}_${r.id}`,
-          request_id: `req_${r.id}`,
-          user_id: r.user_id || `usr_${r.id}`,
-          partner_id: r.id,
+          id: pId,
+          booking_id: `${effectiveBookingId}_${pId}`,
+          request_id: `req_${pId}`,
+          user_id: pId,
+          partner_id: pId,
+          partner_user_id: pId,
+          partnerUserId: pId,
           name: (r.name || r.full_name || 'Partner').trim(),
           full_name: (r.full_name || r.name || 'Partner').trim(),
           city: city,
@@ -105,9 +134,12 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
           accepted: true,
           request_status: 'accepted',
           is_paid: true,
+          isPaid: true,
           payment_status: 'COMPLETED',
+          paymentStatus: 'COMPLETED',
           is_payment_completed: true,
-          payment_id: `pay_${r.id}_${effectiveBookingId}`,
+          payment_id: `pay_${pId}_${effectiveBookingId}`,
+          paymentId: `pay_${pId}_${effectiveBookingId}`,
           payment_status_text: 'Paid'
         };
       });
@@ -115,6 +147,110 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
   } catch (err) {
     console.warn('DB getApprovedPartnersList notice:', err.message);
   }
+
+  // Merge in-memory synced partners
+  const syncedList = Array.from(synchedPartnersMap.values()).map(p => {
+    const photoUrl = formatPartnerPhoto(p.image || p.profile_photo_url, baseUrl);
+    const pId = formatNumericUserId(p.partner_id || p.user_id || p.id);
+    return {
+      id: pId,
+      booking_id: `${effectiveBookingId}_${pId}`,
+      request_id: `req_${pId}`,
+      user_id: pId,
+      partner_id: pId,
+      partner_user_id: pId,
+      partnerUserId: pId,
+      name: p.name,
+      full_name: p.full_name || p.name,
+      city: p.city || 'Jaipur',
+      rating: parseFloat(p.rating || 4.8),
+      price: 1,
+      currency: 'INR',
+      price_type: 'session',
+      activity: p.category || p.activity || 'Coffee',
+      profile_image: photoUrl,
+      image: photoUrl,
+      avatar: photoUrl,
+      profile_images: [photoUrl],
+      photos: [photoUrl],
+      is_verified: true,
+      is_approved: true,
+      approval_status: 'approved',
+      interests: [p.category || 'Coffee', 'Travel'],
+      status: 'approved',
+      is_accepted: true,
+      request_accepted: true,
+      is_request_accepted: true,
+      accepted: true,
+      request_status: 'accepted',
+      is_paid: true,
+      isPaid: true,
+      payment_status: 'COMPLETED',
+      paymentStatus: 'COMPLETED',
+      is_payment_completed: true,
+      payment_id: `pay_${pId}_${effectiveBookingId}`,
+      paymentId: `pay_${pId}_${effectiveBookingId}`,
+      payment_status_text: 'Paid'
+    };
+  });
+
+  // Fetch live partner app partners as fallback
+  let liveList = [];
+  try {
+    const rawLive = await fetchLivePartnerAppPartners();
+    if (rawLive && rawLive.length > 0) {
+      liveList = rawLive.map(lp => {
+        const photoUrl = formatPartnerPhoto(lp.profile_photo_url || lp.profile_image || lp.image, baseUrl);
+        const pId = formatNumericUserId(lp.user_id || lp.partner_id || lp.id);
+        return {
+          id: pId,
+          booking_id: `${effectiveBookingId}_${pId}`,
+          request_id: `req_${pId}`,
+          user_id: pId,
+          partner_id: pId,
+          partner_user_id: pId,
+          partnerUserId: pId,
+          name: lp.name || 'Partner User',
+          full_name: lp.name || 'Partner User',
+          city: lp.city || 'Jaipur',
+          rating: parseFloat(lp.rating || 4.8),
+          price: 1,
+          currency: 'INR',
+          price_type: 'session',
+          activity: lp.category || lp.activity || 'Coffee',
+          profile_image: photoUrl,
+          image: photoUrl,
+          avatar: photoUrl,
+          profile_images: [photoUrl],
+          photos: [photoUrl],
+          is_verified: true,
+          is_approved: true,
+          approval_status: 'approved',
+          interests: [lp.category || 'Coffee', 'Travel'],
+          status: 'approved',
+          is_accepted: true,
+          request_accepted: true,
+          is_request_accepted: true,
+          accepted: true,
+          request_status: 'accepted',
+          is_paid: true,
+          isPaid: true,
+          payment_status: 'COMPLETED',
+          paymentStatus: 'COMPLETED',
+          is_payment_completed: true,
+          payment_id: `pay_${pId}_${effectiveBookingId}`,
+          paymentId: `pay_${pId}_${effectiveBookingId}`,
+          payment_status_text: 'Paid'
+        };
+      });
+    }
+  } catch (e) {}
+
+  // Deduplicate combined list by partner_id
+  const combinedMap = new Map();
+  dbPartners.forEach(p => combinedMap.set(String(p.id), p));
+  syncedList.forEach(p => combinedMap.set(String(p.id), p));
+  liveList.forEach(p => combinedMap.set(String(p.id), p));
 
   const defaultApproved = [
     {
@@ -1066,6 +1202,92 @@ const handlePartnerAction = async (req, res) => {
 router.post('/action', authenticateToken, handlePartnerAction);
 router.post('/approve-all', authenticateToken, handlePartnerAction);
 router.post('/approve', authenticateToken, handlePartnerAction);
+
+// 4. Register / Sync New Partner API — POST (/register-partner, /register, /sync-partner, /sync)
+const handleRegisterPartner = async (req, res) => {
+  const baseUrl = getBaseUrl(req);
+  const pData = req.body || {};
+  const rawUserId = String(pData.partner_id || pData.user_id || `usr_${Date.now()}`).trim();
+  const digits = rawUserId.replace(/\D/g, '');
+  const cleanId = digits.length > 0 ? (isNaN(Number(digits)) ? digits : Number(digits)) : rawUserId;
+  const name = pData.name || pData.full_name || 'Partner User';
+  const email = pData.email || '';
+  const mobile = pData.mobile_number || pData.phone_number || pData.phone || '';
+  const gender = pData.gender || 'Female';
+  const dob = pData.dob || '';
+  const city = pData.city || pData.area || 'Jaipur';
+  const state = pData.state || 'Rajasthan';
+  const locality = pData.area || pData.locality || 'Vaishali Nagar';
+  const address = pData.address || `${locality}, ${city}`;
+  const photoUrl = formatPartnerPhoto(pData.profile_image || pData.image || pData.profile_photo_url, baseUrl);
+  const priceVal = pData.price !== undefined ? parseFloat(pData.price) : 1;
+  const categoryVal = pData.category || pData.activity || 'Coffee';
+
+  const partnerRecord = {
+    id: cleanId,
+    partner_id: cleanId,
+    user_id: cleanId,
+    partner_user_id: cleanId,
+    partnerUserId: cleanId,
+    name,
+    full_name: name,
+    email,
+    mobile_number: mobile,
+    gender,
+    dob,
+    city,
+    state,
+    locality,
+    address,
+    image: photoUrl,
+    profile_image: photoUrl,
+    profile_photo_url: photoUrl,
+    category: categoryVal,
+    activity: categoryVal,
+    rating: parseFloat(pData.rating || 4.8),
+    total_reviews: 120,
+    price: priceVal,
+    currency: 'INR',
+    is_approved: 1,
+    status: 'ACTIVE',
+    created_at: new Date().toISOString()
+  };
+
+  synchedPartnersMap.set(String(cleanId), partnerRecord);
+
+  // Insert into MySQL withme_partners
+  try {
+    await query(`
+      INSERT INTO withme_partners (
+        partner_id, user_id, name, full_name, email, mobile_number, phone_number,
+        gender, dob, city, state, locality, address, profile_photo_url, image,
+        category, activity, rating, price, is_approved, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE')
+      ON DUPLICATE KEY UPDATE
+        name = VALUES(name), full_name = VALUES(full_name), email = VALUES(email),
+        profile_photo_url = VALUES(profile_photo_url), image = VALUES(image),
+        city = VALUES(city), locality = VALUES(locality), status = 'ACTIVE', updated_at = NOW()
+    `, [
+      String(cleanId), String(cleanId), name, name, email, mobile, mobile,
+      gender, dob, city, state, locality, address, photoUrl, photoUrl,
+      categoryVal, categoryVal, partnerRecord.rating, priceVal
+    ]);
+    console.log(`[User App API] Synced new partner ${name} (${cleanId}) to withme_partners table.`);
+  } catch (err) {
+    console.warn('[User App DB Sync Notice]:', err.message);
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'Partner registered and synced successfully in User App',
+    data: partnerRecord
+  });
+};
+
+router.post('/register-partner', handleRegisterPartner);
+router.post('/register', handleRegisterPartner);
+router.post('/sync-partner', handleRegisterPartner);
+router.post('/sync', handleRegisterPartner);
 
 module.exports = router;
 
