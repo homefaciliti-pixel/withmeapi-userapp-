@@ -39,25 +39,42 @@ async function findUser(userId) {
   const uId = toUserIdStr(userId);
   if (!uId) return null;
 
+  const rawId = uId.replace(/^usr_/, '');
+  const formattedId = uId.startsWith('usr_') ? uId : `usr_${uId}`;
+
+  // 1. Check users table
   try {
     const rows = await query(
-      `SELECT * FROM users WHERE id = ? OR phone_number = ? LIMIT 1`,
-      [uId, uId]
+      `SELECT * FROM users WHERE id = ? OR user_id = ? OR id = ? OR phone_number = ? LIMIT 1`,
+      [uId, formattedId, rawId, uId]
     );
     if (rows && rows.length > 0) {
-      return rows[0];
+      const u = rows[0];
+      return {
+        user_id: u.id || u.user_id || uId,
+        name: u.name || u.full_name || `User ${uId}`,
+        full_name: u.full_name || u.name || `User ${uId}`,
+        profile_image: u.profile_image || u.image || u.profile_photo_url || "/uploads/profile.jpg"
+      };
     }
   } catch (err) {
     // Ignore database connection error
   }
 
+  // 2. Check withme_partners table
   try {
     const rows = await query(
-      `SELECT * FROM withme_partners WHERE user_id = ? OR partner_id = ? OR mobile_number = ? LIMIT 1`,
-      [uId, uId, uId]
+      `SELECT * FROM withme_partners WHERE partner_id = ? OR id = ? OR user_id = ? OR mobile_number = ? LIMIT 1`,
+      [uId, rawId, formattedId, uId]
     );
     if (rows && rows.length > 0) {
-      return rows[0];
+      const p = rows[0];
+      return {
+        user_id: p.user_id || p.partner_id || p.id || uId,
+        name: p.name || p.full_name || `Partner ${uId}`,
+        full_name: p.full_name || p.name || `Partner ${uId}`,
+        profile_image: p.image || p.profile_photo_url || "/uploads/priya.jpg"
+      };
     }
   } catch (err) {
     // Ignore database connection error
@@ -67,6 +84,7 @@ async function findUser(userId) {
     return {
       user_id: uId,
       name: `User ${uId}`,
+      full_name: `User ${uId}`,
       profile_image: "/uploads/profile.jpg"
     };
   }
