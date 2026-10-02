@@ -1364,5 +1364,136 @@ SMS Template Text: "Your OTP for registering on Superhome is: {#var#}. This code
   }
 
 ================================================================================
+13. REAL-TIME ONE-TO-ONE CHAT APIs & SOCKET.IO EVENTS (/api/chat)
+================================================================================
+
+13.1 Create or Get Private Conversation
+- Endpoint: POST /api/chat/conversation
+- Headers: Authorization: Bearer <token>, Content-Type: application/json
+- Request Body:
+  {
+    "userId": "205"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "conversationId": 123
+  }
+
+13.2 Get Chat List (User Conversations)
+- Endpoint: GET /api/chat/conversations
+- Headers: Authorization: Bearer <token>
+- Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      {
+        "conversationId": 123,
+        "otherUserId": "205",
+        "otherUserName": "Rahul",
+        "otherUserProfileImage": "https://withmeapi-userapp.onrender.com/uploads/user205.jpg",
+        "lastMessage": "Hello!",
+        "lastMessageTime": "2026-10-02T10:30:00.000Z",
+        "unreadCount": 2,
+        "isOnline": true
+      }
+    ]
+  }
+
+13.3 Get Chat History Messages
+- Endpoint: GET /api/chat/messages/:conversationId
+- Headers: Authorization: Bearer <token>
+- Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      {
+        "messageId": 1001,
+        "conversationId": 123,
+        "senderId": "101",
+        "receiverId": "205",
+        "message": "Hello!",
+        "messageType": "text",
+        "isDelivered": true,
+        "isRead": false,
+        "createdAt": "2026-10-02T10:30:00.000Z"
+      }
+    ]
+  }
+
+13.4 Delete Message
+- Endpoint: DELETE /api/chat/message/:messageId
+- Headers: Authorization: Bearer <token>
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Message deleted successfully"
+  }
+
+13.5 Block User
+- Endpoint: POST /api/chat/block
+- Headers: Authorization: Bearer <token>, Content-Type: application/json
+- Request Body:
+  {
+    "userId": "205"
+  }
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "User blocked successfully"
+  }
+
+================================================================================
+13.6 SOCKET.IO REAL-TIME EVENTS REFERENCE
+================================================================================
+Server URL: https://withmeapi-userapp.onrender.com (or http://localhost:5000)
+
+Client Connection:
+const socket = io("https://withmeapi-userapp.onrender.com", {
+  auth: {
+    token: "YOUR_JWT_TOKEN"
+  }
+});
+
+Socket.IO Event Specifications:
+
+1. send_message (Client -> Server)
+   Payload: { "conversationId": 123, "receiverId": "205", "message": "Hello" }
+
+2. message_sent (Server -> Sender)
+   Payload: { "id": 1001, "conversationId": 123, "senderId": "101", "receiverId": "205", "messageType": "text", "message": "Hello", "isDelivered": false, "isRead": false, "createdAt": "..." }
+
+3. receive_message (Server -> Receiver Socket)
+   Payload: Message Object (same format as above)
+
+4. message_delivered (Server -> Sender Socket)
+   Payload: { "messageId": 1001, "conversationId": 123 }
+
+5. mark_message_read (Client -> Server)
+   Payload: { "messageId": 1001 }
+
+6. message_read (Server -> Sender Socket)
+   Payload: { "messageId": 1001, "conversationId": 123 }
+
+7. typing_start (Client -> Server)
+   Payload: { "conversationId": 123, "receiverId": "205" }
+
+8. typing_stop (Client -> Server)
+   Payload: { "conversationId": 123, "receiverId": "205" }
+
+9. user_typing (Server -> Receiver Socket)
+   Payload: { "conversationId": 123, "userId": "101" }
+
+10. user_stopped_typing (Server -> Receiver Socket)
+    Payload: { "conversationId": 123, "userId": "101" }
+
+11. user_online (Server -> Online Users)
+    Payload: { "userId": "101" }
+
+12. user_offline (Server -> Online Users)
+    Payload: { "userId": "101" }
+
+================================================================================
                               END OF DOCUMENTATION
 ================================================================================
+
