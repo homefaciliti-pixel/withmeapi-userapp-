@@ -9,9 +9,22 @@ const memoryBlocks = new Set(); // "blockerId:blockedId"
 let autoMessageId = 1000;
 let autoConversationId = 100;
 
+function formatNumericUserId(id) {
+  if (id === null || id === undefined || id === '') return 101;
+  const str = String(id).trim();
+  const digits = str.replace(/\D/g, '');
+  if (digits.length > 0) {
+    const num = Number(digits);
+    return isNaN(num) ? digits : num;
+  }
+  return 101;
+}
+
 function toUserIdStr(id) {
   if (id === null || id === undefined) return "";
-  return String(id).trim();
+  const str = String(id).trim();
+  const digits = str.replace(/\D/g, '');
+  return digits.length > 0 ? digits : str;
 }
 
 /**
@@ -51,7 +64,7 @@ async function findUser(userId) {
     if (rows && rows.length > 0) {
       const u = rows[0];
       return {
-        user_id: u.id || u.user_id || uId,
+        user_id: formatNumericUserId(u.id || u.user_id || uId),
         name: u.name || u.full_name || `User ${uId}`,
         full_name: u.full_name || u.name || `User ${uId}`,
         profile_image: u.profile_image || u.image || u.profile_photo_url || "/uploads/profile.jpg"
@@ -70,7 +83,7 @@ async function findUser(userId) {
     if (rows && rows.length > 0) {
       const p = rows[0];
       return {
-        user_id: p.user_id || p.partner_id || p.id || uId,
+        user_id: formatNumericUserId(p.user_id || p.partner_id || p.id || uId),
         name: p.name || p.full_name || `Partner ${uId}`,
         full_name: p.full_name || p.name || `Partner ${uId}`,
         profile_image: p.image || p.profile_photo_url || "/uploads/priya.jpg"
@@ -82,7 +95,7 @@ async function findUser(userId) {
 
   if (uId.length > 0) {
     return {
-      user_id: uId,
+      user_id: formatNumericUserId(uId),
       name: `User ${uId}`,
       full_name: `User ${uId}`,
       profile_image: "/uploads/profile.jpg"
@@ -361,7 +374,7 @@ async function getUserConversations(authenticatedUserId, req, isUserOnlineFn) {
 
     conversationList.push({
       conversationId: cId,
-      otherUserId: isNaN(otherUserId) ? otherUserId : Number(otherUserId),
+      otherUserId: formatNumericUserId(otherUserId),
       otherUserName,
       otherUserProfileImage,
       lastMessage: lastMsg ? lastMsg.message : "No messages yet",
@@ -404,8 +417,8 @@ async function getConversationMessages(conversationId, authenticatedUserId) {
         messageId: Number(r.id),
         id: Number(r.id),
         conversationId: Number(r.conversation_id),
-        senderId: isNaN(r.sender_id) ? r.sender_id : Number(r.sender_id),
-        receiverId: isNaN(r.receiver_id) ? r.receiver_id : Number(r.receiver_id),
+        senderId: formatNumericUserId(r.sender_id),
+        receiverId: formatNumericUserId(r.receiver_id),
         message: r.message,
         messageType: r.message_type || 'text',
         isDelivered: Boolean(r.is_delivered),
@@ -423,8 +436,8 @@ async function getConversationMessages(conversationId, authenticatedUserId) {
       messageId: Number(r.id),
       id: Number(r.id),
       conversationId: Number(r.conversation_id),
-      senderId: isNaN(r.sender_id) ? r.sender_id : Number(r.sender_id),
-      receiverId: isNaN(r.receiver_id) ? r.receiver_id : Number(r.receiver_id),
+      senderId: formatNumericUserId(r.sender_id),
+      receiverId: formatNumericUserId(r.receiver_id),
       message: r.message,
       messageType: r.message_type || 'text',
       isDelivered: Boolean(r.is_delivered),
@@ -495,8 +508,8 @@ async function saveMessage({ conversationId, senderId, receiverId, message, mess
     id: insertedId,
     messageId: insertedId,
     conversationId: convId,
-    senderId: isNaN(sId) ? sId : Number(sId),
-    receiverId: isNaN(rId) ? rId : Number(rId),
+    senderId: formatNumericUserId(sId),
+    receiverId: formatNumericUserId(rId),
     messageType,
     message: String(message),
     isDelivered: Boolean(isDelivered),
