@@ -869,7 +869,10 @@ const handlePartnerRequestDetails = async (req, res) => {
 
   const meetupLoc = (typeof details.location === 'string' ? details.location : (details.location && details.location.address)) || details.meetup_location || details.address || 'Malviya Nagar, Jaipur, Rajasthan';
 
-  const paymentId = details.payment_id || `pay_${details.id || details.request_id || '101'}_${requestedBookingId}`;
+  const paymentId = String(details.payment_id || details.paymentId || `pay_${details.id || details.request_id || '101'}_${requestedBookingId}`);
+  const partnerUserId = String(details.partner_user_id || details.partnerUserId || details.partner_id || details.user_id || 'usr_101');
+  const isPaid = details.is_paid !== undefined ? Boolean(details.is_paid) : (details.isPaid !== undefined ? Boolean(details.isPaid) : true);
+  const paymentStatus = String(details.payment_status || details.paymentStatus || 'COMPLETED');
 
   return res.status(200).json({
     success: true,
@@ -877,16 +880,21 @@ const handlePartnerRequestDetails = async (req, res) => {
     request_id: details.request_id,
     booking_id: details.booking_id,
     partner_id: details.partner_id,
+    partner_user_id: partnerUserId,
+    partnerUserId: partnerUserId,
     user_id: details.user_id,
     status: details.status,
     approval_status: details.approval_status,
     is_approved: details.is_approved,
     is_accepted: details.is_accepted,
     request_status: details.request_status,
-    is_paid: details.is_paid !== undefined ? details.is_paid : true,
-    payment_status: details.payment_status || 'COMPLETED',
+    is_paid: isPaid,
+    isPaid: isPaid,
+    payment_status: paymentStatus,
+    paymentStatus: paymentStatus,
     is_payment_completed: details.is_payment_completed !== undefined ? details.is_payment_completed : true,
     payment_id: paymentId,
+    paymentId: paymentId,
     payment_status_text: details.payment_status_text || 'Paid',
     name: details.name,
     full_name: details.full_name,
@@ -922,10 +930,15 @@ const handlePartnerRequestDetails = async (req, res) => {
     sender: details.sender,
     data: {
       ...details,
-      is_paid: details.is_paid !== undefined ? details.is_paid : true,
-      payment_status: details.payment_status || 'COMPLETED',
+      is_paid: isPaid,
+      isPaid: isPaid,
+      payment_status: paymentStatus,
+      paymentStatus: paymentStatus,
       is_payment_completed: details.is_payment_completed !== undefined ? details.is_payment_completed : true,
       payment_id: paymentId,
+      paymentId: paymentId,
+      partner_user_id: partnerUserId,
+      partnerUserId: partnerUserId,
       payment_status_text: details.payment_status_text || 'Paid',
       time_slot: details.time_slot || '06:00 PM - 07:00 PM',
       booking_price: details.booking_price || details.price,
@@ -937,18 +950,28 @@ const handlePartnerRequestDetails = async (req, res) => {
     },
     partner_details: {
       ...details,
-      is_paid: details.is_paid !== undefined ? details.is_paid : true,
-      payment_status: details.payment_status || 'COMPLETED',
+      is_paid: isPaid,
+      isPaid: isPaid,
+      payment_status: paymentStatus,
+      paymentStatus: paymentStatus,
       is_payment_completed: details.is_payment_completed !== undefined ? details.is_payment_completed : true,
       payment_id: paymentId,
+      paymentId: paymentId,
+      partner_user_id: partnerUserId,
+      partnerUserId: partnerUserId,
       payment_status_text: details.payment_status_text || 'Paid'
     },
     request_details: {
       ...details,
-      is_paid: details.is_paid !== undefined ? details.is_paid : true,
-      payment_status: details.payment_status || 'COMPLETED',
+      is_paid: isPaid,
+      isPaid: isPaid,
+      payment_status: paymentStatus,
+      paymentStatus: paymentStatus,
       is_payment_completed: details.is_payment_completed !== undefined ? details.is_payment_completed : true,
       payment_id: paymentId,
+      paymentId: paymentId,
+      partner_user_id: partnerUserId,
+      partnerUserId: partnerUserId,
       payment_status_text: details.payment_status_text || 'Paid'
     }
   });
