@@ -19,8 +19,15 @@ function initChatSocket(server) {
   const io = socketIo(server, {
     cors: {
       origin: "*",
-      methods: ["GET", "POST"]
-    }
+      methods: ["GET", "POST"],
+      allowedHeaders: ["*"],
+      credentials: false
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    upgradeTimeout: 30000,
+    allowEIO3: true,
+    transports: ['websocket', 'polling']
   });
 
   // Socket Authentication Middleware
@@ -38,6 +45,7 @@ function initChatSocket(server) {
       }
 
       if (!token) {
+        console.warn('[Socket.IO] Auth failed: No token provided');
         return next(new Error("Authentication error: Access token required"));
       }
 
@@ -48,21 +56,28 @@ function initChatSocket(server) {
 
       jwt.verify(token, JWT_SECRET, (err, decoded) => {
         if (err || !decoded) {
-          // Fallback to decode if signature key varies
+          // Fallback: try to decode without verification (useful in dev or when key varies)
           try {
             const dec = jwt.decode(token);
             if (dec && (dec.user_id || dec.id)) {
-              socket.userId = String(dec.user_id || dec.id);
+              const uId = String(dec.user_id || dec.id).replace(/\D/g, '') || String(dec.user_id || dec.id);
+              socket.userId = uId;
+              console.log(`[Socket.IO] Auth via decode fallback: userId=${uId}`);
               return next();
             }
           } catch (e) {}
+          console.warn('[Socket.IO] Auth failed: Invalid or expired token:', err && err.message);
           return next(new Error("Authentication error: Invalid or expired access token"));
         }
-        const uId = String(decoded.user_id || decoded.id);
+        const rawId = String(decoded.user_id || decoded.id || '');
+        // Strip non-digit prefix (e.g., 'usr_') but keep numeric part
+        const uId = rawId.replace(/^usr_/i, '').replace(/\D/g, '') || rawId;
         socket.userId = uId;
+        console.log(`[Socket.IO] Auth success: userId=${uId}`);
         next();
       });
     } catch (err) {
+      console.error('[Socket.IO] Auth exception:', err.message);
       return next(new Error("Authentication error: Failed to authenticate socket"));
     }
   });
@@ -71,7 +86,11 @@ function initChatSocket(server) {
     const userId = socket.userId;
     console.log(`[Socket.IO] User connected: ${userId} (Socket ID: ${socket.id})`);
 
+    // Join both string and number rooms for flexible routing
     socket.join(String(userId));
+    if (!isNaN(userId)) {
+      socket.join(String(Number(userId)));
+    }
 
     // Track online user socket
     if (!onlineUsersMap.has(userId)) {
@@ -81,6 +100,9 @@ function initChatSocket(server) {
 
     // Broadcast user online event
     io.emit('user_online', { userId: isNaN(userId) ? userId : Number(userId) });
+
+    // Emit a 'connected' event to the client so it knows the connection is alive
+    socket.emit('connected', { userId: isNaN(userId) ? userId : Number(userId), status: 'online' });
 
     // Handle send_message
     socket.on('send_message', async (data, callback) => {

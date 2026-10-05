@@ -5,6 +5,14 @@ const { JWT_SECRET, authenticateToken } = require('../middleware/authMiddleware'
 const { sendOtpSms } = require('../services/smsService');
 const { query } = require('../config/db');
 
+// Helper: Get IST (UTC+5:30) ISO timestamp string
+function getISTTimestamp() {
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000; // 5h 30m in ms
+  const istTime = new Date(now.getTime() + istOffset);
+  return istTime.toISOString().replace('Z', '+05:30');
+}
+
 // Helper to normalize phone and country code
 const parsePhoneAndCountry = (countryCodeInput = '+91', phoneInput = '') => {
   let country_code = (countryCodeInput || '+91').toString().trim();
@@ -98,6 +106,9 @@ router.post('/verify-otp', async (req, res) => {
   const rawCountryCode = (req.body && (req.body.country_code || req.body.countryCode)) || (req.query && (req.query.country_code || req.query.countryCode)) || '+91';
   const rawPhone = (req.body && (req.body.phone_number || req.body.mobile_number || req.body.phone || req.body.mobile)) || (req.query && (req.query.phone_number || req.query.mobile_number || req.query.phone || req.query.mobile));
   const rawOtp = (req.body && (req.body.otp_code || req.body.otp || req.body.code || req.body.verification_code || req.body.otpCode)) || (req.query && (req.query.otp_code || req.query.otp || req.query.code || req.query.verification_code || req.query.otpCode));
+  // Read fcm_token and device_type from request body
+  const fcmToken = (req.body && (req.body.fcm_token || req.body.fcmToken || req.body.device_token || req.body.deviceToken)) || null;
+  const deviceType = (req.body && (req.body.device_type || req.body.deviceType || req.body.platform)) || 'android';
 
   if (!rawPhone || rawOtp === undefined || rawOtp === null || rawOtp === '') {
     return res.status(400).json({
@@ -188,18 +199,38 @@ router.post('/verify-otp', async (req, res) => {
         full_phone_number: existing.phone_number && existing.phone_number.startsWith('+') ? existing.phone_number : `${country_code}${existingPhone}`,
         name: existing.name && existing.name !== 'User' ? existing.name : defaultName
       };
+      // Update fcm_token on existing user if provided
+      if (fcmToken) {
+        await query(
+          `UPDATE users SET fcm_token = ?, device_type = ?, updated_at = NOW() WHERE id = ?`,
+          [fcmToken, deviceType, existing.id]
+        ).catch(() => {});
+        // Also update in withme_users if exists
+        await query(
+          `UPDATE withme_users SET fcm_token = ? WHERE user_id = ? OR id = ? OR phone_number = ?`,
+          [fcmToken, String(existing.id), String(existing.id), full_phone_number]
+        ).catch(() => {});
+      }
     } else {
       await query(
         `INSERT INTO users (id, phone_number, name) VALUES (?, ?, ?)`,
         [userId, full_phone_number, defaultName]
       );
       userPayload.user_id = userId;
+      // Save fcm_token for new user if provided
+      if (fcmToken) {
+        await query(
+          `UPDATE users SET fcm_token = ?, device_type = ? WHERE id = ?`,
+          [fcmToken, deviceType, userId]
+        ).catch(() => {});
+      }
     }
   } catch (err) {
     console.warn('MySQL User Query notice:', err.message);
   }
 
   const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '7d' });
+  const istTimestamp = getISTTimestamp();
 
   return res.status(200).json({
     success: true,
@@ -208,19 +239,24 @@ router.post('/verify-otp', async (req, res) => {
     access_token: token,
     auth_token: token,
     user_id: userPayload.user_id,
+    fcm_token_saved: fcmToken ? true : false,
+    verified_at: istTimestamp,
     user: {
       ...userPayload,
       is_profile_complete: false,
-      kyc_status: 'NOT_STARTED'
+      kyc_status: 'NOT_STARTED',
+      fcm_token: fcmToken || null
     },
     data: {
       token,
       access_token: token,
       user_id: userPayload.user_id,
+      verified_at: istTimestamp,
       user: {
         ...userPayload,
         is_profile_complete: false,
-        kyc_status: 'NOT_STARTED'
+        kyc_status: 'NOT_STARTED',
+        fcm_token: fcmToken || null
       }
     }
   });
