@@ -90,7 +90,7 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
     const rows = await query(`
       SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, rating, total_reviews, category, activity, price, currency, status, is_approved
       FROM withme_partners
-      WHERE is_approved = 1 AND status = 'ACTIVE'
+      WHERE (status IS NULL OR status != 'DELETED') AND (is_approved IS NULL OR is_approved != 0)
       ORDER BY id DESC
       LIMIT 100
     `);
