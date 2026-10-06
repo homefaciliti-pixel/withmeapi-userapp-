@@ -53,7 +53,12 @@ const initializeDatabaseTables = async () => {
       'ALTER TABLE users ADD COLUMN profile_image VARCHAR(255) DEFAULT NULL',
       "ALTER TABLE users MODIFY COLUMN kyc_status VARCHAR(50) DEFAULT 'NOT_VERIFIED'",
       'ALTER TABLE users ADD COLUMN fcm_token TEXT DEFAULT NULL',
-      "ALTER TABLE users ADD COLUMN device_type VARCHAR(20) DEFAULT 'android'"
+      "ALTER TABLE users ADD COLUMN device_type VARCHAR(20) DEFAULT 'android'",
+      'ALTER TABLE users ADD COLUMN profile_images TEXT DEFAULT NULL',
+      'ALTER TABLE users ADD COLUMN interests TEXT DEFAULT NULL',
+      'ALTER TABLE users ADD COLUMN available_for TEXT DEFAULT NULL',
+      'ALTER TABLE users ADD COLUMN state VARCHAR(100) DEFAULT NULL',
+      "ALTER TABLE users ADD COLUMN country VARCHAR(100) DEFAULT 'India'"
     ];
 
     for (const sql of alterStatements) {

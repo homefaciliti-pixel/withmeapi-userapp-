@@ -53,7 +53,7 @@ router.post('/viewed-interest', authenticateToken, (req, res) => {
 });
 
 // 2. Profile Photo Upload API — POST
-router.post('/photo-upload', authenticateToken, upload.single('photo'), (req, res) => {
+router.post('/photo-upload', authenticateToken, upload.single('photo'), async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const photoFile = req.file;
 
@@ -61,10 +61,30 @@ router.post('/photo-upload', authenticateToken, upload.single('photo'), (req, re
     ? `${baseUrl}/uploads/${photoFile.filename}`
     : `${baseUrl}/uploads/default_uploaded_photo.jpg`;
 
+  if (req.user && photoUrl) {
+    const userId = req.user.user_id || req.user.id;
+    const userPhone = (req.user.phone_number || '').toString().replace(/^\+91/, '').replace(/^\+/, '');
+    const userFullPhone = (req.user.full_phone_number || req.user.phone_number || '').toString();
+
+    try {
+      const { query } = require('../config/db');
+      const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
+      await query(
+        `UPDATE users SET profile_image = ?, profile_images = ?, updated_at = NOW() 
+         WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
+        [photoUrl, JSON.stringify([photoUrl]), userId, userFullPhone, userPhone, `%${cleanDigits}`]
+      );
+    } catch (err) {
+      console.warn('MySQL photo-upload update notice:', err.message);
+    }
+  }
+
   return res.status(200).json({
     success: true,
     message: 'Profile photo uploaded successfully',
-    photo_url: photoUrl
+    photo_url: photoUrl,
+    url: photoUrl,
+    profile_image: photoUrl
   });
 });
 

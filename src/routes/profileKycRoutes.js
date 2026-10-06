@@ -74,56 +74,64 @@ const handleGetProfile = async (req, res) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1] ? authHeader.split(' ')[1] : '';
 
-  const userId = req.user.user_id || req.user.id || `usr_${Date.now()}`;
-  const rawPhone = (req.user.phone_number || req.user.full_phone_number || '').toString();
-  const userCountryCode = req.user.country_code || '+91';
+  const userId = (req.user && (req.user.user_id || req.user.id)) || `usr_${Date.now()}`;
+  const rawPhone = (req.user && (req.user.phone_number || req.user.full_phone_number) || '').toString();
+  const userCountryCode = (req.user && req.user.country_code) || '+91';
   let userPhone = rawPhone.replace(/^\+91/, '').replace(/^\+/, '');
   const userFullPhone = rawPhone.startsWith('+') ? rawPhone : (userPhone ? `${userCountryCode}${userPhone}` : '');
   const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
 
-  const imageList = [
-    `${baseUrl}/uploads/profile1.jpg`,
-    `${baseUrl}/uploads/profile2.jpg`,
-    `${baseUrl}/uploads/profile3.jpg`
-  ];
+  // Check memory store first for any transient/recent updates
+  const memoryData = userProfilesStore[userId] || userProfilesStore[userPhone] || userProfilesStore[userFullPhone] || {};
 
-  // Default Base Profile Template with full details
-  let defaultProfile = {
+  let profileData = {
     user_id: userId,
-    name: req.user.name || 'User',
+    name: memoryData.name || (req.user && req.user.name && req.user.name !== 'User' ? req.user.name : 'User'),
     country_code: userCountryCode,
     phone_number: userPhone,
     full_phone_number: userFullPhone,
-    email: `${userPhone || 'user'}@withme.app`,
-    gender: 'Male',
-    interested_in_gender: 'Female',
-    dob: '1998-05-15',
-    bio: 'Enthusiastic explorer and tech lover',
-    city: 'Jaipur',
-    profile_image: imageList[0],
-    profile_images: imageList,
-    is_photo_verified: true,
-    photo_verification_status: 'VERIFIED',
-    is_kyc_completed: true,
-    is_approved: true,
-    approval_status: 'APPROVED',
-    kyc_status: 'APPROVED',
-    adhar_otp: 'PENDING',
-    aadhaar_otp: 'PENDING',
-    aadhaar_otp_status: 'PENDING',
-    adhar_otp_status: 'PENDING',
-    aadhaar_status: 'PENDING',
-    otp_status: 'PENDING'
+    email: memoryData.email || (userPhone ? `${userPhone}@withme.app` : 'user@withme.app'),
+    gender: memoryData.gender || 'Male',
+    interested_in_gender: memoryData.interested_in_gender || 'Female',
+    dob: memoryData.dob || '',
+    bio: memoryData.bio || '',
+    city: memoryData.city || '',
+    state: memoryData.state || '',
+    country: memoryData.country || 'India',
+    profile_image: memoryData.profile_image || `${baseUrl}/uploads/profile.jpg`,
+    profile_images: memoryData.profile_images && Array.isArray(memoryData.profile_images) && memoryData.profile_images.length > 0
+      ? memoryData.profile_images 
+      : [memoryData.profile_image || `${baseUrl}/uploads/profile.jpg`],
+    is_photo_verified: memoryData.is_photo_verified !== undefined ? memoryData.is_photo_verified : false,
+    photo_verification_status: memoryData.photo_verification_status || 'NOT_VERIFIED',
+    is_kyc_completed: memoryData.is_kyc_completed !== undefined ? memoryData.is_kyc_completed : false,
+    is_approved: memoryData.is_approved !== undefined ? memoryData.is_approved : false,
+    approval_status: memoryData.approval_status || 'NOT_VERIFIED',
+    kyc_status: memoryData.kyc_status || 'NOT_VERIFIED',
+    adhar_otp: memoryData.adhar_otp || 'PENDING',
+    aadhaar_otp: memoryData.aadhaar_otp || 'PENDING',
+    aadhaar_otp_status: memoryData.aadhaar_otp_status || 'PENDING',
+    adhar_otp_status: memoryData.adhar_otp_status || 'PENDING',
+    aadhaar_status: memoryData.aadhaar_status || 'PENDING',
+    otp_status: memoryData.otp_status || 'PENDING',
+    interests: memoryData.interests || [
+      { name: 'Coffee', icon: 'coffee' },
+      { name: 'Travel', icon: 'flight' },
+      { name: 'Music', icon: 'music_note' }
+    ],
+    available_for: memoryData.available_for || [
+      { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+      { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+      { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+    ]
   };
-
-  let profileData = { ...defaultProfile };
 
   // Query MySQL Database strictly for THIS user
   try {
     const queryConditions = [];
     const queryParams = [];
 
-    if (userId && !String(userId).startsWith('usr_guest') && !String(userId).startsWith('usr_17')) {
+    if (userId && !String(userId).startsWith('usr_guest')) {
       queryConditions.push('id = ?');
       queryParams.push(userId);
     }
@@ -147,33 +155,58 @@ const handleGetProfile = async (req, res) => {
       if (dbUsers && dbUsers.length > 0) {
         const u = dbUsers[0];
         const dbPhone = (u.phone_number || userPhone || '').replace(/^\+91/, '').replace(/^\+/, '');
+        
+        let dbProfileImage = u.profile_image ? u.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl) : null;
+        let dbProfileImages = null;
+        if (u.profile_images) {
+          try {
+            const parsed = JSON.parse(u.profile_images);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              dbProfileImages = parsed.map(img => img.replace(/http:\/\/localhost:\d+/, baseUrl));
+            }
+          } catch (e) {}
+        }
+
+        const finalProfileImage = dbProfileImage || profileData.profile_image;
+        const finalProfileImages = dbProfileImages || (dbProfileImage ? [dbProfileImage] : profileData.profile_images);
+
+        let parsedInterests = profileData.interests;
+        if (u.interests) {
+          try { parsedInterests = JSON.parse(u.interests); } catch (e) {}
+        }
+
+        let parsedAvailableFor = profileData.available_for;
+        if (u.available_for) {
+          try { parsedAvailableFor = JSON.parse(u.available_for); } catch (e) {}
+        }
+
+        const isKycApproved = u.kyc_status === 'APPROVED' || u.kyc_status === 'VERIFIED' || profileData.kyc_status === 'APPROVED';
+
         profileData = {
           ...profileData,
           user_id: u.id || userId,
-          name: u.name || req.user.name || 'User',
+          name: u.name || profileData.name,
           country_code: userCountryCode,
           phone_number: dbPhone || userPhone,
           full_phone_number: u.phone_number ? (u.phone_number.startsWith('+') ? u.phone_number : `${userCountryCode}${dbPhone}`) : userFullPhone,
-          email: u.email || `${dbPhone || userPhone}@withme.app`,
-          gender: u.gender || profileData.gender || 'Male',
-          interested_in_gender: u.interested_in_gender || profileData.interested_in_gender || 'Female',
-          dob: u.dob || profileData.dob || '1998-05-15',
-          bio: u.bio || profileData.bio || 'Enthusiastic explorer',
-          city: u.city || profileData.city || 'Jaipur',
-          profile_image: u.profile_image ? u.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl) : profileData.profile_image,
-          profile_images: imageList,
-          is_photo_verified: true,
-          photo_verification_status: 'VERIFIED',
-          kyc_status: (u.kyc_status && u.kyc_status !== 'NOT_VERIFIED') ? u.kyc_status : 'APPROVED',
-          is_kyc_completed: true,
-          is_approved: true,
-          approval_status: 'APPROVED',
-          adhar_otp: 'PENDING',
-          aadhaar_otp: 'PENDING',
-          aadhaar_otp_status: 'PENDING',
-          adhar_otp_status: 'PENDING',
-          aadhaar_status: 'PENDING',
-          otp_status: 'PENDING'
+          email: u.email || profileData.email,
+          gender: u.gender || profileData.gender,
+          interested_in_gender: u.interested_in_gender || profileData.interested_in_gender,
+          dob: u.dob || profileData.dob,
+          bio: u.bio || profileData.bio,
+          city: u.city || profileData.city,
+          state: u.state || profileData.state,
+          country: u.country || profileData.country,
+          profile_image: finalProfileImage,
+          profile_images: finalProfileImages,
+          is_photo_verified: isKycApproved || Boolean(dbProfileImage),
+          photo_verification_status: (isKycApproved || Boolean(dbProfileImage)) ? 'VERIFIED' : 'NOT_VERIFIED',
+          kyc_status: isKycApproved ? 'APPROVED' : (u.kyc_status || 'NOT_VERIFIED'),
+          is_kyc_completed: isKycApproved,
+          is_approved: isKycApproved,
+          approval_status: isKycApproved ? 'APPROVED' : 'PENDING',
+          interests: parsedInterests,
+          available_for: parsedAvailableFor
         };
       }
     }
@@ -184,25 +217,29 @@ const handleGetProfile = async (req, res) => {
   // Cache updated profile in memory
   userProfilesStore[userId] = profileData;
 
+  // Calculate dynamic age from DOB if available
+  let calculatedAge = 24;
+  if (profileData.dob) {
+    const parts = profileData.dob.split('-');
+    if (parts.length === 3) {
+      const birthYear = parseInt(parts[0]);
+      if (!isNaN(birthYear) && birthYear > 1940 && birthYear < 2015) {
+        calculatedAge = new Date().getFullYear() - birthYear;
+      }
+    }
+  }
+
   const detailedData = {
     location: {
-      city: profileData.city || 'Mumbai',
-      state: 'Maharashtra',
-      country: 'India'
+      city: profileData.city || 'Jaipur',
+      state: profileData.state || 'Rajasthan',
+      country: profileData.country || 'India'
     },
     rating: 4.8,
     total_reviews: 120,
-    about: profileData.bio || 'Friendly, outgoing and loves exploring new places and meeting people.',
-    interests: [
-      { name: 'Coffee', icon: 'coffee' },
-      { name: 'Travel', icon: 'flight' },
-      { name: 'Music', icon: 'music_note' }
-    ],
-    available_for: [
-      { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
-      { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
-      { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
-    ]
+    about: profileData.bio || 'Enthusiastic explorer and tech lover',
+    interests: profileData.interests,
+    available_for: profileData.available_for
   };
 
   const combinedData = {
@@ -221,7 +258,7 @@ const handleGetProfile = async (req, res) => {
     detailed_profile: {
       id: profileData.user_id,
       name: profileData.name,
-      age: 26,
+      age: calculatedAge,
       gender: profileData.gender,
       verified: profileData.is_photo_verified,
       location: detailedData.location,
@@ -557,14 +594,20 @@ const handleKycSubmit = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const body = (req.method === 'GET' ? req.query : req.body) || {};
 
-  // Extract all user profile & KYC fields
-  const name = (body.name || body.full_name || body.fullName || (req.user && req.user.name) || 'Alex Sharma').toString();
-  const nick_name = (body.nick_name || body.nickname || 'Alex').toString();
-  const email = (body.email || 'alex.sharma@example.com').toString();
-  const gender = (body.gender || 'Male').toString();
-  const dob = (body.dob || body.date_of_birth || body.birth_date || '1998-05-15').toString();
-  const city = (body.city || 'Mumbai').toString();
-  const bio = (body.bio || 'Enthusiastic explorer and tech lover').toString();
+  const userId = req.user ? (req.user.user_id || req.user.id || 'usr_998877') : 'usr_998877';
+  const userPhone = req.user ? (req.user.phone_number || '').toString().replace(/^\+91/, '').replace(/^\+/, '') : '';
+  const userFullPhone = req.user ? (req.user.full_phone_number || req.user.phone_number || '').toString() : '';
+
+  const existingMem = userProfilesStore[userId] || {};
+
+  // Extract user profile & KYC fields with precedence: body > existing memory store > req.user
+  const name = (body.name || body.full_name || body.fullName || existingMem.name || (req.user && req.user.name !== 'User' ? req.user.name : null) || 'User').toString();
+  const nick_name = (body.nick_name || body.nickname || existingMem.nick_name || name).toString();
+  const email = (body.email || existingMem.email || (userPhone ? `${userPhone}@withme.app` : 'user@withme.app')).toString();
+  const gender = (body.gender || existingMem.gender || 'Male').toString();
+  const dob = (body.dob || body.date_of_birth || body.birth_date || existingMem.dob || '').toString();
+  const city = (body.city || existingMem.city || '').toString();
+  const bio = (body.bio || existingMem.bio || '').toString();
 
   const document_type = (
     body.document_type ||
@@ -589,9 +632,6 @@ const handleKycSubmit = async (req, res) => {
     req.query.number ||
     '123456789012'
   ).toString();
-
-  const userId = req.user ? (req.user.user_id || req.user.id || 'usr_998877') : 'usr_998877';
-  const userPhone = req.user ? (req.user.phone_number || '') : '';
 
   // Handle uploaded document files (aadhaar_front, aadhaar_back, etc.)
   let uploadedFiles = [];
@@ -624,50 +664,42 @@ const handleKycSubmit = async (req, res) => {
   const submittedAt = new Date().toISOString();
 
   // Update in-memory user profile with APPROVED status and PENDING adhar_otp
-  if (userProfilesStore[userId]) {
-    userProfilesStore[userId] = {
-      ...userProfilesStore[userId],
-      name,
-      email,
-      gender,
-      dob,
-      city,
-      bio,
-      kyc_status: 'APPROVED',
-      status: 'APPROVED',
-      approval_status: 'APPROVED',
-      is_approved: true,
-      is_kyc_completed: true,
-      is_verified: true,
-      adhar_otp: 'PENDING',
-      aadhaar_otp: 'PENDING',
-      aadhaar_otp_status: 'PENDING',
-      adhar_otp_status: 'PENDING',
-      aadhaar_status: 'PENDING',
-      otp_status: 'PENDING'
-    };
-  }
+  userProfilesStore[userId] = {
+    ...userProfilesStore[userId],
+    user_id: userId,
+    name,
+    email,
+    gender,
+    dob,
+    city,
+    bio,
+    kyc_status: 'APPROVED',
+    status: 'APPROVED',
+    approval_status: 'APPROVED',
+    is_approved: true,
+    is_kyc_completed: true,
+    is_verified: true,
+    adhar_otp: 'PENDING',
+    aadhaar_otp: 'PENDING',
+    aadhaar_otp_status: 'PENDING',
+    adhar_otp_status: 'PENDING',
+    aadhaar_status: 'PENDING',
+    otp_status: 'PENDING'
+  };
 
   // Persist into MySQL
   try {
-    const effectivePhone = userPhone || '+919199953391';
+    const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
     await query(
-      `INSERT INTO users (phone_number, name, email, gender, dob, bio, city, kyc_status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'APPROVED') 
-       ON DUPLICATE KEY UPDATE 
-         name = COALESCE(VALUES(name), name), 
-         email = COALESCE(VALUES(email), email), 
-         gender = COALESCE(VALUES(gender), gender), 
-         dob = COALESCE(VALUES(dob), dob), 
-         bio = COALESCE(VALUES(bio), bio), 
-         city = COALESCE(VALUES(city), city), 
-         kyc_status = 'APPROVED'`,
-      [effectivePhone, name, email, gender, dob, bio, city]
+      `UPDATE users SET name = ?, email = ?, gender = ?, dob = ?, bio = ?, city = ?, kyc_status = 'APPROVED', updated_at = NOW() 
+       WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
+      [name, email, gender, dob, bio, city, userId, userFullPhone, userPhone, `%${cleanDigits}`]
     );
+
     await query(
       `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'APPROVED')`,
       [userId, document_type, rawDocumentNumber, name]
-    );
+    ).catch(() => {});
   } catch (err) {
     console.warn('MySQL KYC submission notice:', err.message);
   }

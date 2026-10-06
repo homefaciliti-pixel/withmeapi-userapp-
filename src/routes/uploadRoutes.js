@@ -36,7 +36,7 @@ const safeUploadAny = (req, res, next) => {
 };
 
 // 1. Generic Universal File Upload Handler — POST (/upload, /api/v1/upload, /uploads, etc.)
-const handleFileUpload = (req, res) => {
+const handleFileUpload = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const body = req.body || {};
 
@@ -138,6 +138,25 @@ const handleFileUpload = (req, res) => {
   }
 
   const primary = filesList[0];
+
+  // Update user profile image in MySQL DB if user is authenticated
+  if (req.user && primary && primary.url) {
+    const userId = req.user.user_id || req.user.id;
+    const userPhone = (req.user.phone_number || '').toString().replace(/^\+91/, '').replace(/^\+/, '');
+    const userFullPhone = (req.user.full_phone_number || req.user.phone_number || '').toString();
+
+    try {
+      const { query } = require('../config/db');
+      const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
+      await query(
+        `UPDATE users SET profile_image = ?, profile_images = ?, updated_at = NOW() 
+         WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
+        [primary.url, JSON.stringify([primary.url]), userId, userFullPhone, userPhone, `%${cleanDigits}`]
+      );
+    } catch (err) {
+      console.warn('MySQL upload profile image update notice:', err.message);
+    }
+  }
 
   const responseData = {
     url: primary.url,
