@@ -12,7 +12,7 @@ const getBaseUrl = (req) => {
   return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
 
-// Global User Profiles Memory Store
+// In-memory store — only used for transient updates within the same server instance
 let userProfilesStore = {};
 
 // Detailed User Profiles Catalog Mock Store
@@ -81,49 +81,31 @@ const handleGetProfile = async (req, res) => {
   const userFullPhone = rawPhone.startsWith('+') ? rawPhone : (userPhone ? `${userCountryCode}${userPhone}` : '');
   const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
 
-  // Check memory store first for any transient/recent updates
-  const memoryData = userProfilesStore[userId] || userProfilesStore[userPhone] || userProfilesStore[userFullPhone] || {};
-
+  // Default profile — all user-specific fields start as null, DB overrides them
   let profileData = {
     user_id: userId,
-    name: memoryData.name || (req.user && req.user.name && req.user.name !== 'User' ? req.user.name : 'User'),
+    name: 'User',
     country_code: userCountryCode,
     phone_number: userPhone,
     full_phone_number: userFullPhone,
-    email: memoryData.email || (userPhone ? `${userPhone}@withme.app` : 'user@withme.app'),
-    gender: memoryData.gender || 'Male',
-    interested_in_gender: memoryData.interested_in_gender || 'Female',
-    dob: memoryData.dob || '',
-    bio: memoryData.bio || '',
-    city: memoryData.city || '',
-    state: memoryData.state || '',
-    country: memoryData.country || 'India',
-    profile_image: memoryData.profile_image || `${baseUrl}/uploads/profile.jpg`,
-    profile_images: memoryData.profile_images && Array.isArray(memoryData.profile_images) && memoryData.profile_images.length > 0
-      ? memoryData.profile_images 
-      : [memoryData.profile_image || `${baseUrl}/uploads/profile.jpg`],
-    is_photo_verified: memoryData.is_photo_verified !== undefined ? memoryData.is_photo_verified : false,
-    photo_verification_status: memoryData.photo_verification_status || 'NOT_VERIFIED',
-    is_kyc_completed: memoryData.is_kyc_completed !== undefined ? memoryData.is_kyc_completed : false,
-    is_approved: memoryData.is_approved !== undefined ? memoryData.is_approved : false,
-    approval_status: memoryData.approval_status || 'NOT_VERIFIED',
-    kyc_status: memoryData.kyc_status || 'NOT_VERIFIED',
-    adhar_otp: memoryData.adhar_otp || 'PENDING',
-    aadhaar_otp: memoryData.aadhaar_otp || 'PENDING',
-    aadhaar_otp_status: memoryData.aadhaar_otp_status || 'PENDING',
-    adhar_otp_status: memoryData.adhar_otp_status || 'PENDING',
-    aadhaar_status: memoryData.aadhaar_status || 'PENDING',
-    otp_status: memoryData.otp_status || 'PENDING',
-    interests: memoryData.interests || [
-      { name: 'Coffee', icon: 'coffee' },
-      { name: 'Travel', icon: 'flight' },
-      { name: 'Music', icon: 'music_note' }
-    ],
-    available_for: memoryData.available_for || [
-      { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
-      { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
-      { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
-    ]
+    email: userPhone ? `${userPhone}@withme.app` : null,
+    gender: null,
+    interested_in_gender: null,
+    dob: null,
+    bio: null,
+    city: null,
+    state: null,
+    country: 'India',
+    profile_image: null,
+    profile_images: [],
+    is_photo_verified: false,
+    photo_verification_status: 'NOT_VERIFIED',
+    is_kyc_completed: false,
+    is_approved: false,
+    approval_status: 'NOT_VERIFIED',
+    kyc_status: 'NOT_VERIFIED',
+    interests: [],
+    available_for: []
   };
 
   // Query MySQL Database strictly for THIS user
@@ -155,9 +137,14 @@ const handleGetProfile = async (req, res) => {
       if (dbUsers && dbUsers.length > 0) {
         const u = dbUsers[0];
         const dbPhone = (u.phone_number || userPhone || '').replace(/^\+91/, '').replace(/^\+/, '');
-        
-        let dbProfileImage = u.profile_image ? u.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl) : null;
-        let dbProfileImages = null;
+
+        // Fix profile image URL (replace localhost with live URL)
+        let dbProfileImage = u.profile_image
+          ? u.profile_image.replace(/http:\/\/localhost:\d+/, baseUrl)
+          : null;
+
+        // Parse profile_images array from DB
+        let dbProfileImages = [];
         if (u.profile_images) {
           try {
             const parsed = JSON.parse(u.profile_images);
@@ -167,38 +154,43 @@ const handleGetProfile = async (req, res) => {
           } catch (e) {}
         }
 
-        const finalProfileImage = dbProfileImage || profileData.profile_image;
-        const finalProfileImages = dbProfileImages || (dbProfileImage ? [dbProfileImage] : profileData.profile_images);
+        // If profile_images is empty but profile_image exists, build a single-item array
+        if (dbProfileImages.length === 0 && dbProfileImage) {
+          dbProfileImages = [dbProfileImage];
+        }
 
-        let parsedInterests = profileData.interests;
+        // Parse interests & available_for from DB JSON
+        let parsedInterests = [];
         if (u.interests) {
           try { parsedInterests = JSON.parse(u.interests); } catch (e) {}
         }
 
-        let parsedAvailableFor = profileData.available_for;
+        let parsedAvailableFor = [];
         if (u.available_for) {
           try { parsedAvailableFor = JSON.parse(u.available_for); } catch (e) {}
         }
 
-        const isKycApproved = u.kyc_status === 'APPROVED' || u.kyc_status === 'VERIFIED' || profileData.kyc_status === 'APPROVED';
+        const isKycApproved = u.kyc_status === 'APPROVED' || u.kyc_status === 'VERIFIED';
 
+        // Build profile ONLY from DB data — no hardcoded fallbacks for user-specific fields
         profileData = {
-          ...profileData,
           user_id: u.id || userId,
-          name: u.name || profileData.name,
+          name: u.name || 'User',
           country_code: userCountryCode,
           phone_number: dbPhone || userPhone,
-          full_phone_number: u.phone_number ? (u.phone_number.startsWith('+') ? u.phone_number : `${userCountryCode}${dbPhone}`) : userFullPhone,
-          email: u.email || profileData.email,
-          gender: u.gender || profileData.gender,
-          interested_in_gender: u.interested_in_gender || profileData.interested_in_gender,
-          dob: u.dob || profileData.dob,
-          bio: u.bio || profileData.bio,
-          city: u.city || profileData.city,
-          state: u.state || profileData.state,
-          country: u.country || profileData.country,
-          profile_image: finalProfileImage,
-          profile_images: finalProfileImages,
+          full_phone_number: u.phone_number
+            ? (u.phone_number.startsWith('+') ? u.phone_number : `${userCountryCode}${dbPhone}`)
+            : userFullPhone,
+          email: u.email || (dbPhone ? `${dbPhone}@withme.app` : null),
+          gender: u.gender || null,
+          interested_in_gender: u.interested_in_gender || null,
+          dob: u.dob || null,
+          bio: u.bio || null,
+          city: u.city || null,
+          state: u.state || null,
+          country: u.country || 'India',
+          profile_image: dbProfileImage,
+          profile_images: dbProfileImages,
           is_photo_verified: isKycApproved || Boolean(dbProfileImage),
           photo_verification_status: (isKycApproved || Boolean(dbProfileImage)) ? 'VERIFIED' : 'NOT_VERIFIED',
           kyc_status: isKycApproved ? 'APPROVED' : (u.kyc_status || 'NOT_VERIFIED'),
@@ -214,11 +206,8 @@ const handleGetProfile = async (req, res) => {
     console.warn('MySQL getProfile query notice:', err.message);
   }
 
-  // Cache updated profile in memory
-  userProfilesStore[userId] = profileData;
-
   // Calculate dynamic age from DOB if available
-  let calculatedAge = 24;
+  let calculatedAge = null;
   if (profileData.dob) {
     const parts = profileData.dob.split('-');
     if (parts.length === 3) {
@@ -231,13 +220,13 @@ const handleGetProfile = async (req, res) => {
 
   const detailedData = {
     location: {
-      city: profileData.city || 'Jaipur',
-      state: profileData.state || 'Rajasthan',
+      city: profileData.city || null,
+      state: profileData.state || null,
       country: profileData.country || 'India'
     },
-    rating: 4.8,
-    total_reviews: 120,
-    about: profileData.bio || 'Enthusiastic explorer and tech lover',
+    rating: null,
+    total_reviews: 0,
+    about: profileData.bio || null,
     interests: profileData.interests,
     available_for: profileData.available_for
   };
@@ -264,13 +253,14 @@ const handleGetProfile = async (req, res) => {
       location: detailedData.location,
       rating: detailedData.rating,
       total_reviews: detailedData.total_reviews,
-      profile_image: profileData.profile_images,
+      profile_image: profileData.profile_image,
+      profile_images: profileData.profile_images,
       about: detailedData.about,
       interests: detailedData.interests,
       available_for: detailedData.available_for
     },
     interest_selection: {
-      interested_in_gender: profileData.interested_in_gender || 'Female'
+      interested_in_gender: profileData.interested_in_gender || null
     },
     kyc_verification: {
       is_kyc_completed: profileData.is_kyc_completed,
@@ -279,7 +269,7 @@ const handleGetProfile = async (req, res) => {
   });
 };
 
-// 2.0 Combined All-In-One Profile & KYC GET API
+
 router.get('/profile/all-in-one', authenticateToken, handleGetProfile);
 router.get('/profile/combined', authenticateToken, handleGetProfile);
 router.get('/profile/dashboard', authenticateToken, handleGetProfile);
