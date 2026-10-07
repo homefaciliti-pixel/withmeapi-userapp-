@@ -542,14 +542,14 @@ const handleKycSubmit = async (req, res) => {
 
   const existingMem = userProfilesStore[userId] || {};
 
-  // Extract user profile & KYC fields with precedence: body > existing memory store > req.user
-  const name = (body.name || body.full_name || body.fullName || existingMem.name || (req.user && req.user.name !== 'User' ? req.user.name : null) || 'User').toString();
-  const nick_name = (body.nick_name || body.nickname || existingMem.nick_name || name).toString();
-  const email = (body.email || existingMem.email || (userPhone ? `${userPhone}@withme.app` : 'user@withme.app')).toString();
-  const gender = (body.gender || existingMem.gender || 'Male').toString();
-  const dob = (body.dob || body.date_of_birth || body.birth_date || existingMem.dob || '').toString();
-  const city = (body.city || existingMem.city || '').toString();
-  const bio = (body.bio || existingMem.bio || '').toString();
+  // Only use values explicitly provided in body — no auto-defaults that overwrite existing DB data
+  const name   = body.name || body.full_name || body.fullName || null;
+  const nick_name = body.nick_name || body.nickname || null;
+  const email  = body.email || null;                          // NO auto phone@withme.app
+  const gender = body.gender || null;                         // NO auto 'Male' default
+  const dob    = body.dob || body.date_of_birth || body.birth_date || null;
+  const city   = body.city || null;
+  const bio    = body.bio || null;
 
   const document_type = (
     body.document_type ||
@@ -605,16 +605,16 @@ const handleKycSubmit = async (req, res) => {
   const kycId = `KYC_${Math.floor(100000 + Math.random() * 900000)}`;
   const submittedAt = new Date().toISOString();
 
-  // Update in-memory user profile with APPROVED status and PENDING adhar_otp
+  // Update in-memory store only with provided fields
   userProfilesStore[userId] = {
     ...userProfilesStore[userId],
     user_id: userId,
-    name,
-    email,
-    gender,
-    dob,
-    city,
-    bio,
+    ...(name   && { name }),
+    ...(email  && { email }),
+    ...(gender && { gender }),
+    ...(dob    && { dob }),
+    ...(city   && { city }),
+    ...(bio    && { bio }),
     kyc_status: 'APPROVED',
     status: 'APPROVED',
     approval_status: 'APPROVED',
@@ -629,18 +629,26 @@ const handleKycSubmit = async (req, res) => {
     otp_status: 'PENDING'
   };
 
-  // Persist into MySQL
+  // Persist into MySQL — dynamic SET clause, only update fields provided in body
   try {
     const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
-    await query(
-      `UPDATE users SET name = ?, email = ?, gender = ?, dob = ?, bio = ?, city = ?, kyc_status = 'APPROVED', updated_at = NOW() 
-       WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
-      [name, email, gender, dob, bio, city, userId, userFullPhone, userPhone, `%${cleanDigits}`]
-    );
+
+    const setClauses = ["kyc_status = 'APPROVED'", 'updated_at = NOW()'];
+    const setParams = [];
+
+    if (name)   { setClauses.unshift('name = ?');   setParams.push(name); }
+    if (email)  { setClauses.unshift('email = ?');  setParams.push(email); }
+    if (gender) { setClauses.unshift('gender = ?'); setParams.push(gender); }
+    if (dob)    { setClauses.unshift('dob = ?');    setParams.push(dob); }
+    if (city)   { setClauses.unshift('city = ?');   setParams.push(city); }
+    if (bio)    { setClauses.unshift('bio = ?');    setParams.push(bio); }
+
+    const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
+    await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits}`]);
 
     await query(
       `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'APPROVED')`,
-      [userId, document_type, rawDocumentNumber, name]
+      [userId, document_type, rawDocumentNumber, name || 'User']
     ).catch(() => {});
   } catch (err) {
     console.warn('MySQL KYC submission notice:', err.message);
