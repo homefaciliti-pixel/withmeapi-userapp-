@@ -15,59 +15,6 @@ const getBaseUrl = (req) => {
 // In-memory store — only used for transient updates within the same server instance
 let userProfilesStore = {};
 
-// Detailed User Profiles Catalog Mock Store
-const detailedProfilesCatalog = {
-  usr_203: {
-    id: 'usr_203',
-    name: 'Priya Sharma',
-    age: 25,
-    gender: 'Female',
-    verified: true,
-    location: {
-      city: 'Jaipur',
-      state: 'Rajasthan',
-      country: 'India'
-    },
-    rating: 4.8,
-    total_reviews: 120,
-    about: 'Friendly, outgoing and loves exploring new places and meeting people.',
-    interests: [
-      { name: 'Coffee', icon: 'coffee' },
-      { name: 'Travel', icon: 'flight' },
-      { name: 'Music', icon: 'music_note' }
-    ],
-    available_for: [
-      { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
-      { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
-      { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
-    ]
-  },
-  usr_404: {
-    id: 'usr_404',
-    name: 'Riya Mehta',
-    age: 26,
-    gender: 'Female',
-    verified: true,
-    location: {
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      country: 'India'
-    },
-    rating: 4.9,
-    total_reviews: 145,
-    about: 'Tech enthusiast, guitarist and outdoor trekker.',
-    interests: [
-      { name: 'Trekking', icon: 'hiking' },
-      { name: 'Coding', icon: 'code' },
-      { name: 'Guitar', icon: 'music_note' }
-    ],
-    available_for: [
-      { name: 'Trekking', icon: 'hiking', price: 499, currency: 'INR' },
-      { name: 'Coffee & Code', icon: 'coffee', price: 299, currency: 'INR' }
-    ]
-  }
-};
-
 // Handler for getProfile & Combined Profile Data
 const handleGetProfile = async (req, res) => {
   const baseUrl = getBaseUrl(req);
