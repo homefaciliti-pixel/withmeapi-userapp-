@@ -35,7 +35,7 @@ const handleGetProfile = async (req, res) => {
     country_code: userCountryCode,
     phone_number: userPhone,
     full_phone_number: userFullPhone,
-    email: userPhone ? `${userPhone}@withme.app` : null,
+    email: null,
     gender: null,
     interested_in_gender: null,
     dob: null,
@@ -151,6 +151,26 @@ const handleGetProfile = async (req, res) => {
     }
   } catch (err) {
     console.warn('MySQL getProfile query notice:', err.message);
+  }
+
+  // Merge in-memory store updates if present (for instant reflection after profile edits)
+  const inMemoryProfile = userProfilesStore[userId] || {};
+  if (inMemoryProfile && Object.keys(inMemoryProfile).length > 0) {
+    if (inMemoryProfile.name) profileData.name = inMemoryProfile.name;
+    if (inMemoryProfile.email) profileData.email = inMemoryProfile.email;
+    if (inMemoryProfile.gender) profileData.gender = inMemoryProfile.gender;
+    if (inMemoryProfile.interested_in_gender) profileData.interested_in_gender = inMemoryProfile.interested_in_gender;
+    if (inMemoryProfile.dob) profileData.dob = inMemoryProfile.dob;
+    if (inMemoryProfile.bio) profileData.bio = inMemoryProfile.bio;
+    if (inMemoryProfile.city) profileData.city = inMemoryProfile.city;
+    if (inMemoryProfile.profile_image) profileData.profile_image = inMemoryProfile.profile_image;
+    if (inMemoryProfile.profile_images && inMemoryProfile.profile_images.length > 0) profileData.profile_images = inMemoryProfile.profile_images;
+    if (inMemoryProfile.kyc_status && inMemoryProfile.kyc_status !== 'NOT_VERIFIED') {
+      profileData.kyc_status = inMemoryProfile.kyc_status;
+      profileData.is_kyc_completed = true;
+      profileData.is_approved = true;
+      profileData.approval_status = 'APPROVED';
+    }
   }
 
   // Calculate dynamic age from DOB if available

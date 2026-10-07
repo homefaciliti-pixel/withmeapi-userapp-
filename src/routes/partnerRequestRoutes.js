@@ -1152,29 +1152,45 @@ const handlePartnerRequestDetails = async (req, res) => {
   });
 };
 
-router.get('/details/:id', authenticateToken, handlePartnerRequestDetails);
-router.get('/details', authenticateToken, handlePartnerRequestDetails);
-router.get('/request-details/:id', authenticateToken, handlePartnerRequestDetails);
-router.get('/request-details', authenticateToken, handlePartnerRequestDetails);
-router.get('/view/:id', authenticateToken, handlePartnerRequestDetails);
-router.get('/view', authenticateToken, handlePartnerRequestDetails);
-router.get('/:id', authenticateToken, (req, res, next) => {
-  // If param is a standard route word, pass to next
-  const p = req.params.id.toLowerCase();
-  if (p === 'list' || p === 'approved' || p === 'pending' || p === 'action' || p === 'approve-all') {
-    return next();
-  }
-  return handlePartnerRequestDetails(req, res);
-});
-
-// 2. Request Partner List API — GET (/list, /, /approved, /pending)
+// 2. Request Partner List API — GET / POST (/list, /, /approved, /pending)
 const handlePartnerList = async (req, res) => {
   const baseUrl = getBaseUrl(req);
-  const type = (req.query.type || req.query.status || req.query.filter || '').toLowerCase();
-  const requestedBookingId = req.query.booking_id || req.query.bookingId || 'BK197860';
+  const type = ((req.query && (req.query.type || req.query.status || req.query.filter)) || (req.body && (req.body.type || req.body.status || req.body.filter)) || '').toLowerCase();
+  const requestedBookingId = (req.query && (req.query.booking_id || req.query.bookingId)) || (req.body && (req.body.booking_id || req.body.bookingId)) || 'BK197860';
   const approvedPartners = await getApprovedPartnersList(baseUrl, requestedBookingId);
 
-  // If client specifically requests pending list after all have been approved
+  let realRequests = [];
+  try {
+    const userId = req.user ? (req.user.user_id || req.user.id) : null;
+    let reqRows = [];
+    if (userId) {
+      reqRows = await query('SELECT * FROM withme_partner_requests WHERE user_id = ? OR sender_id = ? ORDER BY id DESC LIMIT 50', [userId, userId]).catch(() => []);
+      if (!reqRows || reqRows.length === 0) {
+        reqRows = await query('SELECT * FROM partner_requests WHERE sender_id = ? ORDER BY created_at DESC LIMIT 50', [userId]).catch(() => []);
+      }
+    }
+    if (reqRows && reqRows.length > 0) {
+      realRequests = reqRows.map(r => ({
+        id: r.id || r.request_id,
+        request_id: r.request_id || r.id,
+        booking_id: r.booking_id || requestedBookingId,
+        user_id: r.user_id || r.sender_id,
+        partner_id: r.partner_id || r.receiver_id || 101,
+        sender_name: r.sender_name || 'User',
+        sender_avatar: formatPartnerPhoto(r.sender_avatar, baseUrl),
+        activity: r.activity || r.activity_name || 'Coffee',
+        date: r.date,
+        time: r.time,
+        location: r.location,
+        price: parseFloat(r.price || 1),
+        status: r.status || 'PENDING',
+        created_at: r.created_at
+      }));
+    }
+  } catch (e) {}
+
+  const combinedList = realRequests.length > 0 ? realRequests : approvedPartners;
+
   if (type === 'pending' || type === 'unapproved') {
     return res.status(200).json({
       success: true,
@@ -1184,7 +1200,8 @@ const handlePartnerList = async (req, res) => {
         booking_id: requestedBookingId,
         partners: [],
         pending_partners: [],
-        approved_partners: approvedPartners
+        approved_partners: approvedPartners,
+        requests: []
       },
       partners: [],
       pending_partners: [],
@@ -1196,19 +1213,23 @@ const handlePartnerList = async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: 'Approved partners fetched successfully',
+    message: 'Approved partners and requests fetched successfully',
     booking_id: requestedBookingId,
     data: {
       booking_id: requestedBookingId,
       partners: approvedPartners,
       approved_partners: approvedPartners,
-      pending_partners: []
+      pending_partners: [],
+      requests: combinedList,
+      list: combinedList
     },
     partners: approvedPartners,
     approved_partners: approvedPartners,
     pending_partners: [],
-    count: approvedPartners.length,
-    requests: approvedPartners
+    count: combinedList.length,
+    requests: combinedList,
+    list: combinedList,
+    partner_requests: combinedList
   });
 };
 
@@ -1218,6 +1239,27 @@ router.get('/approved', authenticateToken, handlePartnerList);
 router.get('/approved-partners', authenticateToken, handlePartnerList);
 router.get('/pending', authenticateToken, handlePartnerList);
 router.get('/pending-partners', authenticateToken, handlePartnerList);
+router.get('/requests', authenticateToken, handlePartnerList);
+router.get('/get-list', authenticateToken, handlePartnerList);
+
+router.post('/list', authenticateToken, handlePartnerList);
+router.post('/approved', authenticateToken, handlePartnerList);
+router.post('/pending', authenticateToken, handlePartnerList);
+router.post('/requests', authenticateToken, handlePartnerList);
+
+router.get('/details/:id', authenticateToken, handlePartnerRequestDetails);
+router.get('/details', authenticateToken, handlePartnerRequestDetails);
+router.get('/request-details/:id', authenticateToken, handlePartnerRequestDetails);
+router.get('/request-details', authenticateToken, handlePartnerRequestDetails);
+router.get('/view/:id', authenticateToken, handlePartnerRequestDetails);
+router.get('/view', authenticateToken, handlePartnerRequestDetails);
+router.get('/:id', authenticateToken, (req, res, next) => {
+  const p = req.params.id.toLowerCase();
+  if (p === 'list' || p === 'approved' || p === 'pending' || p === 'action' || p === 'approve-all' || p === 'requests') {
+    return next();
+  }
+  return handlePartnerRequestDetails(req, res);
+});
 
 // 3. Approve All / Partner Action API — POST (/action, /approve-all, /approve)
 const handlePartnerAction = async (req, res) => {
