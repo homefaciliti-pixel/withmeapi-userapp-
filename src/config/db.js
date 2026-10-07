@@ -52,6 +52,7 @@ const initializeDatabaseTables = async () => {
       "ALTER TABLE users ADD COLUMN interested_in_gender VARCHAR(20) DEFAULT NULL",
       'ALTER TABLE users ADD COLUMN profile_image VARCHAR(255) DEFAULT NULL',
       "ALTER TABLE users MODIFY COLUMN kyc_status VARCHAR(50) DEFAULT 'NOT_VERIFIED'",
+      "ALTER TABLE users MODIFY COLUMN interested_in_gender VARCHAR(20) DEFAULT NULL",
       'ALTER TABLE users ADD COLUMN fcm_token TEXT DEFAULT NULL',
       "ALTER TABLE users ADD COLUMN device_type VARCHAR(20) DEFAULT 'android'",
       'ALTER TABLE users ADD COLUMN profile_images TEXT DEFAULT NULL',
@@ -68,6 +69,14 @@ const initializeDatabaseTables = async () => {
         // Ignore column already exists warnings
       }
     }
+
+    // Migration: clear auto-defaulted 'Female' for users who never explicitly set it
+    // Safe: only affects users whose KYC is not yet verified (they never went through interest selection)
+    try {
+      await connection.query(
+        `UPDATE users SET interested_in_gender = NULL WHERE interested_in_gender = 'Female' AND (kyc_status IS NULL OR kyc_status IN ('NOT_VERIFIED', 'NOT_STARTED', ''))`
+      );
+    } catch (err) { /* ignore */ }
 
     // 2. OTP Store Table
     await connection.query(`
