@@ -382,7 +382,12 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
     }
   ];
 
-  return [...dbPartners, ...defaultApproved];
+  const allRealPartners = Array.from(combinedMap.values());
+  if (allRealPartners.length > 0) {
+    return allRealPartners;
+  }
+
+  return defaultApproved;
 };
 
 // 1. Send Request API — POST (/partner-request/send, /partner-requests/send, /partner/send)

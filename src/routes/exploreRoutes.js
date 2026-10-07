@@ -172,7 +172,7 @@ router.get('/explore', authenticateToken, async (req, res) => {
     }
   ];
 
-  const exploreFeed = [...dbPartners, ...defaultExploreFeed];
+  const exploreFeed = dbPartners.length > 0 ? dbPartners : defaultExploreFeed;
 
   let items = exploreFeed;
   if (categoryFilter) {
@@ -264,7 +264,7 @@ router.post('/filter', authenticateToken, async (req, res) => {
     }
   ];
 
-  const exploreFeed = [...dbPartners, ...defaultExploreFeed];
+  const exploreFeed = dbPartners.length > 0 ? dbPartners : defaultExploreFeed;
 
   let filtered = exploreFeed;
   if (gender) {
