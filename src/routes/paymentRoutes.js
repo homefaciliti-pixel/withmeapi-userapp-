@@ -179,6 +179,80 @@ const handlePaymentInitiate = async (req, res) => {
     console.warn('[Payment DB] Could not persist payment:', dbErr.message);
   }
 
+  // After payment: auto-create a partner request so it appears in Partner App
+  const requestId = `req_pay_${paymentId}`;
+  const userId = paymentData.user_id || '';
+  const actName = activity || 'Coffee';
+  const effectivePartnerId = String(partner_id || '');
+  const senderName = userName;
+  const senderPhone = userPhone;
+  const senderAvatar = `${baseUrl}/uploads/profile.jpg`;
+
+  try {
+    await query(
+      `INSERT INTO withme_partner_requests
+        (id, request_id, booking_id, user_id, partner_id, sender_name, sender_phone, sender_avatar,
+         activity, date, time, location, message, price, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), '06:00 PM', 'Jaipur', 'Payment done, please connect!', ?, 'PAID', NOW())
+       ON DUPLICATE KEY UPDATE status='PAID', updated_at=NOW()`,
+      [
+        requestId, requestId, booking_id,
+        userId, effectivePartnerId, senderName, senderPhone, senderAvatar,
+        actName, numericAmount
+      ]
+    );
+    console.log(`[Payment] Auto-created partner request ${requestId} for partner ${effectivePartnerId}`);
+  } catch (e) {
+    console.warn('[Payment] Could not create partner request after payment:', e.message);
+  }
+
+  // Sync the paid request to Partner App in real-time
+  try {
+    const partnerApiUrls = [
+      process.env.PARTNER_API_URL || 'https://withme-partnerapi.onrender.com',
+      'http://localhost:5001',
+      'http://localhost:5000'
+    ];
+    const syncPayload = {
+      request_id: requestId,
+      booking_id,
+      payment_id: paymentId,
+      partner_id: effectivePartnerId,
+      user_id: userId,
+      name: senderName,
+      sender_name: senderName,
+      phone_number: senderPhone,
+      mobile_number: senderPhone,
+      image: senderAvatar,
+      profile_image: senderAvatar,
+      interest: actName,
+      activity_name: actName,
+      activity: actName,
+      amount: numericAmount,
+      currency,
+      payment_status: 'PAID',
+      is_paid: true,
+      status: 'PAID',
+      message: 'Payment completed. Please connect!',
+      date: new Date().toISOString().split('T')[0],
+      time: '06:00 PM',
+      created_at: createdAt
+    };
+    for (const pUrl of partnerApiUrls) {
+      try {
+        const syncResp = await fetch(`${pUrl}/partner/incoming-request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(syncPayload),
+          signal: AbortSignal.timeout(3000)
+        });
+        if (syncResp.ok) {
+          console.log(`[Payment Sync] Forwarded paid request to Partner App at ${pUrl}`);
+          break;
+        }
+      } catch (e2) { /* partner app offline, skip */ }
+    }
+  } catch (e) {}
   return res.status(200).json({
     success: true,
     message: 'Payment initiated successfully',
