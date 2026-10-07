@@ -352,22 +352,28 @@ router.get('/user-details/:id', authenticateToken, handleDetailedProfileView);
 
 // 3. Interest Selection API — POST (/profile/interest-selection and /interest-selection)
 const handleInterestSelection = async (req, res) => {
-  const { interested_in_gender } = req.body;
+  const body = req.body || {};
+  const rawInterest = body.interested_in_gender || body.interestedInGender || body.interested_in || body.interestedIn || body.interest_selection || body.interest;
 
-  if (!interested_in_gender) {
+  if (!rawInterest) {
     return res.status(400).json({
       success: false,
       message: 'interested_in_gender field is required. Options: Male, Female, Other, Both'
     });
   }
 
-  const userId = req.user.user_id || req.user.id || 'usr_998877';
+  const interestedVal = String(rawInterest).trim();
+  const userId = req.user ? (req.user.user_id || req.user.id || 'usr_998877') : 'usr_998877';
+  const userFullPhone = req.user ? (req.user.full_phone_number || req.user.phone_number || '').toString() : '';
+  const userPhone = req.user ? (req.user.phone_number || '').toString().replace(/^\+91/, '').replace(/^\+/, '') : '';
+  const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
+
   const existingProfile = userProfilesStore[userId] || {};
 
   const updatedProfile = {
     ...existingProfile,
     user_id: userId,
-    interested_in_gender: interested_in_gender.trim(),
+    interested_in_gender: interestedVal,
     updated_at: new Date().toISOString()
   };
 
@@ -375,10 +381,17 @@ const handleInterestSelection = async (req, res) => {
 
   // Persist into MySQL users table
   try {
-    await query(
-      `UPDATE users SET interested_in_gender = ? WHERE id = ? OR phone_number = ?`,
-      [interested_in_gender.trim(), userId, req.user.phone_number || '']
+    const updateRes = await query(
+      `UPDATE users SET interested_in_gender = ?, updated_at = NOW() WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
+      [interestedVal, userId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]
     );
+
+    if (!updateRes || updateRes.affectedRows === 0) {
+      await query(
+        `INSERT INTO users (id, phone_number, interested_in_gender) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE interested_in_gender = VALUES(interested_in_gender), updated_at = NOW()`,
+        [userId, userFullPhone || userPhone, interestedVal]
+      );
+    }
   } catch (err) {
     console.warn('MySQL Interest Selection notice:', err.message);
   }
@@ -386,10 +399,10 @@ const handleInterestSelection = async (req, res) => {
   return res.status(200).json({
     success: true,
     api_name: 'interestSelection',
-    message: `Gender interest preference updated to '${interested_in_gender}' successfully`,
+    message: `Gender interest preference updated to '${interestedVal}' successfully`,
     data: {
       user_id: userId,
-      interested_in_gender: interested_in_gender.trim(),
+      interested_in_gender: interestedVal,
       updated_at: updatedProfile.updated_at
     }
   });
@@ -398,54 +411,61 @@ const handleInterestSelection = async (req, res) => {
 router.post('/profile/interest-selection', authenticateToken, handleInterestSelection);
 router.post('/interest-selection', authenticateToken, handleInterestSelection);
 
-// 4. Combined Profile Edit / Update API (Handles Profile Fields, Interest Selection & KYC Submit in 1 Call) — POST / PUT
+// 4. Combined Profile Edit / Update API (Handles Profile Fields, Interest Selection & KYC Submit in 1 Call) — POST / PUT / PATCH
 const handleProfileEditCombined = async (req, res) => {
-  const userId = req.user.user_id || req.user.id || 'usr_998877';
+  const userId = req.user ? (req.user.user_id || req.user.id || 'usr_998877') : 'usr_998877';
   const existingProfile = userProfilesStore[userId] || {};
+  const body = req.body || {};
 
-  const {
-    name,
-    email,
-    gender,
-    interested_in_gender,
-    dob,
-    bio,
-    city,
-    document_type,
-    document_number,
-    full_name
-  } = req.body;
+  // Extract all possible field name aliases
+  const name = body.name !== undefined ? body.name : (body.full_name || body.fullName);
+  const email = body.email !== undefined ? body.email : (body.email_id || body.emailId || body.emailAddress);
+  const gender = body.gender !== undefined ? body.gender : (body.gender_type || body.genderType);
+  const interested_in_gender = body.interested_in_gender !== undefined
+    ? body.interested_in_gender
+    : (body.interestedInGender !== undefined
+      ? body.interestedInGender
+      : (body.interested_in !== undefined
+        ? body.interested_in
+        : (body.interestedIn !== undefined
+          ? body.interestedIn
+          : (body.interest_selection !== undefined
+            ? body.interest_selection
+            : body.interest))));
+  const dob = body.dob !== undefined ? body.dob : (body.date_of_birth || body.dateOfBirth || body.birth_date || body.birthDate);
+  const bio = body.bio !== undefined ? body.bio : (body.about || body.bio_data || body.bioData || body.description);
+  const city = body.city !== undefined ? body.city : (body.city_name || body.cityName || body.location || body.area);
+  const document_type = body.document_type || body.documentType || body.doc_type || body.type;
+  const document_number = body.document_number || body.documentNumber || body.doc_number || body.number;
+  const full_name = body.full_name || body.fullName || body.name;
+
+  const profile_image = body.profile_image !== undefined
+    ? body.profile_image
+    : (body.profileImage || body.image || body.profile_photo_url || body.profilePhotoUrl || body.profile_photo || body.profilePhoto || body.avatar || body.photo);
+  const profile_images = body.profile_images !== undefined
+    ? body.profile_images
+    : (body.profileImages || body.photos || body.images);
 
   let kycSubmitted = false;
   let kycDetails = null;
-
-  // Only use value if explicitly provided — no auto-default
-  const updatedInterestedIn = interested_in_gender !== undefined && interested_in_gender !== null
-    ? interested_in_gender.trim()
-    : existingProfile.interested_in_gender || null;
 
   if (document_type && document_number) {
     kycSubmitted = true;
     kycDetails = {
       document_type,
-      document_number_masked: document_number.slice(-4).padStart(document_number.length, '*'),
+      document_number_masked: String(document_number).slice(-4).padStart(String(document_number).length, '*'),
       full_name: full_name || name || existingProfile.name || 'User',
       status: 'APPROVED',
       kyc_status: 'APPROVED',
       approval_status: 'APPROVED',
       is_approved: true,
       is_kyc_completed: true,
-      is_verified: true,
-      adhar_otp: 'PENDING',
-      aadhaar_otp: 'PENDING',
-      aadhaar_otp_status: 'PENDING',
-      adhar_otp_status: 'PENDING',
-      aadhaar_status: 'PENDING',
-      otp_status: 'PENDING'
+      is_verified: true
     };
 
     try {
-      await query(`UPDATE users SET kyc_status = 'APPROVED' WHERE id = ? OR phone_number = ?`, [userId, req.user.phone_number || '']);
+      const userPhoneStr = (req.user ? (req.user.phone_number || '') : '').toString();
+      await query(`UPDATE users SET kyc_status = 'APPROVED' WHERE id = ? OR phone_number = ? OR phone_number LIKE ?`, [userId, userPhoneStr, `%${userPhoneStr.replace(/\D/g, '').slice(-8)}`]);
       await query(
         `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'APPROVED')`,
         [userId, document_type, document_number, full_name || name || 'User']
@@ -458,26 +478,22 @@ const handleProfileEditCombined = async (req, res) => {
   const updatedProfile = {
     ...existingProfile,
     user_id: userId,
-    ...(name && { name }),
-    ...(email && { email }),
-    ...(gender && { gender }),
-    interested_in_gender: updatedInterestedIn,
-    ...(dob && { dob }),
-    ...(bio && { bio }),
-    ...(city && { city }),
+    ...(name !== undefined && { name }),
+    ...(email !== undefined && { email }),
+    ...(gender !== undefined && { gender }),
+    ...(interested_in_gender !== undefined && { interested_in_gender }),
+    ...(dob !== undefined && { dob }),
+    ...(bio !== undefined && { bio }),
+    ...(city !== undefined && { city }),
+    ...(profile_image !== undefined && { profile_image }),
+    ...(profile_images !== undefined && { profile_images }),
     ...(kycSubmitted && {
       kyc_status: 'APPROVED',
       status: 'APPROVED',
       approval_status: 'APPROVED',
       is_approved: true,
       is_kyc_completed: true,
-      is_verified: true,
-      adhar_otp: 'PENDING',
-      aadhaar_otp: 'PENDING',
-      aadhaar_otp_status: 'PENDING',
-      adhar_otp_status: 'PENDING',
-      aadhaar_status: 'PENDING',
-      otp_status: 'PENDING'
+      is_verified: true
     }),
     updated_at: new Date().toISOString()
   };
@@ -485,26 +501,22 @@ const handleProfileEditCombined = async (req, res) => {
   userProfilesStore[userId] = updatedProfile;
 
   // Update MySQL database if available
-  const userFullPhone = (req.user.full_phone_number || req.user.phone_number || '').toString();
-  const userPhone = (req.user.phone_number || '').toString().replace(/^\+91/, '').replace(/^\+/, '');
+  const userFullPhone = (req.user ? (req.user.full_phone_number || req.user.phone_number || '') : '').toString();
+  const userPhone = (req.user ? (req.user.phone_number || '') : '').toString().replace(/^\+91/, '').replace(/^\+/, '');
   const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
 
   try {
-    // Build SET clauses dynamically — only update fields that were explicitly sent
     const setClauses = [];
     const setParams = [];
 
-    const profile_image = req.body.profile_image || req.body.profileImage || req.body.image || req.body.profile_photo_url || req.body.avatar;
-    const profile_images = req.body.profile_images || req.body.profileImages || req.body.photos;
-
-    if (name !== undefined) { setClauses.push('name = ?'); setParams.push(name || 'User'); }
-    if (email !== undefined) { setClauses.push('email = ?'); setParams.push(email || null); }
-    if (gender !== undefined) { setClauses.push('gender = ?'); setParams.push(gender); }
-    if (interested_in_gender !== undefined) { setClauses.push('interested_in_gender = ?'); setParams.push(interested_in_gender ? interested_in_gender.trim() : null); }
-    if (dob !== undefined) { setClauses.push('dob = ?'); setParams.push(dob || null); }
-    if (city !== undefined) { setClauses.push('city = ?'); setParams.push(city || null); }
-    if (bio !== undefined) { setClauses.push('bio = ?'); setParams.push(bio || null); }
-    if (profile_image !== undefined) { setClauses.push('profile_image = ?'); setParams.push(profile_image || null); }
+    if (name !== undefined) { setClauses.push('name = ?'); setParams.push(name ? String(name).trim() : 'User'); }
+    if (email !== undefined) { setClauses.push('email = ?'); setParams.push(email ? String(email).trim() : null); }
+    if (gender !== undefined) { setClauses.push('gender = ?'); setParams.push(gender ? String(gender).trim() : null); }
+    if (interested_in_gender !== undefined) { setClauses.push('interested_in_gender = ?'); setParams.push(interested_in_gender ? String(interested_in_gender).trim() : null); }
+    if (dob !== undefined) { setClauses.push('dob = ?'); setParams.push(dob ? String(dob).trim() : null); }
+    if (city !== undefined) { setClauses.push('city = ?'); setParams.push(city ? String(city).trim() : null); }
+    if (bio !== undefined) { setClauses.push('bio = ?'); setParams.push(bio ? String(bio).trim() : null); }
+    if (profile_image !== undefined) { setClauses.push('profile_image = ?'); setParams.push(profile_image ? String(profile_image).trim() : null); }
     if (profile_images !== undefined) {
       const imgVal = typeof profile_images === 'string' ? profile_images : JSON.stringify(profile_images);
       setClauses.push('profile_images = ?'); setParams.push(imgVal || null);
@@ -514,7 +526,40 @@ const handleProfileEditCombined = async (req, res) => {
     if (setClauses.length > 0) {
       setClauses.push('updated_at = NOW()');
       const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
-      await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits}`]);
+      const updateRes = await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
+
+      if (!updateRes || updateRes.affectedRows === 0) {
+        const photosJson = profile_images ? (typeof profile_images === 'string' ? profile_images : JSON.stringify(profile_images)) : null;
+        await query(
+          `INSERT INTO users (id, phone_number, name, email, gender, interested_in_gender, dob, city, bio, profile_image, profile_images, kyc_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             name = COALESCE(VALUES(name), name),
+             email = VALUES(email),
+             gender = VALUES(gender),
+             interested_in_gender = VALUES(interested_in_gender),
+             dob = VALUES(dob),
+             city = VALUES(city),
+             bio = VALUES(bio),
+             profile_image = VALUES(profile_image),
+             profile_images = VALUES(profile_images),
+             updated_at = NOW()`,
+          [
+            userId,
+            userFullPhone || userPhone,
+            name ? String(name).trim() : 'User',
+            email ? String(email).trim() : null,
+            gender ? String(gender).trim() : null,
+            interested_in_gender ? String(interested_in_gender).trim() : null,
+            dob ? String(dob).trim() : null,
+            city ? String(city).trim() : null,
+            bio ? String(bio).trim() : null,
+            profile_image ? String(profile_image).trim() : null,
+            photosJson,
+            kycSubmitted ? 'APPROVED' : 'NOT_VERIFIED'
+          ]
+        );
+      }
     }
   } catch (err) {
     console.warn('MySQL Profile Update notice:', err.message);
@@ -536,6 +581,13 @@ const handleProfileEditCombined = async (req, res) => {
 
 router.post('/profile/edit', authenticateToken, handleProfileEditCombined);
 router.put('/profile/edit', authenticateToken, handleProfileEditCombined);
+router.patch('/profile/edit', authenticateToken, handleProfileEditCombined);
+router.post('/profile/update', authenticateToken, handleProfileEditCombined);
+router.put('/profile/update', authenticateToken, handleProfileEditCombined);
+router.patch('/profile/update', authenticateToken, handleProfileEditCombined);
+router.post('/profile', authenticateToken, handleProfileEditCombined);
+router.put('/profile', authenticateToken, handleProfileEditCombined);
+router.patch('/profile', authenticateToken, handleProfileEditCombined);
 router.post('/profile/combined-update', authenticateToken, handleProfileEditCombined);
 router.post('/profile/update-all', authenticateToken, handleProfileEditCombined);
 
@@ -652,7 +704,24 @@ const handleKycSubmit = async (req, res) => {
     if (bio)    { setClauses.unshift('bio = ?');    setParams.push(bio); }
 
     const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
-    await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits}`]);
+    const updateRes = await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
+
+    if (!updateRes || updateRes.affectedRows === 0) {
+      await query(
+        `INSERT INTO users (id, phone_number, name, email, gender, dob, city, bio, kyc_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED')
+         ON DUPLICATE KEY UPDATE
+           kyc_status = 'APPROVED',
+           name = COALESCE(VALUES(name), name),
+           email = COALESCE(VALUES(email), email),
+           gender = COALESCE(VALUES(gender), gender),
+           dob = COALESCE(VALUES(dob), dob),
+           city = COALESCE(VALUES(city), city),
+           bio = COALESCE(VALUES(bio), bio),
+           updated_at = NOW()`,
+        [userId, userFullPhone || userPhone, name || 'User', email || null, gender || null, dob || null, city || null, bio || null]
+      );
+    }
 
     await query(
       `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'APPROVED')`,
