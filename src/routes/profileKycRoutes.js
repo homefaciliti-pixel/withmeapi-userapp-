@@ -494,6 +494,9 @@ const handleProfileEditCombined = async (req, res) => {
     const setClauses = [];
     const setParams = [];
 
+    const profile_image = req.body.profile_image || req.body.profileImage || req.body.image || req.body.profile_photo_url || req.body.avatar;
+    const profile_images = req.body.profile_images || req.body.profileImages || req.body.photos;
+
     if (name !== undefined) { setClauses.push('name = ?'); setParams.push(name || 'User'); }
     if (email !== undefined) { setClauses.push('email = ?'); setParams.push(email || null); }
     if (gender !== undefined) { setClauses.push('gender = ?'); setParams.push(gender); }
@@ -501,6 +504,11 @@ const handleProfileEditCombined = async (req, res) => {
     if (dob !== undefined) { setClauses.push('dob = ?'); setParams.push(dob || null); }
     if (city !== undefined) { setClauses.push('city = ?'); setParams.push(city || null); }
     if (bio !== undefined) { setClauses.push('bio = ?'); setParams.push(bio || null); }
+    if (profile_image !== undefined) { setClauses.push('profile_image = ?'); setParams.push(profile_image || null); }
+    if (profile_images !== undefined) {
+      const imgVal = typeof profile_images === 'string' ? profile_images : JSON.stringify(profile_images);
+      setClauses.push('profile_images = ?'); setParams.push(imgVal || null);
+    }
     if (kycSubmitted) { setClauses.push("kyc_status = 'APPROVED'"); }
 
     if (setClauses.length > 0) {

@@ -44,13 +44,35 @@ const syncRequestToPartnerApp = async (requestPayload) => {
 
 // Helper to format partner image
 const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com') => {
-  if (!photo || photo === '' || photo === 'null') {
+  if (!photo || photo === '' || photo === 'null' || photo === 'undefined') {
     return `${baseUrl}/uploads/priya.jpg`;
   }
+  if (Array.isArray(photo)) {
+    photo = photo.find(p => p && typeof p === 'string' && p.trim() !== '') || photo[0];
+  }
+  if (typeof photo === 'object' && photo !== null) {
+    photo = photo.url || photo.uri || photo.path || photo.profile_image || photo.image || photo.profile_photo_url;
+  }
+  if (typeof photo !== 'string' || !photo.trim()) {
+    return `${baseUrl}/uploads/priya.jpg`;
+  }
+  photo = photo.trim();
+
   if (photo.startsWith('http://') || photo.startsWith('https://')) {
+    if (photo.includes('localhost') || photo.includes('127.0.0.1') || photo.includes('10.0.2.2')) {
+      const urlPath = photo.substring(photo.indexOf('/', photo.indexOf('://') + 3));
+      return `${baseUrl}${urlPath}`;
+    }
     return photo;
   }
-  if (photo.startsWith('/uploads')) {
+
+  if (photo.startsWith('/uploads/')) {
+    return `${baseUrl}${photo}`;
+  }
+  if (photo.startsWith('uploads/')) {
+    return `${baseUrl}/${photo}`;
+  }
+  if (photo.startsWith('/')) {
     return `${baseUrl}${photo}`;
   }
   return `${baseUrl}/uploads/${photo}`;
@@ -88,7 +110,7 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
 
   try {
     const rows = await query(`
-      SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, rating, total_reviews, category, activity, price, currency, status, is_approved
+      SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, photos, gender, rating, total_reviews, category, activity, price, currency, status, is_approved
       FROM withme_partners
       WHERE (status IS NULL OR status != 'DELETED') AND (is_approved IS NULL OR is_approved != 0)
       ORDER BY id DESC
@@ -101,6 +123,16 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
         const city = r.city ? r.city.trim() : 'Jaipur';
         const partnerCategory = r.category || r.activity || 'Coffee';
         const pId = formatNumericUserId(r.partner_id || r.user_id || r.id);
+
+        let parsedPhotos = [photoUrl];
+        if (r.photos) {
+          try {
+            const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
+            if (Array.isArray(rawP) && rawP.length > 0) {
+              parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p.url || p.uri), baseUrl));
+            }
+          } catch (e) {}
+        }
 
         return {
           id: pId,
@@ -121,8 +153,8 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
           profile_image: photoUrl,
           image: photoUrl,
           avatar: photoUrl,
-          profile_images: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
-          photos: [photoUrl, `${baseUrl}/uploads/priya.jpg`],
+          profile_images: parsedPhotos,
+          photos: parsedPhotos,
           is_verified: true,
           is_approved: true,
           approval_status: 'approved',
@@ -669,11 +701,13 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
         if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
       } catch (e) {}
 
-      let parsedPhotos = [photoUrl, `${baseUrl}/uploads/priya.jpg`];
+      let parsedPhotos = [photoUrl];
       try {
         if (r.photos) {
           const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
-          parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : p.url, baseUrl));
+          if (Array.isArray(rawP) && rawP.length > 0) {
+            parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p.url || p.uri), baseUrl));
+          }
         }
       } catch (e) {}
 
@@ -1208,23 +1242,52 @@ router.post('/action', authenticateToken, handlePartnerAction);
 router.post('/approve-all', authenticateToken, handlePartnerAction);
 router.post('/approve', authenticateToken, handlePartnerAction);
 
-// 4. Register / Sync New Partner API — POST (/register-partner, /register, /sync-partner, /sync)
+// 4. Register / Sync / Update Partner API — POST (/register-partner, /register, /sync-partner, /sync, /update-partner, /update)
 const handleRegisterPartner = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const pData = req.body || {};
-  const rawUserId = String(pData.partner_id || pData.user_id || `usr_${Date.now()}`).trim();
+  const rawUserId = String(pData.partner_id || pData.user_id || pData.partnerUserId || `usr_${Date.now()}`).trim();
   const digits = rawUserId.replace(/\D/g, '');
   const cleanId = digits.length > 0 ? (isNaN(Number(digits)) ? digits : Number(digits)) : rawUserId;
-  const name = pData.name || pData.full_name || 'Partner User';
+  const name = pData.name || pData.full_name || pData.fullName || 'Partner User';
   const email = pData.email || '';
-  const mobile = pData.mobile_number || pData.phone_number || pData.phone || '';
+  const mobile = pData.mobile_number || pData.phone_number || pData.phone || pData.mobile || '';
   const gender = pData.gender || 'Female';
   const dob = pData.dob || '';
   const city = pData.city || pData.area || 'Jaipur';
   const state = pData.state || 'Rajasthan';
   const locality = pData.area || pData.locality || 'Vaishali Nagar';
   const address = pData.address || `${locality}, ${city}`;
-  const photoUrl = formatPartnerPhoto(pData.profile_image || pData.image || pData.profile_photo_url, baseUrl);
+
+  let rawPhotosInput = pData.photos || pData.profile_images || pData.profileImages || [];
+  if (typeof rawPhotosInput === 'string') {
+    try {
+      const parsed = JSON.parse(rawPhotosInput);
+      if (Array.isArray(parsed)) rawPhotosInput = parsed;
+      else if (typeof parsed === 'string') rawPhotosInput = [parsed];
+    } catch (e) {
+      if (rawPhotosInput.includes(',')) rawPhotosInput = rawPhotosInput.split(',').map(s => s.trim());
+      else rawPhotosInput = [rawPhotosInput];
+    }
+  }
+  if (!Array.isArray(rawPhotosInput)) rawPhotosInput = [];
+
+  const extractedPhoto = pData.profile_image || pData.profileImage ||
+                         pData.profile_photo_url || pData.profilePhotoUrl ||
+                         pData.profile_photo || pData.profilePhoto ||
+                         pData.image || pData.photo || pData.avatar ||
+                         pData.user_image || pData.user_avatar ||
+                         pData.image_url || pData.imageUrl ||
+                         (rawPhotosInput.length > 0 ? rawPhotosInput[0] : null);
+
+  const photoUrl = formatPartnerPhoto(extractedPhoto, baseUrl);
+
+  let parsedPhotos = rawPhotosInput.map(p => formatPartnerPhoto(p, baseUrl)).filter(Boolean);
+  if (parsedPhotos.length === 0) {
+    parsedPhotos = [photoUrl];
+  }
+  const photosJson = JSON.stringify(parsedPhotos);
+
   const priceVal = pData.price !== undefined ? parseFloat(pData.price) : 1;
   const categoryVal = pData.category || pData.activity || 'Coffee';
 
@@ -1247,6 +1310,8 @@ const handleRegisterPartner = async (req, res) => {
     image: photoUrl,
     profile_image: photoUrl,
     profile_photo_url: photoUrl,
+    profile_images: parsedPhotos,
+    photos: parsedPhotos,
     category: categoryVal,
     activity: categoryVal,
     rating: parseFloat(pData.rating || 4.8),
@@ -1260,24 +1325,24 @@ const handleRegisterPartner = async (req, res) => {
 
   synchedPartnersMap.set(String(cleanId), partnerRecord);
 
-  // Insert into MySQL withme_partners
+  // Insert or update into MySQL withme_partners
   try {
     await query(`
       INSERT INTO withme_partners (
         partner_id, user_id, name, full_name, email, mobile_number, phone_number,
-        gender, dob, city, state, locality, address, profile_photo_url, image,
+        gender, dob, city, state, locality, address, profile_photo_url, image, photos,
         category, activity, rating, price, is_approved, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE')
       ON DUPLICATE KEY UPDATE
         name = VALUES(name), full_name = VALUES(full_name), email = VALUES(email),
-        profile_photo_url = VALUES(profile_photo_url), image = VALUES(image),
+        profile_photo_url = VALUES(profile_photo_url), image = VALUES(image), photos = VALUES(photos),
         city = VALUES(city), locality = VALUES(locality), status = 'ACTIVE', updated_at = NOW()
     `, [
       String(cleanId), String(cleanId), name, name, email, mobile, mobile,
-      gender, dob, city, state, locality, address, photoUrl, photoUrl,
+      gender, dob, city, state, locality, address, photoUrl, photoUrl, photosJson,
       categoryVal, categoryVal, partnerRecord.rating, priceVal
     ]);
-    console.log(`[User App API] Synced new partner ${name} (${cleanId}) to withme_partners table.`);
+    console.log(`[User App API] Synced new partner ${name} (${cleanId}) to withme_partners table with photo ${photoUrl}`);
   } catch (err) {
     console.warn('[User App DB Sync Notice]:', err.message);
   }
@@ -1293,6 +1358,9 @@ router.post('/register-partner', handleRegisterPartner);
 router.post('/register', handleRegisterPartner);
 router.post('/sync-partner', handleRegisterPartner);
 router.post('/sync', handleRegisterPartner);
+router.post('/update-partner', handleRegisterPartner);
+router.post('/update', handleRegisterPartner);
+router.post('/profile-update', handleRegisterPartner);
 
 module.exports = router;
 

@@ -14,13 +14,35 @@ const getBaseUrl = (req) => {
 
 // Helper to format partner image
 const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com') => {
-  if (!photo || photo === '' || photo === 'null') {
+  if (!photo || photo === '' || photo === 'null' || photo === 'undefined') {
     return `${baseUrl}/uploads/priya.jpg`;
   }
+  if (Array.isArray(photo)) {
+    photo = photo.find(p => p && typeof p === 'string' && p.trim() !== '') || photo[0];
+  }
+  if (typeof photo === 'object' && photo !== null) {
+    photo = photo.url || photo.uri || photo.path || photo.profile_image || photo.image || photo.profile_photo_url;
+  }
+  if (typeof photo !== 'string' || !photo.trim()) {
+    return `${baseUrl}/uploads/priya.jpg`;
+  }
+  photo = photo.trim();
+
   if (photo.startsWith('http://') || photo.startsWith('https://')) {
+    if (photo.includes('localhost') || photo.includes('127.0.0.1') || photo.includes('10.0.2.2')) {
+      const urlPath = photo.substring(photo.indexOf('/', photo.indexOf('://') + 3));
+      return `${baseUrl}${urlPath}`;
+    }
     return photo;
   }
-  if (photo.startsWith('/uploads')) {
+
+  if (photo.startsWith('/uploads/')) {
+    return `${baseUrl}${photo}`;
+  }
+  if (photo.startsWith('uploads/')) {
+    return `${baseUrl}/${photo}`;
+  }
+  if (photo.startsWith('/')) {
     return `${baseUrl}${photo}`;
   }
   return `${baseUrl}/uploads/${photo}`;
@@ -51,11 +73,13 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
         if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
       } catch (e) {}
 
-      let parsedPhotos = [photoUrl, `${baseUrl}/uploads/priya.jpg`];
+      let parsedPhotos = [photoUrl];
       try {
         if (r.photos) {
           const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
-          parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : p.url, baseUrl));
+          if (Array.isArray(rawP) && rawP.length > 0) {
+            parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p.url || p.uri), baseUrl));
+          }
         }
       } catch (e) {}
 
@@ -991,11 +1015,13 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
         }
       } catch (e) {}
 
-      let parsedPhotos = [photoUrl, `${baseUrl}/uploads/priya.jpg`];
+      let parsedPhotos = [photoUrl];
       try {
         if (r.photos) {
           const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
-          parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : p.url, baseUrl));
+          if (Array.isArray(rawP) && rawP.length > 0) {
+            parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p.url || p.uri), baseUrl));
+          }
         }
       } catch (e) {}
 
