@@ -78,7 +78,15 @@ const createRazorpayLiveOrder = async (amountInPaise, currency, receipt, keyId, 
 // 1. Payment Create / Initiate API — POST (/payments/create, /payments/initiate, /payments, /payment)
 const handlePaymentInitiate = async (req, res) => {
   const baseUrl = getBaseUrl(req);
-  const { booking_id = 'BK197860', amount = 1, currency = 'INR', payment_method = 'UPI' } = req.body || {};
+  const {
+    booking_id = 'BK197860',
+    amount = 1,
+    currency = 'INR',
+    payment_method = 'UPI',
+    partner_id,
+    partner_name,
+    activity
+  } = req.body || {};
   const razorpayKey = getRazorpayKey(req);
   const razorpaySecret = getRazorpaySecret(req);
 
@@ -129,12 +137,16 @@ const handlePaymentInitiate = async (req, res) => {
     razorpay_order_id: orderId,
     id: paymentId,
     booking_id,
+    partner_id: partner_id || null,
+    partner_name: partner_name || null,
+    activity: activity || null,
+    user_id: req.user ? (req.user.user_id || req.user.id) : null,
     amount: numericAmount,
     amount_in_paise: amountInPaise,
     amount_paise: amountInPaise,
     currency,
     payment_method,
-    status: 'INITIATED',
+    status: 'COMPLETED',
     razorpay_key: razorpayKey,
     razorpay_key_id: razorpayKey,
     key_id: razorpayKey,
@@ -148,6 +160,24 @@ const handlePaymentInitiate = async (req, res) => {
 
   paymentsStore[paymentId] = paymentData;
   paymentsStore[orderId] = paymentData;
+
+  // Persist payment to database so it survives server restarts
+  try {
+    await query(
+      `INSERT INTO withme_payments
+        (payment_id, order_id, booking_id, user_id, partner_id, partner_name, activity, amount, currency, payment_method, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', NOW())
+       ON DUPLICATE KEY UPDATE status='COMPLETED', updated_at=NOW()`,
+      [
+        paymentId, orderId, booking_id,
+        paymentData.user_id || '', partner_id || '', partner_name || '', activity || 'Coffee',
+        numericAmount, currency, payment_method
+      ]
+    );
+    console.log(`[Payment DB] Saved payment ${paymentId} to withme_payments`);
+  } catch (dbErr) {
+    console.warn('[Payment DB] Could not persist payment:', dbErr.message);
+  }
 
   return res.status(200).json({
     success: true,

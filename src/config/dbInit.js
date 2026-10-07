@@ -119,11 +119,22 @@ async function initAllWithMeTables() {
       city VARCHAR(100),
       profile_image TEXT,
       kyc_status VARCHAR(50) DEFAULT 'PENDING',
+      fcm_token TEXT DEFAULT NULL,
+      device_type VARCHAR(20) DEFAULT 'android',
       status VARCHAR(50) DEFAULT 'ACTIVE',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Ensure fcm_token column exists on pre-existing withme_users
+  const usersAlter = [
+    'ALTER TABLE withme_users ADD COLUMN fcm_token TEXT DEFAULT NULL',
+    "ALTER TABLE withme_users ADD COLUMN device_type VARCHAR(20) DEFAULT 'android'"
+  ];
+  for (const sql of usersAlter) {
+    try { await query(sql); } catch (e) { /* already exists */ }
+  }
 
   // 6. conversations
   await query(`
@@ -188,6 +199,27 @@ async function initAllWithMeTables() {
       data_payload TEXT,
       is_read TINYINT(1) DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // 11. withme_payments
+  await query(`
+    CREATE TABLE IF NOT EXISTS withme_payments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      payment_id VARCHAR(100) UNIQUE,
+      order_id VARCHAR(100),
+      booking_id VARCHAR(100),
+      user_id VARCHAR(100),
+      partner_id VARCHAR(100),
+      partner_name VARCHAR(150),
+      partner_image TEXT,
+      activity VARCHAR(100) DEFAULT 'Coffee',
+      amount DECIMAL(10,2) DEFAULT 1.00,
+      currency VARCHAR(10) DEFAULT 'INR',
+      payment_method VARCHAR(50) DEFAULT 'UPI',
+      status VARCHAR(50) DEFAULT 'COMPLETED',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 

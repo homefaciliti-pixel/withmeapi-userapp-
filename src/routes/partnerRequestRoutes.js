@@ -3,6 +3,18 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { query } = require('../config/db');
 
+// Helper: extract numeric id from any format e.g. 'usr_2346' -> 2346, '101' -> 101
+const formatNumericUserId = (rawId) => {
+  if (!rawId) return 101;
+  const str = String(rawId).trim();
+  const digits = str.replace(/\D/g, '');
+  if (digits.length > 0) {
+    const num = Number(digits);
+    return isNaN(num) ? str : num;
+  }
+  return str || 101;
+};
+
 const getBaseUrl = (req) => {
   if (req) {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
@@ -1164,17 +1176,17 @@ const handlePartnerList = async (req, res) => {
     const userId = req.user ? (req.user.user_id || req.user.id) : null;
     let reqRows = [];
     if (userId) {
-      reqRows = await query('SELECT * FROM withme_partner_requests WHERE user_id = ? OR sender_id = ? ORDER BY id DESC LIMIT 50', [userId, userId]).catch(() => []);
+      reqRows = await query('SELECT * FROM withme_partner_requests WHERE user_id = ? ORDER BY id DESC LIMIT 50', [userId]).catch(() => []);
       if (!reqRows || reqRows.length === 0) {
-        reqRows = await query('SELECT * FROM partner_requests WHERE sender_id = ? OR user_id = ? ORDER BY created_at DESC LIMIT 50', [userId, userId]).catch(() => []);
+        reqRows = await query('SELECT * FROM partner_requests WHERE sender_id = ? ORDER BY created_at DESC LIMIT 50', [userId]).catch(() => []);
       }
     }
-    // Also fetch all partner requests if empty or generic query
+    // Also fetch all partner requests if none found for this user
     if (!reqRows || reqRows.length === 0) {
       reqRows = await query('SELECT * FROM withme_partner_requests ORDER BY id DESC LIMIT 50').catch(() => []);
-      if (!reqRows || reqRows.length === 0) {
-        reqRows = await query('SELECT * FROM partner_requests ORDER BY created_at DESC LIMIT 50').catch(() => []);
-      }
+    }
+    if (!reqRows || reqRows.length === 0) {
+      reqRows = await query('SELECT * FROM partner_requests ORDER BY created_at DESC LIMIT 50').catch(() => []);
     }
 
     if (reqRows && reqRows.length > 0) {
@@ -1290,8 +1302,63 @@ const handlePartnerList = async (req, res) => {
     }
   } catch (e) {}
 
-  // Fetch memory payments from paymentsStore
+  // Fetch payments from DB (withme_payments table) AND memory store
   let memoryPayments = [];
+  try {
+    // DB payments first — these survive server restarts
+    const dbPayments = await query('SELECT * FROM withme_payments ORDER BY id DESC LIMIT 50').catch(() => []);
+    if (dbPayments && dbPayments.length > 0) {
+      dbPayments.forEach(p => {
+        const bId = p.booking_id || requestedBookingId;
+        const pId = formatNumericUserId(p.partner_id || '101');
+        const photoUrl = formatPartnerPhoto(p.partner_image || p.image, baseUrl);
+        memoryPayments.push({
+          id: p.payment_id || p.id || `pay_${pId}_${bId}`,
+          request_id: `req_${pId}`,
+          booking_id: bId,
+          user_id: p.user_id || 'usr_203',
+          partner_id: pId,
+          partner_user_id: pId,
+          partnerUserId: pId,
+          name: p.partner_name || 'Priya Sharma',
+          full_name: p.partner_name || 'Priya Sharma',
+          city: p.city || 'Jaipur',
+          rating: 4.8,
+          price: parseFloat(p.amount || 1),
+          currency: p.currency || 'INR',
+          price_type: 'session',
+          activity: p.activity || 'Coffee',
+          activity_name: p.activity || 'Coffee',
+          profile_image: photoUrl,
+          image: photoUrl,
+          avatar: photoUrl,
+          profile_images: [photoUrl],
+          photos: [photoUrl],
+          is_verified: true,
+          is_approved: true,
+          approval_status: 'approved',
+          interests: [p.activity || 'Coffee', 'Travel'],
+          status: 'approved',
+          is_accepted: true,
+          request_accepted: true,
+          is_request_accepted: true,
+          accepted: true,
+          request_status: 'accepted',
+          is_paid: true,
+          isPaid: true,
+          payment_status: 'COMPLETED',
+          paymentStatus: 'COMPLETED',
+          is_payment_completed: true,
+          payment_id: p.payment_id || `pay_${pId}_${bId}`,
+          paymentId: p.payment_id || `pay_${pId}_${bId}`,
+          payment_status_text: 'Paid',
+          created_at: p.created_at || new Date().toISOString()
+        });
+      });
+    }
+  } catch (e) {}
+
+  // Also check in-memory store (current session payments)
   try {
     const paymentRoutesModule = require('./paymentRoutes');
     const store = paymentRoutesModule.paymentsStore || {};
