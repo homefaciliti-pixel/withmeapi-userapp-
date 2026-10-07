@@ -153,8 +153,32 @@ const handleGetProfile = async (req, res) => {
     console.warn('MySQL getProfile query notice:', err.message);
   }
 
-  // Merge in-memory store updates if present (for instant reflection after profile edits)
-  const inMemoryProfile = userProfilesStore[userId] || {};
+  // Query kyc_documents table from MySQL DB for THIS user
+  let kycDoc = null;
+  try {
+    const kycConditions = [];
+    const kycParams = [];
+    if (userId && !String(userId).startsWith('usr_guest')) { kycConditions.push('user_id = ?'); kycParams.push(userId); }
+    if (userFullPhone) { kycConditions.push('user_id = ?'); kycParams.push(userFullPhone); }
+    if (userPhone) { kycConditions.push('user_id = ?'); kycParams.push(userPhone); }
+    if (cleanDigits && cleanDigits.length >= 8) { kycConditions.push('user_id LIKE ?'); kycParams.push(`%${cleanDigits}`); }
+
+    if (kycConditions.length > 0) {
+      const kycRows = await query(`SELECT * FROM kyc_documents WHERE ${kycConditions.join(' OR ')} ORDER BY id DESC LIMIT 1`, kycParams);
+      if (kycRows && kycRows.length > 0) {
+        kycDoc = kycRows[0];
+      }
+    }
+  } catch (err) {
+    console.warn('MySQL kyc_documents query notice:', err.message);
+  }
+
+  // Merge in-memory store updates across all possible user ID and phone aliases
+  const inMemoryProfile = userProfilesStore[userId] ||
+                          userProfilesStore[userPhone] ||
+                          userProfilesStore[userFullPhone] ||
+                          (cleanDigits ? userProfilesStore[cleanDigits] : null) || {};
+
   if (inMemoryProfile && Object.keys(inMemoryProfile).length > 0) {
     if (inMemoryProfile.name) profileData.name = inMemoryProfile.name;
     if (inMemoryProfile.email) profileData.email = inMemoryProfile.email;
@@ -172,6 +196,47 @@ const handleGetProfile = async (req, res) => {
       profileData.approval_status = 'APPROVED';
     }
   }
+
+  const isKycApproved = (profileData.kyc_status === 'APPROVED' || profileData.kyc_status === 'VERIFIED') ||
+                        (kycDoc && (kycDoc.status === 'APPROVED' || kycDoc.status === 'VERIFIED')) ||
+                        (inMemoryProfile.kyc_status && inMemoryProfile.kyc_status !== 'NOT_VERIFIED');
+
+  const kycStatusFinal = isKycApproved ? 'APPROVED' : (profileData.kyc_status || (kycDoc ? kycDoc.status : 'NOT_VERIFIED'));
+  const rawDocNumber = kycDoc ? (kycDoc.document_number || '') : (inMemoryProfile.document_number || '');
+  const docTypeVal = kycDoc ? (kycDoc.document_type || 'AADHAAR') : (inMemoryProfile.document_type || 'AADHAAR');
+  const docNameVal = kycDoc ? (kycDoc.full_name || profileData.name) : (inMemoryProfile.full_name || profileData.name);
+  const maskedDocNum = rawDocNumber.length >= 4 ? rawDocNumber.slice(-4).padStart(rawDocNumber.length, '*') : (isKycApproved ? 'XXXXXXXX1234' : null);
+
+  const kycVerificationObj = {
+    is_kyc_completed: isKycApproved,
+    kyc_status: kycStatusFinal,
+    status: kycStatusFinal,
+    approval_status: isKycApproved ? 'APPROVED' : 'PENDING',
+    is_approved: isKycApproved,
+    is_verified: isKycApproved,
+    document_type: docTypeVal,
+    document_number: rawDocNumber || null,
+    document_number_masked: maskedDocNum,
+    full_name: docNameVal || profileData.name || 'User',
+    submitted_at: kycDoc ? kycDoc.submitted_at : null
+  };
+
+  const interestedGenderVal = profileData.interested_in_gender || inMemoryProfile.interested_in_gender || null;
+
+  profileData.kyc_status = kycStatusFinal;
+  profileData.is_kyc_completed = isKycApproved;
+  profileData.is_approved = isKycApproved;
+  profileData.approval_status = isKycApproved ? 'APPROVED' : 'PENDING';
+  profileData.interested_in_gender = interestedGenderVal;
+  profileData.kyc_verification = kycVerificationObj;
+  profileData.kyc_details = kycVerificationObj;
+
+  const interestSelectionObj = {
+    interested_in_gender: interestedGenderVal,
+    interestedInGender: interestedGenderVal,
+    interested_in: interestedGenderVal,
+    interest: interestedGenderVal
+  };
 
   // Calculate dynamic age from DOB if available
   let calculatedAge = null;
@@ -201,6 +266,10 @@ const handleGetProfile = async (req, res) => {
   const combinedData = {
     ...profileData,
     ...detailedData,
+    kyc_verification: kycVerificationObj,
+    kyc_details: kycVerificationObj,
+    interest_selection: interestSelectionObj,
+    interested_in_gender: interestedGenderVal,
     is_logged_in: true,
     token: token
   };
@@ -216,6 +285,7 @@ const handleGetProfile = async (req, res) => {
       name: profileData.name,
       age: calculatedAge,
       gender: profileData.gender,
+      interested_in_gender: interestedGenderVal,
       verified: profileData.is_photo_verified,
       location: detailedData.location,
       rating: detailedData.rating,
@@ -224,15 +294,12 @@ const handleGetProfile = async (req, res) => {
       profile_images: profileData.profile_images,
       about: detailedData.about,
       interests: detailedData.interests,
-      available_for: detailedData.available_for
+      available_for: detailedData.available_for,
+      kyc_verification: kycVerificationObj
     },
-    interest_selection: {
-      interested_in_gender: profileData.interested_in_gender || null
-    },
-    kyc_verification: {
-      is_kyc_completed: profileData.is_kyc_completed,
-      kyc_status: profileData.kyc_status
-    }
+    interest_selection: interestSelectionObj,
+    kyc_verification: kycVerificationObj,
+    kyc_details: kycVerificationObj
   });
 };
 
@@ -398,6 +465,9 @@ const handleInterestSelection = async (req, res) => {
   };
 
   userProfilesStore[userId] = updatedProfile;
+  if (userPhone) userProfilesStore[userPhone] = updatedProfile;
+  if (userFullPhone) userProfilesStore[userFullPhone] = updatedProfile;
+  if (cleanDigits) userProfilesStore[cleanDigits] = updatedProfile;
 
   // Persist into MySQL users table
   try {
@@ -519,6 +589,9 @@ const handleProfileEditCombined = async (req, res) => {
   };
 
   userProfilesStore[userId] = updatedProfile;
+  if (userPhone) userProfilesStore[userPhone] = updatedProfile;
+  if (userFullPhone) userProfilesStore[userFullPhone] = updatedProfile;
+  if (cleanDigits) userProfilesStore[cleanDigits] = updatedProfile;
 
   // Update MySQL database if available
   const userFullPhone = (req.user ? (req.user.full_phone_number || req.user.phone_number || '') : '').toString();
