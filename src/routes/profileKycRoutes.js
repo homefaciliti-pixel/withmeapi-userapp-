@@ -128,7 +128,7 @@ const handleGetProfile = async (req, res) => {
           full_phone_number: u.phone_number
             ? (u.phone_number.startsWith('+') ? u.phone_number : `${userCountryCode}${dbPhone}`)
             : userFullPhone,
-          email: u.email || (dbPhone ? `${dbPhone}@withme.app` : null),
+          email: u.email || null,
           gender: u.gender || null,
           interested_in_gender: u.interested_in_gender || null,
           dob: u.dob || null,
@@ -419,7 +419,10 @@ const handleProfileEditCombined = async (req, res) => {
   let kycSubmitted = false;
   let kycDetails = null;
 
-  const updatedInterestedIn = interested_in_gender ? interested_in_gender.trim() : existingProfile.interested_in_gender || 'Female';
+  // Only use value if explicitly provided — no auto-default
+  const updatedInterestedIn = interested_in_gender !== undefined && interested_in_gender !== null
+    ? interested_in_gender.trim()
+    : existingProfile.interested_in_gender || null;
 
   if (document_type && document_number) {
     kycSubmitted = true;
@@ -487,22 +490,24 @@ const handleProfileEditCombined = async (req, res) => {
   const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
 
   try {
-    await query(
-      `UPDATE users SET name = ?, email = ?, gender = ?, interested_in_gender = ?, city = ?, bio = ?${kycSubmitted ? ", kyc_status = 'APPROVED'" : ''} 
-       WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
-      [
-        updatedProfile.name || 'User',
-        updatedProfile.email || null,
-        updatedProfile.gender || 'Male',
-        updatedProfile.interested_in_gender || 'Female',
-        updatedProfile.city || null,
-        updatedProfile.bio || null,
-        userId,
-        userFullPhone,
-        userPhone,
-        `%${cleanDigits}`
-      ]
-    );
+    // Build SET clauses dynamically — only update fields that were explicitly sent
+    const setClauses = [];
+    const setParams = [];
+
+    if (name !== undefined) { setClauses.push('name = ?'); setParams.push(name || 'User'); }
+    if (email !== undefined) { setClauses.push('email = ?'); setParams.push(email || null); }
+    if (gender !== undefined) { setClauses.push('gender = ?'); setParams.push(gender); }
+    if (interested_in_gender !== undefined) { setClauses.push('interested_in_gender = ?'); setParams.push(interested_in_gender ? interested_in_gender.trim() : null); }
+    if (dob !== undefined) { setClauses.push('dob = ?'); setParams.push(dob || null); }
+    if (city !== undefined) { setClauses.push('city = ?'); setParams.push(city || null); }
+    if (bio !== undefined) { setClauses.push('bio = ?'); setParams.push(bio || null); }
+    if (kycSubmitted) { setClauses.push("kyc_status = 'APPROVED'"); }
+
+    if (setClauses.length > 0) {
+      setClauses.push('updated_at = NOW()');
+      const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
+      await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits}`]);
+    }
   } catch (err) {
     console.warn('MySQL Profile Update notice:', err.message);
   }
