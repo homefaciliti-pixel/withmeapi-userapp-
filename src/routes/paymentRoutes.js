@@ -627,3 +627,4 @@ router.get('/status', authenticateToken, handleGetPaymentDetails);
 router.get('/:id', authenticateToken, handleGetPaymentDetails);
 
 module.exports = router;
+module.exports.paymentsStore = paymentsStore;

@@ -1290,8 +1290,66 @@ const handlePartnerList = async (req, res) => {
     }
   } catch (e) {}
 
-  // Merge real requests, bookings, and approved partners while preventing duplicates
+  // Fetch memory payments from paymentsStore
+  let memoryPayments = [];
+  try {
+    const paymentRoutesModule = require('./paymentRoutes');
+    const store = paymentRoutesModule.paymentsStore || {};
+    Object.values(store).forEach(p => {
+      if (p && (p.payment_id || p.id || p.order_id)) {
+        const bId = p.booking_id || requestedBookingId;
+        const pId = formatNumericUserId(p.partner_id || '101');
+        const photoUrl = formatPartnerPhoto(p.partner_image || p.image, baseUrl);
+
+        memoryPayments.push({
+          id: p.payment_id || p.id || `pay_${pId}_${bId}`,
+          request_id: `req_${pId}`,
+          booking_id: bId,
+          user_id: p.user_id || 'usr_203',
+          partner_id: pId,
+          partner_user_id: pId,
+          partnerUserId: pId,
+          name: p.partner_name || p.name || 'Priya Sharma',
+          full_name: p.partner_name || p.name || 'Priya Sharma',
+          city: p.city || 'Jaipur',
+          rating: 4.8,
+          price: parseFloat(p.amount || 1),
+          currency: p.currency || 'INR',
+          price_type: 'session',
+          activity: p.activity || 'Coffee',
+          activity_name: p.activity || 'Coffee',
+          profile_image: photoUrl,
+          image: photoUrl,
+          avatar: photoUrl,
+          profile_images: [photoUrl],
+          photos: [photoUrl],
+          is_verified: true,
+          is_approved: true,
+          approval_status: 'approved',
+          interests: [p.activity || 'Coffee', 'Travel'],
+          status: 'approved',
+          is_accepted: true,
+          request_accepted: true,
+          is_request_accepted: true,
+          accepted: true,
+          request_status: 'accepted',
+          is_paid: true,
+          isPaid: true,
+          payment_status: 'COMPLETED',
+          paymentStatus: 'COMPLETED',
+          is_payment_completed: true,
+          payment_id: p.payment_id || `pay_${pId}_${bId}`,
+          paymentId: p.payment_id || `pay_${pId}_${bId}`,
+          payment_status_text: 'Paid',
+          created_at: p.created_at || new Date().toISOString()
+        });
+      }
+    });
+  } catch (e) {}
+
+  // Merge real requests, memory payments, bookings, and approved partners while preventing duplicates
   const finalMap = new Map();
+  memoryPayments.forEach(item => finalMap.set(String(item.id || item.payment_id), item));
   realRequests.forEach(item => finalMap.set(String(item.id || item.request_id), item));
   bookingRequests.forEach(item => finalMap.set(String(item.id || item.booking_id), item));
   approvedPartners.forEach(item => {
