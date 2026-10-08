@@ -225,7 +225,7 @@ Any disputes shall be subject to the jurisdiction of the courts having appropria
 22. Contact Us
 WITHME24
 Email: officalwithme24@withme24.com
-Website: https://withme24.com
+Website: www.withme24.com
 Address: WITHME24`;
 
   return res.status(200).json({
@@ -236,7 +236,7 @@ Address: WITHME24`;
       last_updated: '2026-10-08',
       version: '1.0',
       support_email: 'officalwithme24@withme24.com',
-      website: 'https://withme24.com',
+      website: 'www.withme24.com',
       content: termsText
     }
   });

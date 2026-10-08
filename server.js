@@ -187,6 +187,16 @@ const serveTermsAndConditions = (req, res) => {
   return res.status(404).send('Terms & Conditions file not found.');
 };
 
+// Privacy Policy Serve Endpoints
+const servePrivacyPolicy = (req, res) => {
+  const privacyPath = path.join(__dirname, 'PRIVACY_POLICY.txt');
+  if (fs.existsSync(privacyPath)) {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.sendFile(privacyPath);
+  }
+  return res.status(404).send('Privacy Policy file not found.');
+};
+
 app.get('/API_DOCUMENTATION.txt', serveApiDocumentation);
 app.get('/api_documentation.txt', serveApiDocumentation);
 app.get('/API_DOCUMENTATION', serveApiDocumentation);
@@ -205,6 +215,14 @@ app.get('/terms.txt', serveTermsAndConditions);
 app.get('/terms-of-service.txt', serveTermsAndConditions);
 app.get('/terms', serveTermsAndConditions);
 app.get('/api/v1/terms.txt', serveTermsAndConditions);
+
+app.get('/PRIVACY_POLICY.txt', servePrivacyPolicy);
+app.get('/privacy-policy.txt', servePrivacyPolicy);
+app.get('/privacy_policy.txt', servePrivacyPolicy);
+app.get('/privacy.txt', servePrivacyPolicy);
+app.get('/privacy-policy', servePrivacyPolicy);
+app.get('/privacy', servePrivacyPolicy);
+app.get('/api/v1/privacy.txt', servePrivacyPolicy);
 
 // Health Check Endpoint
 app.get('/', (req, res) => {

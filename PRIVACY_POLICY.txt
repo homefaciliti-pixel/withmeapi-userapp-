@@ -1,0 +1,55 @@
+WITHME24 — Privacy Policy
+Last Updated: 2026-10-08
+
+Welcome to WITHME24.
+This Privacy Policy describes how WITHME24 ("we", "our", or "us") collects, uses, shares, and protects your personal information when you use our application, website, and related services (collectively, the "Platform").
+
+By accessing or using WITHME24, you consent to the practices described in this Privacy Policy.
+
+1. Information We Collect
+We collect information you provide directly to us, as well as information collected automatically when you use our Platform:
+- Account & Profile Information: Name, mobile number, email address, profile photo, age, location, gender, bio, and activity/experience preferences.
+- Identity Verification Data: Biometric data and identification documents strictly for KYC (Know Your Customer) and safety verification.
+- Experience & Booking Details: Experience preferences, booking history, scheduled dates/times, and interaction with hosts/partners.
+- Communication Data: Messages, customer support inquiries, feedback, and reports submitted through the Platform.
+- Device & Usage Information: IP address, device type, operating system, app version, unique device identifiers, and usage logs.
+
+2. How We Use Your Information
+We use the information we collect for the following purposes:
+- To create, manage, and verify your account.
+- To facilitate experience discovery, host matching, and booking requests.
+- To perform identity verification and KYC checks to ensure platform safety and security.
+- To communicate with you regarding booking updates, service notifications, and support inquiries.
+- To personalize activity and host recommendations based on your preferences.
+- To detect, prevent, and address fraud, safety incidents, and policy violations.
+- To comply with legal obligations and enforce our Terms & Conditions.
+
+3. Information Sharing and Disclosure
+We respect your privacy and do not sell your personal data. We may share your information under the following circumstances:
+- With Hosts/Partners: Basic profile details (such as name and photo) necessary to facilitate confirmed experience bookings.
+- Service Providers: Trusted third-party vendors who perform services on our behalf (e.g., cloud hosting, payment gateways, SMS delivery, analytics, and identity verification services).
+- Legal & Safety Requirements: When required by law, subpoena, or legal process, or to protect the safety, rights, or property of WITHME24, our users, or the public.
+- Business Transfers: In connection with any merger, sale of company assets, financing, or acquisition of all or a portion of our business.
+
+4. Data Security & Retention
+We implement industry-standard administrative, technical, and physical security measures to protect your personal information against unauthorized access, loss, misuse, or alteration.
+We retain your personal information for as long as your account is active or as needed to provide services, resolve disputes, and comply with legal requirements.
+
+5. Child Safety & Minimum Age
+WITHME24 is strictly intended for users who are 18 years of age or older. We do not knowingly collect or solicit personal information from children under 18. If we learn that we have collected personal data from a child under 18, we will promptly delete that information and terminate the account.
+
+6. Your Rights and Choices
+Subject to applicable laws, you have the right to:
+- Access and update your profile information through the app settings.
+- Request deletion of your account and personal data.
+- Opt out of non-essential communications.
+
+7. Changes to This Privacy Policy
+We may update this Privacy Policy from time to time. Updated versions will be posted on the Platform with a revised "Last Updated" date. Continued use of WITHME24 after changes become effective constitutes acceptance of the revised policy.
+
+8. Contact Us
+If you have any questions, concerns, or requests regarding this Privacy Policy, please contact us at:
+WITHME24
+Email: officalwithme24@withme24.com
+Website: www.withme24.com
+Address: WITHME24
