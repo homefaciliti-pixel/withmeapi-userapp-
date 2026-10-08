@@ -48,12 +48,196 @@ router.post('/help-support', authenticateToken, (req, res) => {
 
 // 2. Terms & Conditions API — GET
 router.get('/terms-and-conditions', (req, res) => {
+  const termsText = `WITHME24 — Terms & Conditions
+Last Updated: 2026-10-08
+
+Welcome to WITHME24.
+These Terms & Conditions ("Terms") govern your access to and use of the WITHME24 application and related services.
+By creating an account or using WITHME24, you agree to these Terms.
+If you do not agree with these Terms, please do not use the Platform.
+
+1. About WITHME24
+WITHME24 is an experience-based platform that allows users to discover hosts and experiences, view experience information, select available dates and times, and make bookings.
+Hosts/partners may list and provide experiences through the Platform.
+WITHME24 may provide the technology platform connecting users and hosts.
+
+2. Eligibility
+You must meet the minimum age requirement applicable to the Platform.
+If WITHME24 is 18+:
+You must be at least 18 years old to create an account or use WITHME24.
+You are responsible for providing accurate information about your age and identity.
+
+3. Account Registration
+When creating an account, you agree to:
+- Provide accurate information
+- Provide a valid mobile number/email where required
+- Keep your account information updated
+- Protect your login credentials
+- Not share your account with another person
+- Not impersonate another person
+You are responsible for activity conducted through your account.
+
+4. Profile Information
+Users and hosts may create profiles containing information such as:
+- Name
+- Photograph
+- Age
+- Location
+- Bio
+- Interests
+- Experience information
+You agree that information you provide must be accurate and must not intentionally mislead other users.
+
+5. Host and Experience Listings
+Hosts may provide information about their experiences, including:
+- Experience title
+- Description
+- Location
+- Date/time availability
+- Pricing, where applicable
+- Participant limits
+- Other relevant information
+Hosts are responsible for ensuring that their listings are accurate and lawful.
+WITHME24 may remove or restrict listings that violate these Terms or applicable law.
+
+6. Booking Process
+The general booking flow may include:
+Host/Event → Experience Details → Date/Time → Location → Participants → Booking → Payment → Confirmation
+Availability and booking confirmation may depend on the information displayed at the time of booking.
+Users should review booking information before confirming a booking.
+
+7. Payment
+Where payments are enabled, users may be required to pay the applicable amount shown during the booking process.
+Payment status may be displayed in the application.
+If the current version uses a mock/static payment system:
+The current version of WITHME24 may display a mock/static payment flow for testing purposes. Such mock transactions do not represent actual payments or financial transactions.
+For future real payments, separate payment, refund, cancellation, and transaction terms should be added before enabling live payments.
+
+8. Cancellation and Refunds
+Cancellation and refund eligibility, where applicable, will depend on the booking terms displayed at the time of booking.
+WITHME24 may establish specific cancellation/refund rules for different experiences.
+Any applicable refund will be processed according to the applicable policy and payment provider rules.
+
+9. User Conduct
+You agree not to:
+- Harass, threaten, abuse, or intimidate others
+- Create fake accounts
+- Impersonate another person
+- Provide fraudulent information
+- Scam or defraud another user
+- Upload illegal content
+- Attempt unauthorized access to the Platform
+- Misuse another user's personal information
+- Circumvent Platform security
+- Use the Platform for unlawful purposes
+
+10. Strictly Prohibited Activities
+WITHME24 strictly prohibits using the Platform to facilitate or promote:
+- Human trafficking
+- Child exploitation
+- Sexual exploitation
+- Prostitution or sexual services
+- Forced labor
+- Criminal activities
+- Illegal services
+- Fraud or scams
+- Sale or distribution of illegal goods
+- Threats or violence
+- Other activities prohibited under applicable law
+Any account involved in such activities may be immediately suspended or terminated.
+Where required by law, information may be provided to appropriate authorities.
+
+11. Safety
+Users are responsible for exercising reasonable judgment when interacting with other users or attending an experience.
+Users should:
+- Meet at appropriate/public locations where appropriate
+- Follow applicable safety instructions
+- Avoid sharing unnecessary sensitive information
+- Report suspicious or unsafe behavior
+- Contact appropriate emergency services in an emergency
+WITHME24 should not be represented as a replacement for emergency services or law enforcement.
+
+12. Reporting and Blocking
+Where these features are available, users may report or block other users or content that violates these Terms.
+Reports may be reviewed and appropriate action may include:
+- Content removal
+- Account restrictions
+- Account suspension
+- Account termination
+- Referral to appropriate authorities where legally required
+
+13. Intellectual Property
+The WITHME24 name, logo, software, design, graphics, trademarks, and other platform materials are owned by or licensed to WITHME24 unless otherwise stated.
+You may not copy, reproduce, modify, distribute, or commercially exploit these materials without authorization.
+
+14. User Content
+You retain responsibility for content you submit to WITHME24.
+By submitting content, you confirm that:
+- You have the necessary rights to submit it.
+- It does not violate applicable law.
+- It does not infringe another person's rights.
+- It does not contain prohibited or abusive material.
+You grant WITHME24 the limited rights necessary to host, display, process, and provide the content as part of the Platform.
+
+15. Privacy
+Your use of WITHME24 is also governed by our Privacy Policy.
+The Privacy Policy explains how we collect and process personal information.
+
+16. Account Suspension and Termination
+WITHME24 may suspend, restrict, or terminate an account if:
+- The user violates these Terms.
+- The user provides false information.
+- The user engages in fraudulent activity.
+- The user creates a safety risk.
+- The user uses the Platform for illegal activity.
+- The user abuses another user.
+- Required by law or legitimate legal process.
+Users may also request account deletion according to the applicable account deletion process.
+
+17. Availability of the Platform
+We aim to keep WITHME24 available and functional, but we do not guarantee uninterrupted availability.
+The Platform may occasionally be unavailable because of:
+- Maintenance
+- Updates
+- Technical issues
+- Network problems
+- Third-party service failures
+- Security incidents
+- Events outside our reasonable control
+
+18. Third-Party Services
+WITHME24 may integrate third-party services such as payment providers, hosting providers, analytics services, maps, notifications, or authentication services.
+Third-party services may have their own terms and privacy policies.
+
+19. Limitation of Liability
+To the extent permitted by applicable law, WITHME24 will not be responsible for losses resulting from circumstances beyond our reasonable control or from a user's violation of these Terms.
+Nothing in these Terms is intended to exclude liability that cannot legally be excluded under applicable law.
+
+20. Changes to These Terms
+We may update these Terms from time to time.
+Updated Terms will be published through the Platform or our website.
+Your continued use of WITHME24 after updated Terms become effective means that you accept the updated Terms, subject to applicable law.
+
+21. Governing Law
+These Terms shall be governed by the applicable laws of India.
+Any disputes shall be subject to the jurisdiction of the courts having appropriate jurisdiction, subject to applicable law.
+
+22. Contact Us
+WITHME24
+Email: officalwithme24@withme24.com
+Website: https://withme24.com
+Address: WITHME24`;
+
   return res.status(200).json({
     success: true,
     data: {
-      title: 'General Terms & Conditions',
-      last_updated: '2026-01-01',
-      content: 'By using WitMe App, you agree to our user safety policies, accurate profile information standard, and community engagement rules.'
+      title: 'WITHME24 — Terms & Conditions',
+      app_name: 'WITHME24',
+      last_updated: '2026-10-08',
+      version: '1.0',
+      support_email: 'officalwithme24@withme24.com',
+      website: 'https://withme24.com',
+      content: termsText
     }
   });
 });

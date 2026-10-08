@@ -177,6 +177,16 @@ const serveApiDocumentation = (req, res) => {
   return res.status(404).send('Documentation file not found.');
 };
 
+// Terms & Conditions Serve Endpoints
+const serveTermsAndConditions = (req, res) => {
+  const termsPath = path.join(__dirname, 'TERMS_AND_CONDITIONS.txt');
+  if (fs.existsSync(termsPath)) {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.sendFile(termsPath);
+  }
+  return res.status(404).send('Terms & Conditions file not found.');
+};
+
 app.get('/API_DOCUMENTATION.txt', serveApiDocumentation);
 app.get('/api_documentation.txt', serveApiDocumentation);
 app.get('/API_DOCUMENTATION', serveApiDocumentation);
@@ -187,6 +197,14 @@ app.get('/docs', serveApiDocumentation);
 app.get('/txt', serveApiDocumentation);
 app.get('/api/v1/documentation', serveApiDocumentation);
 app.get('/api/v1/docs', serveApiDocumentation);
+
+app.get('/TERMS_AND_CONDITIONS.txt', serveTermsAndConditions);
+app.get('/terms-and-conditions.txt', serveTermsAndConditions);
+app.get('/terms_and_conditions.txt', serveTermsAndConditions);
+app.get('/terms.txt', serveTermsAndConditions);
+app.get('/terms-of-service.txt', serveTermsAndConditions);
+app.get('/terms', serveTermsAndConditions);
+app.get('/api/v1/terms.txt', serveTermsAndConditions);
 
 // Health Check Endpoint
 app.get('/', (req, res) => {
