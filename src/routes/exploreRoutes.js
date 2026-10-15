@@ -31,6 +31,13 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
   }
   photo = photo.trim();
 
+  // Return null for generic/placeholder filenames that are the same for all partners
+  const genericNames = ['photo_1.jpg', 'photo_1.jpeg', 'photo_1.png', 'priya.jpg', 'default.jpg', 'placeholder.jpg', 'avatar.jpg', 'user.jpg', 'no_image.jpg', 'no-image.jpg'];
+  const fileName = photo.split('/').pop().toLowerCase();
+  if (genericNames.includes(fileName)) {
+    return null;
+  }
+
   if (photo.startsWith('http://') || photo.startsWith('https://')) {
     if (photo.includes('localhost') || photo.includes('127.0.0.1') || photo.includes('10.0.2.2')) {
       const urlPath = photo.substring(photo.indexOf('/', photo.indexOf('://') + 3));
