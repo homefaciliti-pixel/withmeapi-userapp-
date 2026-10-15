@@ -93,6 +93,32 @@ const handlePaymentInitiate = async (req, res) => {
   const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 1;
   const amountInPaise = Math.round(numericAmount * 100);
 
+  // Check if request is accepted by partner before allowing payment
+  try {
+    const existingRequests = await query(
+      `SELECT status, is_accepted FROM withme_partner_requests WHERE booking_id = ? OR id = ? OR request_id = ? ORDER BY id DESC LIMIT 1`,
+      [booking_id, booking_id, booking_id]
+    ).catch(() => []);
+
+    if (existingRequests && existingRequests.length > 0) {
+      const reqRecord = existingRequests[0];
+      const isAccepted = reqRecord.is_accepted === 1 || reqRecord.is_accepted === true || ['accepted', 'approved', 'confirmed'].includes(String(reqRecord.status || '').toLowerCase());
+      const isAlreadyPaid = String(reqRecord.status || '').toLowerCase() === 'paid';
+
+      if (!isAccepted && !isAlreadyPaid) {
+        return res.status(403).json({
+          success: false,
+          is_accepted: false,
+          can_pay: false,
+          status: 'PENDING',
+          message: 'Partner has not accepted your request yet. Payment screen will only open after the partner accepts your request.'
+        });
+      }
+    }
+  } catch (chkErr) {
+    // Continue if DB check fails
+  }
+
   // Try creating official order from Razorpay server if live secret is available
   const liveOrder = await createRazorpayLiveOrder(amountInPaise, currency, booking_id, razorpayKey, razorpaySecret);
 
@@ -292,6 +318,30 @@ const handleCheckout = async (req, res) => {
 
   const numericPrice = typeof price === 'number' ? price : parseFloat(price) || 299;
   const amountInPaise = Math.round(numericPrice * 100);
+
+  // Check if partner accepted the request before checkout
+  try {
+    const existingRequests = await query(
+      `SELECT status, is_accepted FROM withme_partner_requests WHERE booking_id = ? OR id = ? OR request_id = ? ORDER BY id DESC LIMIT 1`,
+      [booking_id, booking_id, booking_id]
+    ).catch(() => []);
+
+    if (existingRequests && existingRequests.length > 0) {
+      const reqRecord = existingRequests[0];
+      const isAccepted = reqRecord.is_accepted === 1 || reqRecord.is_accepted === true || ['accepted', 'approved', 'confirmed'].includes(String(reqRecord.status || '').toLowerCase());
+      const isAlreadyPaid = String(reqRecord.status || '').toLowerCase() === 'paid';
+
+      if (!isAccepted && !isAlreadyPaid) {
+        return res.status(403).json({
+          success: false,
+          is_accepted: false,
+          can_pay: false,
+          status: 'PENDING',
+          message: 'Partner has not accepted your request yet. Checkout will be enabled once partner accepts.'
+        });
+      }
+    }
+  } catch (chkErr) {}
 
   const liveOrder = await createRazorpayLiveOrder(amountInPaise, currency, booking_id, razorpayKey, razorpaySecret);
   const orderId = liveOrder && liveOrder.id ? liveOrder.id : generateRazorpayId('order');
