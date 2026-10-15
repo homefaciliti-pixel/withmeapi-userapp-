@@ -22,17 +22,21 @@ const getPartnerApiUrl = () => {
 
 const syncBookingToPartnerApp = async (bookingPayload) => {
   const partnerUrls = [
-    getPartnerApiUrl(),
+    process.env.PARTNER_API_URL,
+    'https://withmepartner.onrender.com',
+    'https://withme-partnerapi.onrender.com',
+    'https://withmepartnerapi.onrender.com',
     'http://localhost:5000',
     'http://localhost:5001'
-  ];
+  ].filter(Boolean);
 
   for (const baseUrl of partnerUrls) {
     try {
       const response = await fetch(`${baseUrl}/partner/incoming-booking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookingPayload)
+        body: JSON.stringify(bookingPayload),
+        signal: AbortSignal.timeout(3500)
       });
       if (response.ok) {
         console.log(`[Partner Booking Sync] Successfully forwarded booking ${bookingPayload.booking_id} to Partner App at ${baseUrl}`);

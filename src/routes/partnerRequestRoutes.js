@@ -31,17 +31,21 @@ const getPartnerApiUrl = () => {
 // Helper to push real-time incoming request to Partner App API
 const syncRequestToPartnerApp = async (requestPayload) => {
   const partnerUrls = [
-    getPartnerApiUrl(),
+    process.env.PARTNER_API_URL,
+    'https://withmepartner.onrender.com',
+    'https://withme-partnerapi.onrender.com',
+    'https://withmepartnerapi.onrender.com',
     'http://localhost:5000',
     'http://localhost:5001'
-  ];
+  ].filter(Boolean);
 
   for (const baseUrl of partnerUrls) {
     try {
       const response = await fetch(`${baseUrl}/partner/incoming-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestPayload)
+        body: JSON.stringify(requestPayload),
+        signal: AbortSignal.timeout(3500)
       });
       if (response.ok) {
         console.log(`[Partner Sync] Successfully forwarded request ${requestPayload.request_id} to Partner App at ${baseUrl}`);
@@ -181,20 +185,22 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
           is_approved: true,
           approval_status: 'approved',
           interests: [partnerCategory, 'Travel'],
-          status: 'approved',
-          is_accepted: true,
-          request_accepted: true,
-          is_request_accepted: true,
-          accepted: true,
-          request_status: 'accepted',
-          is_paid: true,
-          isPaid: true,
-          payment_status: 'COMPLETED',
-          paymentStatus: 'COMPLETED',
-          is_payment_completed: true,
-          payment_id: `pay_${pId}_${effectiveBookingId}`,
-          paymentId: `pay_${pId}_${effectiveBookingId}`,
-          payment_status_text: 'Paid'
+          status: 'pending',
+          is_accepted: false,
+          request_accepted: false,
+          is_request_accepted: false,
+          accepted: false,
+          can_pay: false,
+          is_payment_allowed: false,
+          request_status: 'pending',
+          is_paid: false,
+          isPaid: false,
+          payment_status: 'PENDING',
+          paymentStatus: 'PENDING',
+          is_payment_completed: false,
+          payment_id: null,
+          paymentId: null,
+          payment_status_text: 'Pending'
         };
       });
     }
@@ -231,20 +237,22 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
       is_approved: true,
       approval_status: 'approved',
       interests: [p.category || 'Coffee', 'Travel'],
-      status: 'approved',
-      is_accepted: true,
-      request_accepted: true,
-      is_request_accepted: true,
-      accepted: true,
-      request_status: 'accepted',
-      is_paid: true,
-      isPaid: true,
-      payment_status: 'COMPLETED',
-      paymentStatus: 'COMPLETED',
-      is_payment_completed: true,
-      payment_id: `pay_${pId}_${effectiveBookingId}`,
-      paymentId: `pay_${pId}_${effectiveBookingId}`,
-      payment_status_text: 'Paid'
+      status: 'pending',
+      is_accepted: false,
+      request_accepted: false,
+      is_request_accepted: false,
+      accepted: false,
+      can_pay: false,
+      is_payment_allowed: false,
+      request_status: 'pending',
+      is_paid: false,
+      isPaid: false,
+      payment_status: 'PENDING',
+      paymentStatus: 'PENDING',
+      is_payment_completed: false,
+      payment_id: null,
+      paymentId: null,
+      payment_status_text: 'Pending'
     };
   });
 
@@ -340,17 +348,22 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
       is_approved: true,
       approval_status: 'approved',
       interests: ['Coffee', 'Travel'],
-      status: 'approved',
-      is_accepted: true,
-      request_accepted: true,
-      is_request_accepted: true,
-      accepted: true,
-      request_status: 'accepted',
-      is_paid: true,
-      payment_status: 'COMPLETED',
-      is_payment_completed: true,
-      payment_id: `pay_101_${effectiveBookingId}`,
-      payment_status_text: 'Paid'
+      status: 'pending',
+      is_accepted: false,
+      request_accepted: false,
+      is_request_accepted: false,
+      accepted: false,
+      can_pay: false,
+      is_payment_allowed: false,
+      request_status: 'pending',
+      is_paid: false,
+      isPaid: false,
+      payment_status: 'PENDING',
+      paymentStatus: 'PENDING',
+      is_payment_completed: false,
+      payment_id: null,
+      paymentId: null,
+      payment_status_text: 'Pending'
     },
     {
       id: 102,
@@ -857,12 +870,19 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
       is_verified: true,
       is_approved: true,
       approval_status: 'approved',
-      status: 'approved',
-      is_accepted: true,
-      request_accepted: true,
-      is_request_accepted: true,
-      accepted: true,
-      request_status: 'accepted',
+      status: 'pending',
+      is_accepted: false,
+      request_accepted: false,
+      is_request_accepted: false,
+      accepted: false,
+      can_pay: false,
+      is_payment_allowed: false,
+      request_status: 'pending',
+      is_paid: false,
+      isPaid: false,
+      payment_status: 'PENDING',
+      paymentStatus: 'PENDING',
+      is_payment_completed: false,
       profile_image: `${baseUrl}/uploads/priya.jpg`,
       image: `${baseUrl}/uploads/priya.jpg`,
       avatar: `${baseUrl}/uploads/priya.jpg`,
