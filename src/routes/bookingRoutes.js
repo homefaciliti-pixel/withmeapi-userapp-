@@ -126,8 +126,8 @@ const handleCreateBooking = async (req, res) => {
       `INSERT INTO withme_partner_bookings (
         booking_id, user_id, partner_id, customer_name, customer_phone, activity,
         date, time, duration, location, price, currency, payment_status, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'PAID', 'CONFIRMED', NOW())
-      ON DUPLICATE KEY UPDATE status = 'CONFIRMED', updated_at = NOW()`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'PENDING', 'PENDING', NOW())
+      ON DUPLICATE KEY UPDATE status = 'PENDING', updated_at = NOW()`,
       [bookingId, userId, effectivePartnerId, userName, userPhone, activity, date, time, newBooking.duration, locationStr, price]
     );
     // Backward compatibility mirror
@@ -135,8 +135,8 @@ const handleCreateBooking = async (req, res) => {
       `INSERT INTO partner_bookings (
         booking_id, user_id, user_name, user_phone, partner_id, activity,
         date, time, location, price, currency, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'Upcoming', NOW())
-      ON DUPLICATE KEY UPDATE status = 'Upcoming', updated_at = NOW()`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'Pending', NOW())
+      ON DUPLICATE KEY UPDATE status = 'Pending', updated_at = NOW()`,
       [bookingId, userId, userName, userPhone, effectivePartnerId, activity, date, time, locationStr, price]
     ).catch(() => {});
     console.log(`[Database] Booking ${bookingId} saved to MySQL withme_partner_bookings table.`);

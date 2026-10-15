@@ -1211,13 +1211,6 @@ const handlePartnerList = async (req, res) => {
         reqRows = await query('SELECT * FROM partner_requests WHERE sender_id = ? ORDER BY created_at DESC LIMIT 50', [userId]).catch(() => []);
       }
     }
-    // Also fetch all partner requests if none found for this user
-    if (!reqRows || reqRows.length === 0) {
-      reqRows = await query('SELECT * FROM withme_partner_requests ORDER BY id DESC LIMIT 50').catch(() => []);
-    }
-    if (!reqRows || reqRows.length === 0) {
-      reqRows = await query('SELECT * FROM partner_requests ORDER BY created_at DESC LIMIT 50').catch(() => []);
-    }
 
     if (reqRows && reqRows.length > 0) {
       realRequests = reqRows.map(r => {
@@ -1446,16 +1439,35 @@ const handlePartnerList = async (req, res) => {
     });
   } catch (e) {}
 
-  // Merge real requests, memory payments, bookings, and approved partners while preventing duplicates
+  // Only return real requests made by the user
+  // If user has actual requests, show them
+  // Do NOT inject old dummy memory payments or auto-create paid requests for every partner!
   const finalMap = new Map();
-  memoryPayments.forEach(item => finalMap.set(String(item.id || item.payment_id), item));
   realRequests.forEach(item => finalMap.set(String(item.id || item.request_id), item));
-  bookingRequests.forEach(item => finalMap.set(String(item.id || item.booking_id), item));
-  approvedPartners.forEach(item => {
-    if (!finalMap.has(String(item.id)) && !finalMap.has(String(item.request_id))) {
-      finalMap.set(String(item.id), item);
-    }
-  });
+
+  // If no requests were sent yet, return approved partners as clean profiles (NOT paid, NOT accepted)
+  if (finalMap.size === 0) {
+    approvedPartners.forEach(item => {
+      finalMap.set(String(item.id), {
+        ...item,
+        is_accepted: false,
+        request_accepted: false,
+        is_request_accepted: false,
+        accepted: false,
+        can_pay: false,
+        is_payment_allowed: false,
+        is_paid: false,
+        isPaid: false,
+        payment_status: 'PENDING',
+        paymentStatus: 'PENDING',
+        is_payment_completed: false,
+        payment_id: null,
+        paymentId: null,
+        payment_status_text: 'Pending',
+        status: 'pending'
+      });
+    });
+  }
 
   const combinedList = Array.from(finalMap.values());
 
