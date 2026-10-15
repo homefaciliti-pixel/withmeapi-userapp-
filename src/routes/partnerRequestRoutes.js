@@ -55,18 +55,21 @@ const syncRequestToPartnerApp = async (requestPayload) => {
 };
 
 // Helper to format partner image
+// Returns null if no real image found — prevents all partners showing same fallback photo
 const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com') => {
   if (!photo || photo === '' || photo === 'null' || photo === 'undefined') {
-    return `${baseUrl}/uploads/priya.jpg`;
+    return null;
   }
   if (Array.isArray(photo)) {
-    photo = photo.find(p => p && typeof p === 'string' && p.trim() !== '') || photo[0];
+    photo = photo.find(p => p && typeof p === 'string' && p.trim() !== '' && p !== 'null' && p !== 'undefined') || null;
+    if (!photo) return null;
   }
   if (typeof photo === 'object' && photo !== null) {
-    photo = photo.url || photo.uri || photo.path || photo.profile_image || photo.image || photo.profile_photo_url;
+    photo = photo.url || photo.uri || photo.path || photo.profile_image || photo.image || photo.profile_photo_url || null;
+    if (!photo) return null;
   }
   if (typeof photo !== 'string' || !photo.trim()) {
-    return `${baseUrl}/uploads/priya.jpg`;
+    return null;
   }
   photo = photo.trim();
 
