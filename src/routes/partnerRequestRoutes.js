@@ -675,21 +675,55 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
       const dateVal = reqData.date || currentDateStr;
       const timeSlotStr = `${timeVal} - 07:00 PM`;
       const priceVal = reqData.price !== undefined && reqData.price !== null ? parseFloat(reqData.price) : 1;
-      const photoUrl = formatPartnerPhoto(reqData.sender_avatar, baseUrl);
+
+      const pId = reqData.partner_id || reqData.receiver_id || 101;
+      let resolvedPartnerName = (reqData.partner_name && reqData.partner_name !== reqData.sender_name) ? reqData.partner_name : '';
+      let partnerPhoto = reqData.partner_avatar || null;
+      let partnerCity = 'Jaipur';
+      let partnerGender = 'Female';
+      let partnerAge = 24;
+      let partnerAbout = 'Friendly partner available for meetups.';
+
+      try {
+        const pRows = await query(
+          'SELECT name, full_name, profile_photo_url, image, city, gender, age, about FROM withme_partners WHERE partner_id = ? OR id = ? OR user_id = ? LIMIT 1',
+          [String(pId), String(pId), String(pId)]
+        ).catch(() => []);
+        if (pRows && pRows.length > 0) {
+          if (!resolvedPartnerName) resolvedPartnerName = pRows[0].full_name || pRows[0].name;
+          if (!partnerPhoto) partnerPhoto = pRows[0].profile_photo_url || pRows[0].image;
+          if (pRows[0].city) partnerCity = pRows[0].city;
+          if (pRows[0].gender) partnerGender = pRows[0].gender;
+          if (pRows[0].age) partnerAge = pRows[0].age;
+          if (pRows[0].about) partnerAbout = pRows[0].about;
+        }
+      } catch (e) {}
+
+      if (!resolvedPartnerName) resolvedPartnerName = 'Partner';
+      const partnerPhotoUrl = formatPartnerPhoto(partnerPhoto, baseUrl);
+      const userPhotoUrl = formatPartnerPhoto(reqData.sender_avatar, baseUrl);
+
+      const isPaid = String(reqData.status || '').toLowerCase() === 'paid' || reqData.is_paid === 1;
+      const isAccepted = reqData.is_accepted === 1 || isPaid || ['accepted', 'approved', 'confirmed'].includes(String(reqData.status || '').toLowerCase());
 
       return {
         id: reqData.id || targetId,
         request_id: reqData.request_id || targetId,
         booking_id: reqData.booking_id || effectiveBookingId,
         user_id: reqData.user_id || reqData.sender_id || 'usr_203',
-        partner_id: reqData.partner_id || reqData.receiver_id || 101,
-        name: reqData.sender_name || 'Priya Sharma',
-        full_name: reqData.sender_name || 'Priya Sharma',
-        age: 24,
-        gender: 'Female',
-        city: 'Jaipur',
+        partner_id: pId,
+        partner_user_id: pId,
+        partnerUserId: pId,
+        partner_name: resolvedPartnerName,
+        name: resolvedPartnerName,
+        full_name: resolvedPartnerName,
+        customer_name: reqData.sender_name || 'User',
+        user_name: reqData.sender_name || 'User',
+        age: partnerAge,
+        gender: partnerGender,
+        city: partnerCity,
         location: {
-          city: 'Jaipur',
+          city: partnerCity,
           state: 'Rajasthan',
           country: 'India',
           address: meetupLoc
@@ -716,29 +750,40 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
         date: dateVal,
         booking_date: dateVal,
         date_time: reqData.date && reqData.time ? `${reqData.date} ${reqData.time}` : `${dateVal} ${timeVal}`,
-        about: 'Friendly partner available for meetups.',
+        about: partnerAbout,
         is_verified: true,
         is_approved: true,
         approval_status: 'approved',
-        status: (reqData.status || 'APPROVED').toLowerCase(),
-        is_accepted: true,
-        request_accepted: true,
-        is_request_accepted: true,
-        accepted: true,
-        request_status: (reqData.status || 'APPROVED').toLowerCase(),
-        profile_image: photoUrl,
-        image: photoUrl,
-        avatar: photoUrl,
-        profile_images: [photoUrl],
-        photos: [photoUrl],
+        status: (reqData.status || 'PENDING').toLowerCase(),
+        is_accepted: isAccepted,
+        request_accepted: isAccepted,
+        is_request_accepted: isAccepted,
+        accepted: isAccepted,
+        can_pay: isAccepted && !isPaid,
+        is_payment_allowed: isAccepted && !isPaid,
+        request_status: (reqData.status || 'PENDING').toLowerCase(),
+        is_paid: isPaid,
+        isPaid: isPaid,
+        payment_status: isPaid ? 'COMPLETED' : 'PENDING',
+        paymentStatus: isPaid ? 'COMPLETED' : 'PENDING',
+        is_payment_completed: isPaid,
+        payment_id: reqData.payment_id || `pay_${pId}_${reqData.booking_id || effectiveBookingId}`,
+        paymentId: reqData.payment_id || `pay_${pId}_${reqData.booking_id || effectiveBookingId}`,
+        payment_status_text: isPaid ? 'Paid' : 'Pending',
+        profile_image: partnerPhotoUrl,
+        image: partnerPhotoUrl,
+        avatar: partnerPhotoUrl,
+        profile_images: [partnerPhotoUrl],
+        photos: [partnerPhotoUrl],
         interests: [categoryName, 'Travel', 'Music'],
         available_for: [
           { name: categoryName, icon: 'coffee', price: priceVal, currency: 'INR' }
         ],
         sender: {
           user_id: reqData.user_id || reqData.sender_id || 'usr_998877',
-          name: reqData.sender_name || 'Amit',
-          avatar: photoUrl
+          name: reqData.sender_name || 'User',
+          avatar: userPhotoUrl,
+          profile_image: userPhotoUrl
         },
         message: reqData.message || 'Hello, I want to connect for a meetup!',
         created_at: reqData.created_at || new Date().toISOString(),
@@ -1126,8 +1171,11 @@ const handlePartnerRequestDetails = async (req, res) => {
 
   const paymentId = String(details.payment_id || details.paymentId || `pay_${details.id || details.request_id || '101'}_${requestedBookingId}`);
   const partnerUserId = String(details.partner_user_id || details.partnerUserId || details.partner_id || details.user_id || 'usr_101');
-  const isPaid = details.is_paid !== undefined ? Boolean(details.is_paid) : (details.isPaid !== undefined ? Boolean(details.isPaid) : true);
-  const paymentStatus = String(details.payment_status || details.paymentStatus || 'COMPLETED');
+  const isPaid = details.is_paid !== undefined ? Boolean(details.is_paid) : (details.isPaid !== undefined ? Boolean(details.isPaid) : false);
+  const paymentStatus = String(details.payment_status || details.paymentStatus || (isPaid ? 'COMPLETED' : 'PENDING'));
+
+  const partnerName = details.partner_name || details.name || 'Partner';
+  const customerName = details.customer_name || details.user_name || (details.sender && details.sender.name) || 'User';
 
   return res.status(200).json({
     success: true,
@@ -1147,12 +1195,16 @@ const handlePartnerRequestDetails = async (req, res) => {
     isPaid: isPaid,
     payment_status: paymentStatus,
     paymentStatus: paymentStatus,
-    is_payment_completed: details.is_payment_completed !== undefined ? details.is_payment_completed : true,
+    is_payment_completed: isPaid,
     payment_id: paymentId,
     paymentId: paymentId,
-    payment_status_text: details.payment_status_text || 'Paid',
-    name: details.name,
-    full_name: details.full_name,
+    payment_status_text: details.payment_status_text || (isPaid ? 'Paid' : 'Pending'),
+    partner_name: partnerName,
+    name: partnerName,
+    full_name: partnerName,
+    customer_name: customerName,
+    user_name: customerName,
+    sender_name: customerName,
     age: details.age,
     gender: details.gender,
     rating: details.rating,
