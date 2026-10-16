@@ -73,11 +73,15 @@ function formatISTDateTime(dateInput) {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const formattedDate = `${day} ${monthNames[istDate.getUTCMonth()]} ${year}`;
 
+  const isoUTC = dateObj.toISOString();
   const isoIST = `${year}-${month}-${day}T${hours.toString().padStart(2, '0')}:${minutes}:${seconds}+05:30`;
 
   return {
-    iso: isoIST,
+    iso: isoUTC,
+    iso_utc: isoUTC,
+    iso_ist: isoIST,
     time: time12,
+    formatted_time: time12,
     time12: time12,
     time24: time24,
     date: formattedDate,
@@ -385,7 +389,7 @@ async function getUserConversations(authenticatedUserId, req, isUserOnlineFn) {
 
     try {
       const rows = await query(
-        `SELECT * FROM messages WHERE conversation_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1`,
+        `SELECT * FROM messages WHERE conversation_id = ? AND is_deleted = 0 ORDER BY id DESC LIMIT 1`,
         [cId]
       );
       if (rows && rows.length > 0) {
@@ -402,7 +406,7 @@ async function getUserConversations(authenticatedUserId, req, isUserOnlineFn) {
     if (!lastMsg) {
       const memMsgs = Array.from(memoryMessages.values())
         .filter(m => m.conversation_id === cId && !m.is_deleted)
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        .sort((a, b) => (b.id || 0) - (a.id || 0));
       if (memMsgs.length > 0) {
         lastMsg = {
           message: memMsgs[0].message,
@@ -464,12 +468,17 @@ async function getUserConversations(authenticatedUserId, req, isUserOnlineFn) {
       message: lastMsg ? lastMsg.message : "No messages yet",
       lastMessageTime: lastMsgFormatted.iso,
       last_message_time: lastMsgFormatted.iso,
+      lastMessageTimeFormatted: lastMsgFormatted.time,
+      last_message_time_formatted: lastMsgFormatted.time,
+      createdAt: lastMsgFormatted.iso,
+      created_at: lastMsgFormatted.iso,
       time: lastMsgFormatted.time,
       formatted_time: lastMsgFormatted.time,
       time12: lastMsgFormatted.time12,
       time24: lastMsgFormatted.time24,
       timestamp: lastMsgFormatted.timestamp,
       date: lastMsgFormatted.date,
+      iso_ist: lastMsgFormatted.iso_ist,
       unreadCount,
       unread_count: unreadCount,
       isOnline: Boolean(isOnline),
@@ -480,7 +489,7 @@ async function getUserConversations(authenticatedUserId, req, isUserOnlineFn) {
     });
   }
 
-  conversationList.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+  conversationList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
   return {
     success: true,
@@ -553,6 +562,7 @@ async function getConversationMessages(conversationId, authenticatedUserId, isUs
       is_read: Boolean(r.is_read),
       createdAt: formatted.iso,
       created_at: formatted.iso,
+      iso_ist: formatted.iso_ist,
       time: formatted.time,
       formatted_time: formatted.time,
       time12: formatted.time12,
@@ -565,7 +575,7 @@ async function getConversationMessages(conversationId, authenticatedUserId, isUs
   let dbMessages = [];
   try {
     const rows = await query(
-      `SELECT * FROM messages WHERE conversation_id = ? AND is_deleted = 0 ORDER BY created_at ASC LIMIT 100`,
+      `SELECT * FROM messages WHERE conversation_id = ? AND is_deleted = 0 ORDER BY id ASC LIMIT 100`,
       [convId]
     );
     if (rows && rows.length > 0) {
@@ -583,7 +593,7 @@ async function getConversationMessages(conversationId, authenticatedUserId, isUs
   dbMessages.forEach(m => map.set(m.messageId, m));
   memMsgs.forEach(m => map.set(m.messageId, m));
 
-  const finalMessages = Array.from(map.values()).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const finalMessages = Array.from(map.values()).sort((a, b) => (a.id || 0) - (b.id || 0));
 
   return {
     success: true,
@@ -683,6 +693,7 @@ async function saveMessage({ conversationId, senderId, receiverId, message, mess
     is_read: false,
     createdAt: formatted.iso,
     created_at: formatted.iso,
+    iso_ist: formatted.iso_ist,
     time: formatted.time,
     formatted_time: formatted.time,
     time12: formatted.time12,

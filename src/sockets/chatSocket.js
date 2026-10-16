@@ -422,7 +422,11 @@ function initChatSocket(server) {
             last_message: savedMessage.message,
             lastMessageTime: savedMessage.createdAt,
             last_message_time: savedMessage.createdAt,
+            lastMessageTimeFormatted: savedMessage.time,
+            last_message_time_formatted: savedMessage.time,
             time: savedMessage.time,
+            formatted_time: savedMessage.time,
+            timestamp: savedMessage.timestamp,
             senderId: senderId,
             sender_id: senderId
           });
