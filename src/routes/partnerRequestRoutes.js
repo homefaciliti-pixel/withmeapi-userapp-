@@ -1536,45 +1536,39 @@ const handlePartnerList = async (req, res) => {
 
   const combinedList = Array.from(finalMap.values());
 
-  if (type === 'pending' || type === 'unapproved') {
-    return res.status(200).json({
-      success: true,
-      message: 'All pending partners have been approved',
-      booking_id: requestedBookingId,
-      data: {
-        booking_id: requestedBookingId,
-        partners: [],
-        pending_partners: [],
-        approved_partners: combinedList,
-        requests: []
-      },
-      partners: [],
-      pending_partners: [],
-      approved_partners: combinedList,
-      count: 0,
-      requests: []
-    });
+  const pathLower = (req.path || '').toLowerCase();
+  const isPendingFilter = type === 'pending' || type === 'unapproved' || pathLower.includes('pending');
+  const isApprovedFilter = type === 'approved' || type === 'paid' || type === 'completed' || pathLower.includes('approved');
+
+  const pendingItems = combinedList.filter(item => !item.is_paid && item.payment_status !== 'COMPLETED' && String(item.status).toLowerCase() !== 'paid');
+  const approvedPaidItems = combinedList.filter(item => item.is_paid || item.payment_status === 'COMPLETED' || String(item.status).toLowerCase() === 'paid');
+
+  let activeList = combinedList;
+  if (isPendingFilter) {
+    activeList = pendingItems;
+  } else if (isApprovedFilter) {
+    activeList = approvedPaidItems;
   }
 
   return res.status(200).json({
     success: true,
-    message: 'Approved partners and requests fetched successfully',
+    message: isPendingFilter ? 'Pending requests fetched successfully' : 'Partners and requests fetched successfully',
     booking_id: requestedBookingId,
     data: {
       booking_id: requestedBookingId,
-      partners: combinedList,
-      approved_partners: combinedList,
-      pending_partners: [],
-      requests: combinedList,
-      list: combinedList
+      partners: activeList,
+      approved_partners: approvedPaidItems,
+      pending_partners: pendingItems,
+      requests: activeList,
+      list: activeList
     },
-    partners: combinedList,
-    approved_partners: combinedList,
-    pending_partners: [],
-    count: combinedList.length,
-    requests: combinedList,
-    list: combinedList,
-    partner_requests: combinedList
+    partners: activeList,
+    approved_partners: approvedPaidItems,
+    pending_partners: pendingItems,
+    count: activeList.length,
+    requests: activeList,
+    list: activeList,
+    partner_requests: activeList
   });
 };
 
@@ -1628,6 +1622,35 @@ const handlePartnerAction = async (req, res) => {
 router.post('/action', authenticateToken, handlePartnerAction);
 router.post('/approve-all', authenticateToken, handlePartnerAction);
 router.post('/approve', authenticateToken, handlePartnerAction);
+
+// 3.1 Update Status Endpoint (used by Partner App when accepting/rejecting requests)
+router.post('/update-status', async (req, res) => {
+  const { request_id, booking_id, status = 'ACCEPTED', is_accepted = true } = req.body || {};
+  const bId = booking_id || request_id;
+  try {
+    await query(
+      `UPDATE withme_partner_requests
+       SET status = ?, is_accepted = ?, updated_at = NOW()
+       WHERE booking_id = ? OR id = ? OR request_id = ?`,
+      [status, is_accepted ? 1 : 0, bId, bId, bId]
+    );
+    await query(
+      `UPDATE withme_partner_bookings
+       SET status = ?, updated_at = NOW()
+       WHERE booking_id = ?`,
+      [status, bId]
+    ).catch(() => {});
+  } catch (e) {}
+
+  return res.status(200).json({
+    success: true,
+    message: `Request status updated to ${status}`,
+    request_id,
+    booking_id: bId,
+    status,
+    is_accepted
+  });
+});
 
 // 4. Register / Sync / Update Partner API — POST (/register-partner, /register, /sync-partner, /sync, /update-partner, /update)
 const handleRegisterPartner = async (req, res) => {

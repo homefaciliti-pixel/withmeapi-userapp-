@@ -205,48 +205,119 @@ const handlePaymentInitiate = async (req, res) => {
     console.warn('[Payment DB] Could not persist payment:', dbErr.message);
   }
 
-  // After payment: auto-create a partner request so it appears in Partner App
-  const requestId = `req_pay_${paymentId}`;
-  const userId = paymentData.user_id || '';
+  // 2. Update existing partner request and booking to PAID (do not create duplicate new ID!)
   const actName = activity || 'Coffee';
   const effectivePartnerId = String(partner_id || '');
   const senderName = userName;
   const senderPhone = userPhone;
   const senderAvatar = `${baseUrl}/uploads/profile.jpg`;
 
+  let activeRequestId = `req_${booking_id}`;
+
   try {
+    // Check if a request already exists for this booking
+    const existingReqs = await query(
+      `SELECT * FROM withme_partner_requests WHERE booking_id = ? OR id = ? OR request_id = ? LIMIT 1`,
+      [booking_id, booking_id, booking_id]
+    ).catch(() => []);
+
+    if (existingReqs && existingReqs.length > 0) {
+      activeRequestId = existingReqs[0].request_id || existingReqs[0].id || activeRequestId;
+      // UPDATE existing request to PAID (no new ID!)
+      await query(
+        `UPDATE withme_partner_requests
+         SET status = 'PAID', is_accepted = 1, is_paid = 1, payment_id = ?, updated_at = NOW()
+         WHERE booking_id = ? OR id = ? OR request_id = ?`,
+        [paymentId, booking_id, booking_id, booking_id]
+      );
+      // Backward compatibility mirror
+      query(
+        `UPDATE partner_requests
+         SET status = 'PAID', updated_at = NOW()
+         WHERE booking_id = ? OR id = ? OR request_id = ?`,
+        [booking_id, booking_id, booking_id]
+      ).catch(() => {});
+      console.log(`[Payment] Updated existing request ${activeRequestId} to PAID for booking ${booking_id}`);
+    } else {
+      // If no request exists yet, resolve actual partner name from DB before inserting
+      let resolvedPartnerName = partner_name || '';
+      try {
+        const pRows = await query(
+          `SELECT name, full_name FROM withme_partners WHERE partner_id = ? OR id = ? LIMIT 1`,
+          [effectivePartnerId, effectivePartnerId]
+        ).catch(() => []);
+        if (pRows && pRows.length > 0) {
+          resolvedPartnerName = pRows[0].full_name || pRows[0].name || resolvedPartnerName;
+        }
+      } catch (e) {}
+
+      await query(
+        `INSERT INTO withme_partner_requests
+          (id, request_id, booking_id, user_id, partner_id, partner_name, sender_name, sender_phone, sender_avatar,
+           activity, date, time, location, message, price, status, is_accepted, is_paid, payment_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), '06:00 PM', 'Jaipur', 'Payment done, please connect!', ?, 'PAID', 1, 1, ?, NOW())
+         ON DUPLICATE KEY UPDATE status='PAID', is_accepted=1, is_paid=1, payment_id=VALUES(payment_id), updated_at=NOW()`,
+        [
+          activeRequestId, activeRequestId, booking_id,
+          userId, effectivePartnerId, resolvedPartnerName, senderName, senderPhone, senderAvatar,
+          actName, numericAmount, paymentId
+        ]
+      ).catch(async () => {
+        await query(
+          `INSERT INTO withme_partner_requests
+            (id, request_id, booking_id, user_id, partner_id, sender_name, sender_phone, sender_avatar,
+             activity, date, time, location, message, price, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), '06:00 PM', 'Jaipur', 'Payment done, please connect!', ?, 'PAID', NOW())
+           ON DUPLICATE KEY UPDATE status='PAID', updated_at=NOW()`,
+          [
+            activeRequestId, activeRequestId, booking_id,
+            userId, effectivePartnerId, senderName, senderPhone, senderAvatar,
+            actName, numericAmount
+          ]
+        );
+      });
+      console.log(`[Payment] Created single partner request ${activeRequestId} for booking ${booking_id}`);
+    }
+
+    // Also update booking status to PAID & CONFIRMED
     await query(
-      `INSERT INTO withme_partner_requests
-        (id, request_id, booking_id, user_id, partner_id, sender_name, sender_phone, sender_avatar,
-         activity, date, time, location, message, price, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), '06:00 PM', 'Jaipur', 'Payment done, please connect!', ?, 'PAID', NOW())
-       ON DUPLICATE KEY UPDATE status='PAID', updated_at=NOW()`,
-      [
-        requestId, requestId, booking_id,
-        userId, effectivePartnerId, senderName, senderPhone, senderAvatar,
-        actName, numericAmount
-      ]
-    );
-    console.log(`[Payment] Auto-created partner request ${requestId} for partner ${effectivePartnerId}`);
+      `UPDATE withme_partner_bookings
+       SET payment_status = 'PAID', status = 'CONFIRMED', updated_at = NOW()
+       WHERE booking_id = ?`,
+      [booking_id]
+    ).catch(() => {});
+
+    query(
+      `UPDATE partner_bookings
+       SET status = 'Confirmed', updated_at = NOW()
+       WHERE booking_id = ?`,
+      [booking_id]
+    ).catch(() => {});
   } catch (e) {
-    console.warn('[Payment] Could not create partner request after payment:', e.message);
+    console.warn('[Payment] Could not update partner request after payment:', e.message);
   }
 
-  // Sync the paid request to Partner App in real-time
+  // 3. Sync the paid request to Partner App in real-time
   try {
     const partnerApiUrls = [
-      process.env.PARTNER_API_URL || 'https://withme-partnerapi.onrender.com',
+      process.env.PARTNER_API_URL,
+      'https://withmepartner.onrender.com',
+      'https://withme-partnerapi.onrender.com',
+      'https://withmepartnerapi.onrender.com',
       'http://localhost:5001',
       'http://localhost:5000'
-    ];
+    ].filter(Boolean);
+
     const syncPayload = {
-      request_id: requestId,
+      request_id: activeRequestId,
       booking_id,
       payment_id: paymentId,
       partner_id: effectivePartnerId,
       user_id: userId,
       name: senderName,
       sender_name: senderName,
+      customer_name: senderName,
+      user_name: senderName,
       phone_number: senderPhone,
       mobile_number: senderPhone,
       image: senderAvatar,
@@ -258,19 +329,20 @@ const handlePaymentInitiate = async (req, res) => {
       currency,
       payment_status: 'PAID',
       is_paid: true,
-      status: 'PAID',
+      status: 'CONFIRMED',
       message: 'Payment completed. Please connect!',
       date: new Date().toISOString().split('T')[0],
       time: '06:00 PM',
       created_at: createdAt
     };
+
     for (const pUrl of partnerApiUrls) {
       try {
         const syncResp = await fetch(`${pUrl}/partner/incoming-request`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(syncPayload),
-          signal: AbortSignal.timeout(3000)
+          signal: AbortSignal.timeout(3500)
         });
         if (syncResp.ok) {
           console.log(`[Payment Sync] Forwarded paid request to Partner App at ${pUrl}`);
@@ -431,6 +503,31 @@ const handlePaymentVerify = (req, res) => {
   const existingPayment = paymentsStore[targetPaymentId] || paymentsStore[targetOrderId] || {};
 
   const verifiedAt = new Date().toISOString();
+  const bId = existingPayment.booking_id || (req.body && req.body.booking_id) || 'BK197860';
+
+  // Update existing partner request and booking in MySQL to PAID
+  try {
+    query(
+      `UPDATE withme_partner_requests
+       SET status = 'PAID', is_accepted = 1, is_paid = 1, payment_id = ?, updated_at = NOW()
+       WHERE booking_id = ? OR id = ? OR request_id = ?`,
+      [targetPaymentId, bId, bId, bId]
+    ).catch(() => {});
+
+    query(
+      `UPDATE withme_partner_bookings
+       SET payment_status = 'PAID', status = 'CONFIRMED', updated_at = NOW()
+       WHERE booking_id = ?`,
+      [bId]
+    ).catch(() => {});
+
+    query(
+      `UPDATE withme_payments
+       SET status = 'COMPLETED', updated_at = NOW()
+       WHERE payment_id = ? OR order_id = ?`,
+      [targetPaymentId, targetOrderId]
+    ).catch(() => {});
+  } catch (e) {}
 
   const verificationData = {
     payment_id: targetPaymentId,
@@ -438,7 +535,7 @@ const handlePaymentVerify = (req, res) => {
     razorpay_payment_id: targetPaymentId,
     razorpay_order_id: targetOrderId,
     razorpay_signature: targetSignature,
-    booking_id: existingPayment.booking_id || 'BK197860',
+    booking_id: bId,
     payment_status: 'PAID',
     verification_status: 'SUCCESS',
     transaction_id: `txn_${Math.floor(1000000000 + Math.random() * 9000000000)}`,
