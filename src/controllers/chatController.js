@@ -21,7 +21,8 @@ async function handleCreateOrGetConversation(req, res, next) {
     const result = await chatService.createOrGetConversation(currentUserId, targetUserId);
     return res.status(200).json({
       success: true,
-      conversationId: result.conversationId
+      conversationId: result.conversationId,
+      conversation_id: result.conversationId
     });
   } catch (err) {
     if (err.message === "User is blocked" || err.message === "Cannot create conversation with yourself") {
@@ -63,7 +64,7 @@ async function handleGetConversations(req, res, next) {
 async function handleGetMessages(req, res, next) {
   try {
     const currentUserId = (req.user && (req.user.user_id || req.user.id)) || 'usr_7250642635';
-    const { conversationId } = req.params;
+    const conversationId = req.params.conversationId || (req.query && req.query.conversationId) || (req.body && req.body.conversationId);
 
     if (!conversationId) {
       return res.status(400).json({
@@ -73,7 +74,7 @@ async function handleGetMessages(req, res, next) {
       });
     }
 
-    const result = await chatService.getConversationMessages(conversationId, currentUserId);
+    const result = await chatService.getConversationMessages(conversationId, currentUserId, isUserOnline);
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode === 403) {
@@ -83,6 +84,33 @@ async function handleGetMessages(req, res, next) {
         error_code: "FORBIDDEN"
       });
     }
+    return next(err);
+  }
+}
+
+/**
+ * API 3.1 – Check User Online Status
+ * GET /api/chat/status/:userId
+ */
+async function handleGetUserStatus(req, res, next) {
+  try {
+    const userId = req.params.userId || (req.query && (req.query.userId || req.query.user_id || req.query.partner_id)) || (req.body && (req.body.userId || req.body.user_id || req.body.partner_id));
+    const online = await isUserOnline(userId);
+    const user = userId ? await chatService.findUser(userId) : null;
+    return res.status(200).json({
+      success: true,
+      userId: userId ? chatService.formatNumericUserId(userId) : null,
+      user_id: userId,
+      partner_id: userId,
+      isOnline: Boolean(online),
+      is_online: Boolean(online),
+      online: Boolean(online),
+      status: online ? 'online' : 'offline',
+      online_status: online ? 'ONLINE' : 'OFFLINE',
+      user: user || undefined,
+      last_seen: new Date().toISOString()
+    });
+  } catch (err) {
     return next(err);
   }
 }
@@ -157,6 +185,7 @@ module.exports = {
   handleCreateOrGetConversation,
   handleGetConversations,
   handleGetMessages,
+  handleGetUserStatus,
   handleDeleteMessage,
   handleBlockUser
 };

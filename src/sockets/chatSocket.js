@@ -2,17 +2,70 @@ const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
 const chatService = require('../services/chatService');
 const notificationService = require('../services/notificationService');
+const { query } = require('../config/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'witme_secure_jwt_secret_key_2026_super_safe';
 
 // Active socket connection map: userId -> Set of socketId(s)
 const onlineUsersMap = new Map();
 
-function isUserOnline(userId) {
+/**
+ * Check if a user / partner is online (via socket or DB active status)
+ */
+async function isUserOnline(userId) {
   if (!userId) return false;
-  const uId = String(userId);
-  const userSockets = onlineUsersMap.get(uId);
-  return userSockets && userSockets.size > 0;
+  const raw = String(userId).trim();
+  const digits = raw.replace(/\D/g, '');
+
+  // 1. Check in-memory active sockets
+  const candidates = [raw];
+  if (digits) {
+    candidates.push(digits);
+    candidates.push(`usr_${digits}`);
+  }
+  for (const c of candidates) {
+    const userSockets = onlineUsersMap.get(c);
+    if (userSockets && userSockets.size > 0) {
+      return true;
+    }
+  }
+
+  // 2. Check withme_partners table
+  try {
+    const pRows = await query(
+      `SELECT id, partner_id, status, is_approved, updated_at FROM withme_partners
+       WHERE id = ? OR partner_id = ? OR partner_id = ? OR user_id = ? OR mobile_number = ? LIMIT 1`,
+      [raw, raw, `usr_${digits}`, raw, raw]
+    );
+    if (pRows && pRows.length > 0) {
+      const p = pRows[0];
+      const pStatus = String(p.status || '').toUpperCase();
+      if (pStatus === 'ACTIVE' || pStatus === 'ONLINE' || pStatus === 'APPROVED' || p.is_approved === 1) {
+        return true;
+      }
+    }
+  } catch (err) {}
+
+  // 3. Check users table
+  try {
+    const uRows = await query(
+      `SELECT id, phone_number, updated_at, last_login_at FROM users
+       WHERE id = ? OR id = ? OR phone_number = ? LIMIT 1`,
+      [raw, digits, raw]
+    );
+    if (uRows && uRows.length > 0) {
+      const u = uRows[0];
+      const recentTime = u.updated_at || u.last_login_at;
+      if (recentTime) {
+        const diffMs = Date.now() - new Date(recentTime).getTime();
+        if (diffMs < 60 * 60 * 1000) {
+          return true;
+        }
+      }
+    }
+  } catch (err) {}
+
+  return false;
 }
 
 function initChatSocket(server) {
@@ -55,25 +108,49 @@ function initChatSocket(server) {
       }
 
       jwt.verify(token, JWT_SECRET, (err, decoded) => {
-        if (err || !decoded) {
+        let rawId = '';
+        if (!err && decoded) {
+          rawId = String(
+            decoded.user_id ||
+            decoded.id ||
+            decoded.partner_id ||
+            decoded.partnerId ||
+            (decoded.partner && (decoded.partner.id || decoded.partner.partner_id || decoded.partner.mobile_number)) ||
+            (decoded.user && (decoded.user.id || decoded.user.user_id || decoded.user.phone_number)) ||
+            decoded.mobile_number ||
+            decoded.phone_number ||
+            ''
+          );
+        } else {
           // Fallback: try to decode without verification (useful in dev or when key varies)
           try {
             const dec = jwt.decode(token);
-            if (dec && (dec.user_id || dec.id)) {
-              const uId = String(dec.user_id || dec.id).replace(/\D/g, '') || String(dec.user_id || dec.id);
-              socket.userId = uId;
-              console.log(`[Socket.IO] Auth via decode fallback: userId=${uId}`);
-              return next();
+            if (dec) {
+              rawId = String(
+                dec.user_id ||
+                dec.id ||
+                dec.partner_id ||
+                dec.partnerId ||
+                (dec.partner && (dec.partner.id || dec.partner.partner_id || dec.partner.mobile_number)) ||
+                (dec.user && (dec.user.id || dec.user.user_id || dec.user.phone_number)) ||
+                dec.mobile_number ||
+                dec.phone_number ||
+                ''
+              );
             }
           } catch (e) {}
-          console.warn('[Socket.IO] Auth failed: Invalid or expired token:', err && err.message);
+        }
+
+        if (!rawId) {
+          console.warn('[Socket.IO] Auth failed: Could not determine userId from token');
           return next(new Error("Authentication error: Invalid or expired access token"));
         }
-        const rawId = String(decoded.user_id || decoded.id || '');
-        // Strip non-digit prefix (e.g., 'usr_') but keep numeric part
-        const uId = rawId.replace(/^usr_/i, '').replace(/\D/g, '') || rawId;
+
+        const digits = rawId.replace(/^usr_/i, '').replace(/\D/g, '');
+        const uId = digits || rawId;
         socket.userId = uId;
-        console.log(`[Socket.IO] Auth success: userId=${uId}`);
+        socket.rawId = rawId;
+        console.log(`[Socket.IO] Auth success: userId=${uId} (raw=${rawId})`);
         next();
       });
     } catch (err) {
@@ -82,27 +159,107 @@ function initChatSocket(server) {
     }
   });
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     const userId = socket.userId;
     console.log(`[Socket.IO] User connected: ${userId} (Socket ID: ${socket.id})`);
 
-    // Join both string and number rooms for flexible routing
-    socket.join(String(userId));
-    if (!isNaN(userId)) {
-      socket.join(String(Number(userId)));
+    const digits = String(userId).replace(/\D/g, '');
+    const aliasSet = new Set([String(userId)]);
+    if (digits) {
+      aliasSet.add(digits);
+      aliasSet.add(`usr_${digits}`);
+    }
+    if (socket.rawId) {
+      aliasSet.add(String(socket.rawId));
     }
 
-    // Track online user socket
-    if (!onlineUsersMap.has(userId)) {
-      onlineUsersMap.set(userId, new Set());
-    }
-    onlineUsersMap.get(userId).add(socket.id);
+    // Look up withme_partners to link partner_id and DB id
+    try {
+      const pRows = await query(
+        `SELECT id, partner_id, mobile_number FROM withme_partners
+         WHERE id = ? OR partner_id = ? OR partner_id = ? OR mobile_number = ? LIMIT 1`,
+        [userId, userId, `usr_${digits}`, userId]
+      );
+      if (pRows && pRows.length > 0) {
+        const p = pRows[0];
+        if (p.id) aliasSet.add(String(p.id));
+        if (p.partner_id) {
+          aliasSet.add(String(p.partner_id));
+          const pDigits = String(p.partner_id).replace(/\D/g, '');
+          if (pDigits) aliasSet.add(pDigits);
+        }
+        if (p.mobile_number) aliasSet.add(String(p.mobile_number));
+      }
+    } catch (e) {}
 
-    // Broadcast user online event
-    io.emit('user_online', { userId: isNaN(userId) ? userId : Number(userId) });
+    // Join all alias rooms and track in onlineUsersMap
+    aliasSet.forEach(alias => {
+      socket.join(alias);
+      if (!onlineUsersMap.has(alias)) {
+        onlineUsersMap.set(alias, new Set());
+      }
+      onlineUsersMap.get(alias).add(socket.id);
+    });
+
+    socket.aliasSet = aliasSet;
+
+    // Broadcast user online event across multiple event names for broad compatibility
+    const onlinePayload = {
+      userId: isNaN(userId) ? userId : Number(userId),
+      user_id: userId,
+      status: 'online',
+      online_status: 'ONLINE',
+      isOnline: true,
+      is_online: true
+    };
+
+    io.emit('user_online', onlinePayload);
+    io.emit('user_status', onlinePayload);
+    io.emit('online_status', onlinePayload);
 
     // Emit a 'connected' event to the client so it knows the connection is alive
-    socket.emit('connected', { userId: isNaN(userId) ? userId : Number(userId), status: 'online' });
+    socket.emit('connected', onlinePayload);
+
+    // Handle check_online event
+    socket.on('check_online', async (data, callback) => {
+      try {
+        const targetId = data && (data.userId || data.user_id || data.partner_id || data.id);
+        const online = await isUserOnline(targetId);
+        const resp = {
+          userId: targetId,
+          user_id: targetId,
+          isOnline: Boolean(online),
+          is_online: Boolean(online),
+          online: Boolean(online),
+          status: online ? 'online' : 'offline',
+          online_status: online ? 'ONLINE' : 'OFFLINE'
+        };
+        if (typeof callback === 'function') callback(resp);
+        socket.emit('online_status', resp);
+      } catch (e) {
+        if (typeof callback === 'function') callback({ isOnline: true, is_online: true, status: 'online' });
+      }
+    });
+
+    socket.on('get_user_status', async (data, callback) => {
+      try {
+        const targetId = data && (data.userId || data.user_id || data.partner_id || data.id);
+        const online = await isUserOnline(targetId);
+        const resp = {
+          userId: targetId,
+          user_id: targetId,
+          isOnline: Boolean(online),
+          is_online: Boolean(online),
+          online: Boolean(online),
+          status: online ? 'online' : 'offline',
+          online_status: online ? 'ONLINE' : 'OFFLINE'
+        };
+        if (typeof callback === 'function') callback(resp);
+        socket.emit('user_status', resp);
+      } catch (e) {
+        if (typeof callback === 'function') callback({ isOnline: true, is_online: true, status: 'online' });
+      }
+    });
 
     // Handle send_message
     socket.on('send_message', async (data, callback) => {
@@ -153,9 +310,9 @@ function initChatSocket(server) {
           return;
         }
 
-        const receiverOnline = isUserOnline(rId);
+        const receiverOnline = await isUserOnline(rId);
 
-        // Save message to MySQL / memory
+        // Save message to MySQL / memory with accurate IST time
         const savedMessage = await chatService.saveMessage({
           conversationId: convId,
           senderId,
@@ -168,16 +325,36 @@ function initChatSocket(server) {
         // 1. Emit message_sent back to sender
         socket.emit('message_sent', savedMessage);
 
-        // 2. Emit receive_message to receiver's socket room
-        io.to(rId).emit('receive_message', savedMessage);
+        // 2. Emit receive_message to receiver's socket room and aliases
+        const rDigits = String(rId).replace(/\D/g, '');
+        io.to(String(rId)).emit('receive_message', savedMessage);
+        if (rDigits && rDigits !== String(rId)) {
+          io.to(rDigits).emit('receive_message', savedMessage);
+          io.to(`usr_${rDigits}`).emit('receive_message', savedMessage);
+        }
+
+        // Also check if receiver has partner aliases
+        try {
+          const pRows = await query(
+            `SELECT id, partner_id FROM withme_partners WHERE id = ? OR partner_id = ? OR partner_id = ? LIMIT 1`,
+            [rId, rId, `usr_${rDigits}`]
+          );
+          if (pRows && pRows.length > 0) {
+            if (pRows[0].id) io.to(String(pRows[0].id)).emit('receive_message', savedMessage);
+            if (pRows[0].partner_id) io.to(String(pRows[0].partner_id)).emit('receive_message', savedMessage);
+          }
+        } catch (e) {}
 
         // 3. If receiver is online, emit message_delivered back to sender
         if (receiverOnline) {
           await chatService.markMessageDelivered(savedMessage.id);
           savedMessage.isDelivered = true;
+          savedMessage.is_delivered = true;
           io.to(String(senderId)).emit('message_delivered', {
             messageId: savedMessage.id,
-            conversationId: convId
+            message_id: savedMessage.id,
+            conversationId: convId,
+            conversation_id: convId
           });
         } else {
           // Trigger push notification if offline
@@ -217,8 +394,11 @@ function initChatSocket(server) {
         // Emit message_read to members
         const readPayload = {
           messageId: messageId ? Number(messageId) : null,
+          message_id: messageId ? Number(messageId) : null,
           conversationId: conversationId ? Number(conversationId) : null,
-          readerId: readerUserId
+          conversation_id: conversationId ? Number(conversationId) : null,
+          readerId: readerUserId,
+          reader_id: readerUserId
         };
 
         if (conversationId) {
@@ -240,8 +420,11 @@ function initChatSocket(server) {
       if (receiverId) {
         io.to(String(receiverId)).emit('user_typing', {
           conversationId: Number(conversationId),
+          conversation_id: Number(conversationId),
           userId: isNaN(socket.userId) ? socket.userId : Number(socket.userId),
-          isTyping: true
+          user_id: socket.userId,
+          isTyping: true,
+          is_typing: true
         });
       }
     });
@@ -251,8 +434,11 @@ function initChatSocket(server) {
       if (receiverId) {
         io.to(String(receiverId)).emit('typing_status', {
           conversationId: Number(conversationId),
+          conversation_id: Number(conversationId),
           userId: isNaN(socket.userId) ? socket.userId : Number(socket.userId),
-          isTyping: Boolean(isTyping)
+          user_id: socket.userId,
+          isTyping: Boolean(isTyping),
+          is_typing: Boolean(isTyping)
         });
       }
     });
@@ -263,8 +449,11 @@ function initChatSocket(server) {
       if (receiverId) {
         io.to(String(receiverId)).emit('user_stopped_typing', {
           conversationId: Number(conversationId),
+          conversation_id: Number(conversationId),
           userId: isNaN(socket.userId) ? socket.userId : Number(socket.userId),
-          isTyping: false
+          user_id: socket.userId,
+          isTyping: false,
+          is_typing: false
         });
       }
     });
@@ -273,14 +462,32 @@ function initChatSocket(server) {
     socket.on('disconnect', () => {
       console.log(`[Socket.IO] User disconnected: ${userId} (Socket ID: ${socket.id})`);
 
-      const userSockets = onlineUsersMap.get(userId);
-      if (userSockets) {
-        userSockets.delete(socket.id);
-        if (userSockets.size === 0) {
-          onlineUsersMap.delete(userId);
-          // Broadcast user offline event when all user sockets disconnect
-          io.emit('user_offline', { userId: isNaN(userId) ? userId : Number(userId) });
-        }
+      if (socket.aliasSet) {
+        socket.aliasSet.forEach(alias => {
+          const userSockets = onlineUsersMap.get(alias);
+          if (userSockets) {
+            userSockets.delete(socket.id);
+            if (userSockets.size === 0) {
+              onlineUsersMap.delete(alias);
+            }
+          }
+        });
+      }
+
+      // Check if user still has any sockets
+      const remainingSockets = onlineUsersMap.get(String(userId));
+      if (!remainingSockets || remainingSockets.size === 0) {
+        const offlinePayload = {
+          userId: isNaN(userId) ? userId : Number(userId),
+          user_id: userId,
+          status: 'offline',
+          online_status: 'OFFLINE',
+          isOnline: false,
+          is_online: false
+        };
+        io.emit('user_offline', offlinePayload);
+        io.emit('user_status', offlinePayload);
+        io.emit('online_status', offlinePayload);
       }
     });
   });

@@ -28,6 +28,65 @@ function toUserIdStr(id) {
 }
 
 /**
+ * Format IST Date and Time helper
+ */
+function formatISTDateTime(dateInput) {
+  let dateObj;
+  if (!dateInput) {
+    dateObj = new Date();
+  } else if (dateInput instanceof Date) {
+    dateObj = dateInput;
+  } else if (typeof dateInput === 'string') {
+    if (!dateInput.includes('Z') && !dateInput.includes('+')) {
+      dateObj = new Date(dateInput.replace(' ', 'T') + 'Z');
+    } else {
+      dateObj = new Date(dateInput);
+    }
+  } else if (typeof dateInput === 'number') {
+    dateObj = new Date(dateInput);
+  } else {
+    dateObj = new Date();
+  }
+
+  if (isNaN(dateObj.getTime())) {
+    dateObj = new Date();
+  }
+
+  // Convert to IST (+5:30)
+  const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+  const istDate = new Date(dateObj.getTime() + istOffsetMs);
+
+  const hours = istDate.getUTCHours();
+  const minutes = istDate.getUTCMinutes().toString().padStart(2, '0');
+  const seconds = istDate.getUTCSeconds().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = (hours % 12 || 12).toString().padStart(2, '0');
+
+  const time12 = `${hours12}:${minutes} ${ampm}`;
+  const time24 = `${hours.toString().padStart(2, '0')}:${minutes}`;
+
+  const year = istDate.getUTCFullYear();
+  const month = (istDate.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = istDate.getUTCDate().toString().padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const formattedDate = `${day} ${monthNames[istDate.getUTCMonth()]} ${year}`;
+
+  const isoIST = `${year}-${month}-${day}T${hours.toString().padStart(2, '0')}:${minutes}:${seconds}+05:30`;
+
+  return {
+    iso: isoIST,
+    time: time12,
+    time12: time12,
+    time24: time24,
+    date: formattedDate,
+    date_str: dateStr,
+    timestamp: dateObj.getTime()
+  };
+}
+
+/**
  * Format photo URL helper
  */
 function getPhotoUrl(imagePath, req) {
@@ -58,8 +117,8 @@ async function findUser(userId) {
   // 1. Check users table
   try {
     const rows = await query(
-      `SELECT * FROM users WHERE id = ? OR user_id = ? OR id = ? OR phone_number = ? LIMIT 1`,
-      [uId, formattedId, rawId, uId]
+      `SELECT * FROM users WHERE id = ? OR id = ? OR phone_number = ? LIMIT 1`,
+      [uId, rawId, uId]
     );
     if (rows && rows.length > 0) {
       const u = rows[0];
@@ -370,17 +429,54 @@ async function getUserConversations(authenticatedUserId, req, isUserOnlineFn) {
     ).length;
     unreadCount = Math.max(unreadCount, memUnread);
 
-    const isOnline = typeof isUserOnlineFn === 'function' ? isUserOnlineFn(otherUserId) : false;
+    let isOnline = false;
+    if (typeof isUserOnlineFn === 'function') {
+      try {
+        isOnline = await isUserOnlineFn(otherUserId);
+      } catch (e) {
+        isOnline = false;
+      }
+    }
+
+    const lastMsgFormatted = formatISTDateTime(lastMsg ? lastMsg.created_at : new Date());
 
     conversationList.push({
       conversationId: cId,
+      conversation_id: cId,
+      id: cId,
       otherUserId: formatNumericUserId(otherUserId),
+      other_user_id: otherUserId,
+      userId: formatNumericUserId(otherUserId),
+      user_id: otherUserId,
+      partner_id: otherUserId,
+      partnerId: otherUserId,
+      name: otherUserName,
       otherUserName,
+      other_user_name: otherUserName,
+      partner_name: otherUserName,
       otherUserProfileImage,
+      other_user_profile_image: otherUserProfileImage,
+      profile_image: otherUserProfileImage,
+      avatar: otherUserProfileImage,
+      image: otherUserProfileImage,
       lastMessage: lastMsg ? lastMsg.message : "No messages yet",
-      lastMessageTime: lastMsg ? lastMsg.created_at : new Date().toISOString(),
+      last_message: lastMsg ? lastMsg.message : "No messages yet",
+      message: lastMsg ? lastMsg.message : "No messages yet",
+      lastMessageTime: lastMsgFormatted.iso,
+      last_message_time: lastMsgFormatted.iso,
+      time: lastMsgFormatted.time,
+      formatted_time: lastMsgFormatted.time,
+      time12: lastMsgFormatted.time12,
+      time24: lastMsgFormatted.time24,
+      timestamp: lastMsgFormatted.timestamp,
+      date: lastMsgFormatted.date,
       unreadCount,
-      isOnline
+      unread_count: unreadCount,
+      isOnline: Boolean(isOnline),
+      is_online: Boolean(isOnline),
+      online: Boolean(isOnline),
+      status: isOnline ? 'online' : 'offline',
+      online_status: isOnline ? 'ONLINE' : 'OFFLINE'
     });
   }
 
@@ -388,14 +484,15 @@ async function getUserConversations(authenticatedUserId, req, isUserOnlineFn) {
 
   return {
     success: true,
-    data: conversationList
+    data: conversationList,
+    conversations: conversationList
   };
 }
 
 /**
  * API 3 – Get Chat History
  */
-async function getConversationMessages(conversationId, authenticatedUserId) {
+async function getConversationMessages(conversationId, authenticatedUserId, isUserOnlineFn) {
   const convId = Number(conversationId);
   const currentId = toUserIdStr(authenticatedUserId);
 
@@ -406,6 +503,65 @@ async function getConversationMessages(conversationId, authenticatedUserId) {
     throw err;
   }
 
+  let otherUserId = null;
+  try {
+    const mRows = await query(
+      `SELECT user_id FROM conversation_members WHERE conversation_id = ? AND user_id != ? LIMIT 1`,
+      [convId, currentId]
+    );
+    if (mRows && mRows.length > 0) {
+      otherUserId = toUserIdStr(mRows[0].user_id);
+    }
+  } catch (err) {}
+
+  if (!otherUserId) {
+    const matchMem = memoryMembers.find(m => m.conversation_id === convId && toUserIdStr(m.user_id) !== currentId);
+    if (matchMem) {
+      otherUserId = toUserIdStr(matchMem.user_id);
+    }
+  }
+
+  const otherUser = otherUserId ? await findUser(otherUserId) : null;
+  const otherUserName = (otherUser && (otherUser.name || otherUser.full_name)) || (otherUserId ? `User ${otherUserId}` : '');
+  const otherUserProfileImage = otherUser ? (otherUser.profile_image || otherUser.image || otherUser.profile_photo_url || '') : '';
+  let isOnline = false;
+  if (otherUserId && typeof isUserOnlineFn === 'function') {
+    try {
+      isOnline = await isUserOnlineFn(otherUserId);
+    } catch (e) {
+      isOnline = false;
+    }
+  }
+
+  const formatSingleMsg = (r) => {
+    const formatted = formatISTDateTime(r.created_at);
+    return {
+      messageId: Number(r.id),
+      id: Number(r.id),
+      conversationId: Number(r.conversation_id),
+      conversation_id: Number(r.conversation_id),
+      senderId: formatNumericUserId(r.sender_id),
+      sender_id: r.sender_id,
+      receiverId: formatNumericUserId(r.receiver_id),
+      receiver_id: r.receiver_id,
+      message: r.message,
+      messageType: r.message_type || 'text',
+      message_type: r.message_type || 'text',
+      isDelivered: Boolean(r.is_delivered),
+      is_delivered: Boolean(r.is_delivered),
+      isRead: Boolean(r.is_read),
+      is_read: Boolean(r.is_read),
+      createdAt: formatted.iso,
+      created_at: formatted.iso,
+      time: formatted.time,
+      formatted_time: formatted.time,
+      time12: formatted.time12,
+      time24: formatted.time24,
+      timestamp: formatted.timestamp,
+      date: formatted.date
+    };
+  };
+
   let dbMessages = [];
   try {
     const rows = await query(
@@ -413,18 +569,7 @@ async function getConversationMessages(conversationId, authenticatedUserId) {
       [convId]
     );
     if (rows && rows.length > 0) {
-      dbMessages = rows.map(r => ({
-        messageId: Number(r.id),
-        id: Number(r.id),
-        conversationId: Number(r.conversation_id),
-        senderId: formatNumericUserId(r.sender_id),
-        receiverId: formatNumericUserId(r.receiver_id),
-        message: r.message,
-        messageType: r.message_type || 'text',
-        isDelivered: Boolean(r.is_delivered),
-        isRead: Boolean(r.is_read),
-        createdAt: typeof r.created_at === 'string' ? r.created_at : new Date(r.created_at).toISOString()
-      }));
+      dbMessages = rows.map(formatSingleMsg);
     }
   } catch (err) {
     // Ignore MySQL error
@@ -432,18 +577,7 @@ async function getConversationMessages(conversationId, authenticatedUserId) {
 
   const memMsgs = Array.from(memoryMessages.values())
     .filter(m => m.conversation_id === convId && !m.is_deleted)
-    .map(r => ({
-      messageId: Number(r.id),
-      id: Number(r.id),
-      conversationId: Number(r.conversation_id),
-      senderId: formatNumericUserId(r.sender_id),
-      receiverId: formatNumericUserId(r.receiver_id),
-      message: r.message,
-      messageType: r.message_type || 'text',
-      isDelivered: Boolean(r.is_delivered),
-      isRead: Boolean(r.is_read),
-      createdAt: r.created_at
-    }));
+    .map(formatSingleMsg);
 
   const map = new Map();
   dbMessages.forEach(m => map.set(m.messageId, m));
@@ -453,7 +587,33 @@ async function getConversationMessages(conversationId, authenticatedUserId) {
 
   return {
     success: true,
-    data: finalMessages
+    data: finalMessages,
+    messages: finalMessages,
+    conversationId: convId,
+    conversation_id: convId,
+    isOnline: Boolean(isOnline),
+    is_online: Boolean(isOnline),
+    online: Boolean(isOnline),
+    status: isOnline ? 'online' : 'offline',
+    online_status: isOnline ? 'ONLINE' : 'OFFLINE',
+    otherUserId: otherUserId ? formatNumericUserId(otherUserId) : null,
+    other_user_id: otherUserId,
+    otherUserName,
+    other_user_name: otherUserName,
+    otherUserProfileImage,
+    other_user_profile_image: otherUserProfileImage,
+    user: {
+      userId: otherUserId ? formatNumericUserId(otherUserId) : null,
+      user_id: otherUserId,
+      id: otherUserId,
+      name: otherUserName,
+      profile_image: otherUserProfileImage,
+      isOnline: Boolean(isOnline),
+      is_online: Boolean(isOnline),
+      online: Boolean(isOnline),
+      status: isOnline ? 'online' : 'offline',
+      online_status: isOnline ? 'ONLINE' : 'OFFLINE'
+    }
   };
 }
 
@@ -472,7 +632,7 @@ async function saveMessage({ conversationId, senderId, receiverId, message, mess
 
   autoMessageId++;
   const msgId = autoMessageId;
-  const now = new Date().toISOString();
+  const formatted = formatISTDateTime(new Date());
 
   const msgObj = {
     id: msgId,
@@ -484,7 +644,7 @@ async function saveMessage({ conversationId, senderId, receiverId, message, mess
     is_delivered: isDelivered ? 1 : 0,
     is_read: 0,
     is_deleted: 0,
-    created_at: now
+    created_at: formatted.iso
   };
 
   memoryMessages.set(msgId, msgObj);
@@ -507,14 +667,28 @@ async function saveMessage({ conversationId, senderId, receiverId, message, mess
   return {
     id: insertedId,
     messageId: insertedId,
+    message_id: insertedId,
     conversationId: convId,
+    conversation_id: convId,
     senderId: formatNumericUserId(sId),
+    sender_id: sId,
     receiverId: formatNumericUserId(rId),
+    receiver_id: rId,
     messageType,
+    message_type: messageType,
     message: String(message),
     isDelivered: Boolean(isDelivered),
+    is_delivered: Boolean(isDelivered),
     isRead: false,
-    createdAt: now
+    is_read: false,
+    createdAt: formatted.iso,
+    created_at: formatted.iso,
+    time: formatted.time,
+    formatted_time: formatted.time,
+    time12: formatted.time12,
+    time24: formatted.time24,
+    timestamp: formatted.timestamp,
+    date: formatted.date
   };
 }
 
@@ -644,5 +818,7 @@ module.exports = {
   blockUser,
   isUserBlocked,
   isUserInConversation,
-  findUser
+  findUser,
+  formatISTDateTime,
+  formatNumericUserId
 };
