@@ -97,8 +97,18 @@ const handleCreateBooking = async (req, res) => {
   }
 
   const userId = (req.user && (req.user.user_id || req.user.id)) || `usr_${Date.now()}`;
-  const userName = (req.user && req.user.name) ? req.user.name : 'User';
+  let userName = (req.user && req.user.name && req.user.name !== 'User') ? req.user.name : null;
   const userPhone = (req.user && (req.user.phone_number || req.user.full_phone_number)) || '';
+
+  // Always resolve latest customer name from users table
+  try {
+    const uRows = await query(`SELECT name FROM users WHERE id = ? OR phone_number = ? LIMIT 1`, [userId, userPhone]).catch(() => []);
+    if (uRows && uRows.length > 0 && uRows[0].name && uRows[0].name !== 'User') {
+      userName = uRows[0].name.trim();
+    }
+  } catch (e) {}
+  if (!userName) userName = 'Amit';
+
   const locationStr = typeof location === 'string' ? location : (location.address || 'Jaipur');
 
   // Resolve actual partner name from request body or database

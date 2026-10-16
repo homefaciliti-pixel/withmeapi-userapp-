@@ -203,6 +203,22 @@ function initChatSocket(server) {
 
     socket.aliasSet = aliasSet;
 
+    // Auto-join all conversation rooms the user is part of so real-time chat updates instantly
+    try {
+      const convRows = await query(
+        `SELECT DISTINCT conversation_id FROM conversation_members WHERE user_id = ? OR user_id = ? OR user_id = ?`,
+        [userId, digits, `usr_${digits}`]
+      ).catch(() => []);
+      if (convRows && convRows.length > 0) {
+        convRows.forEach(c => {
+          const cId = String(c.conversation_id);
+          socket.join(cId);
+          socket.join(`conv_${cId}`);
+          socket.join(`room_${cId}`);
+        });
+      }
+    } catch (e) {}
+
     // Broadcast user online event across multiple event names for broad compatibility
     const onlinePayload = {
       userId: isNaN(userId) ? userId : Number(userId),
@@ -219,6 +235,44 @@ function initChatSocket(server) {
 
     // Emit a 'connected' event to the client so it knows the connection is alive
     socket.emit('connected', onlinePayload);
+
+    // Join conversation rooms dynamically
+    socket.on('join_conversation', (data) => {
+      const convId = data && (data.conversationId || data.conversation_id || data.id || data);
+      if (convId) {
+        socket.join(String(convId));
+        socket.join(`conv_${convId}`);
+        socket.join(`room_${convId}`);
+        console.log(`[Socket.IO] User ${socket.userId} joined conversation room: ${convId}`);
+      }
+    });
+
+    socket.on('join_room', (data) => {
+      const convId = data && (data.conversationId || data.conversation_id || data.room || data);
+      if (convId) {
+        socket.join(String(convId));
+        socket.join(`conv_${convId}`);
+        socket.join(`room_${convId}`);
+      }
+    });
+
+    socket.on('join_chat', (data) => {
+      const convId = data && (data.conversationId || data.conversation_id || data.chat_id || data);
+      if (convId) {
+        socket.join(String(convId));
+        socket.join(`conv_${convId}`);
+        socket.join(`room_${convId}`);
+      }
+    });
+
+    socket.on('join', (data) => {
+      const convId = data && (data.conversationId || data.conversation_id || data.room || data);
+      if (convId) {
+        socket.join(String(convId));
+        socket.join(`conv_${convId}`);
+        socket.join(`room_${convId}`);
+      }
+    });
 
     // Handle check_online event
     socket.on('check_online', async (data, callback) => {
@@ -322,15 +376,26 @@ function initChatSocket(server) {
           isDelivered: receiverOnline
         });
 
-        // 1. Emit message_sent back to sender
+        // 1. Emit message_sent and new_message back to sender
         socket.emit('message_sent', savedMessage);
+        socket.emit('receive_message', savedMessage);
+        socket.emit('new_message', savedMessage);
 
-        // 2. Emit receive_message to receiver's socket room and aliases
+        // 2. Broadcast to conversation room so whoever is in the chat screen auto-updates instantly
+        const convRooms = [String(convId), `conv_${convId}`, `room_${convId}`];
+        convRooms.forEach(room => {
+          socket.to(room).emit('receive_message', savedMessage);
+          socket.to(room).emit('new_message', savedMessage);
+          socket.to(room).emit('chat_message', savedMessage);
+          socket.to(room).emit('message', savedMessage);
+        });
+
+        // 3. Emit directly to receiver socket room and all aliases
         const rDigits = String(rId).replace(/\D/g, '');
-        io.to(String(rId)).emit('receive_message', savedMessage);
-        if (rDigits && rDigits !== String(rId)) {
-          io.to(rDigits).emit('receive_message', savedMessage);
-          io.to(`usr_${rDigits}`).emit('receive_message', savedMessage);
+        const receiverRooms = new Set([String(rId)]);
+        if (rDigits) {
+          receiverRooms.add(rDigits);
+          receiverRooms.add(`usr_${rDigits}`);
         }
 
         // Also check if receiver has partner aliases
@@ -340,12 +405,30 @@ function initChatSocket(server) {
             [rId, rId, `usr_${rDigits}`]
           );
           if (pRows && pRows.length > 0) {
-            if (pRows[0].id) io.to(String(pRows[0].id)).emit('receive_message', savedMessage);
-            if (pRows[0].partner_id) io.to(String(pRows[0].partner_id)).emit('receive_message', savedMessage);
+            if (pRows[0].id) receiverRooms.add(String(pRows[0].id));
+            if (pRows[0].partner_id) receiverRooms.add(String(pRows[0].partner_id));
           }
         } catch (e) {}
 
-        // 3. If receiver is online, emit message_delivered back to sender
+        receiverRooms.forEach(room => {
+          io.to(room).emit('receive_message', savedMessage);
+          io.to(room).emit('new_message', savedMessage);
+          io.to(room).emit('chat_message', savedMessage);
+          io.to(room).emit('message', savedMessage);
+          io.to(room).emit('conversation_updated', {
+            conversationId: convId,
+            conversation_id: convId,
+            lastMessage: savedMessage.message,
+            last_message: savedMessage.message,
+            lastMessageTime: savedMessage.createdAt,
+            last_message_time: savedMessage.createdAt,
+            time: savedMessage.time,
+            senderId: senderId,
+            sender_id: senderId
+          });
+        });
+
+        // 4. If receiver is online, emit message_delivered back to sender
         if (receiverOnline) {
           await chatService.markMessageDelivered(savedMessage.id);
           savedMessage.isDelivered = true;

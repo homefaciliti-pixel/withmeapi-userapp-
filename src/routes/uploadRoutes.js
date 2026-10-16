@@ -148,10 +148,31 @@ const handleFileUpload = async (req, res) => {
     try {
       const { query } = require('../config/db');
       const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
+
+      // Fetch existing profile_images so we never wipe out secondary photos
+      let existingImages = [];
+      const userRows = await query(
+        `SELECT profile_image, profile_images FROM users 
+         WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ? LIMIT 1`,
+        [userId, userFullPhone, userPhone, `%${cleanDigits}`]
+      ).catch(() => []);
+
+      if (userRows && userRows.length > 0 && userRows[0].profile_images) {
+        try {
+          const parsed = JSON.parse(userRows[0].profile_images);
+          if (Array.isArray(parsed)) existingImages = parsed.filter(Boolean);
+        } catch (e) {}
+      }
+
+      const newUrls = filesList.map(f => f.url).filter(Boolean);
+      // Merge unique URLs, preserving existing secondary photos (up to 6 photos)
+      const mergedImages = [...new Set([...existingImages, ...newUrls])].slice(0, 6);
+      const mainPhoto = (userRows && userRows[0] && userRows[0].profile_image) ? userRows[0].profile_image : primary.url;
+
       await query(
         `UPDATE users SET profile_image = ?, profile_images = ?, updated_at = NOW() 
          WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
-        [primary.url, JSON.stringify([primary.url]), userId, userFullPhone, userPhone, `%${cleanDigits}`]
+        [mainPhoto, JSON.stringify(mergedImages), userId, userFullPhone, userPhone, `%${cleanDigits}`]
       );
     } catch (err) {
       console.warn('MySQL upload profile image update notice:', err.message);

@@ -69,10 +69,28 @@ router.post('/photo-upload', authenticateToken, upload.single('photo'), async (r
     try {
       const { query } = require('../config/db');
       const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
+
+      let existingImages = [];
+      const userRows = await query(
+        `SELECT profile_image, profile_images FROM users 
+         WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ? LIMIT 1`,
+        [userId, userFullPhone, userPhone, `%${cleanDigits}`]
+      ).catch(() => []);
+
+      if (userRows && userRows.length > 0 && userRows[0].profile_images) {
+        try {
+          const parsed = JSON.parse(userRows[0].profile_images);
+          if (Array.isArray(parsed)) existingImages = parsed.filter(Boolean);
+        } catch (e) {}
+      }
+
+      const mergedImages = [...new Set([...existingImages, photoUrl])].slice(0, 6);
+      const mainPhoto = (userRows && userRows[0] && userRows[0].profile_image) ? userRows[0].profile_image : photoUrl;
+
       await query(
         `UPDATE users SET profile_image = ?, profile_images = ?, updated_at = NOW() 
          WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
-        [photoUrl, JSON.stringify([photoUrl]), userId, userFullPhone, userPhone, `%${cleanDigits}`]
+        [mainPhoto, JSON.stringify(mergedImages), userId, userFullPhone, userPhone, `%${cleanDigits}`]
       );
     } catch (err) {
       console.warn('MySQL photo-upload update notice:', err.message);

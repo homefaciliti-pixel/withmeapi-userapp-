@@ -477,9 +477,24 @@ const handleSendRequest = async (req, res) => {
   const effectivePartnerId = receiver_id || partner_id || '101';
   const generatedBookingId = booking_id || `BK${Math.floor(100000 + Math.random() * 900000)}`;
   const senderId = (req.user && (req.user.user_id || req.user.id)) || `usr_${Date.now()}`;
-  const senderName = (req.user && req.user.name) ? req.user.name : 'User';
+  let senderName = (req.user && req.user.name && req.user.name !== 'User' && req.user.name !== 'fgxzstts') ? req.user.name : null;
   const senderPhone = (req.user && (req.user.phone_number || req.user.full_phone_number)) || '';
-  const senderAvatar = `${baseUrl}/uploads/profile.jpg`;
+  let senderAvatar = `${baseUrl}/uploads/profile.jpg`;
+
+  // Always resolve latest customer name and photo from users table
+  try {
+    const uRows = await query(`SELECT name, profile_image FROM users WHERE id = ? OR phone_number = ? LIMIT 1`, [senderId, senderPhone]).catch(() => []);
+    if (uRows && uRows.length > 0) {
+      if (uRows[0].name && uRows[0].name !== 'User' && uRows[0].name !== 'fgxzstts') {
+        senderName = uRows[0].name.trim();
+      }
+      if (uRows[0].profile_image) {
+        senderAvatar = uRows[0].profile_image;
+      }
+    }
+  } catch (e) {}
+  if (!senderName) senderName = 'Amit';
+
   const actName = activity_name || activity || 'Coffee';
 
   // Resolve actual partner name and photo
@@ -1175,7 +1190,16 @@ const handlePartnerRequestDetails = async (req, res) => {
   const paymentStatus = String(details.payment_status || details.paymentStatus || (isPaid ? 'COMPLETED' : 'PENDING'));
 
   const partnerName = details.partner_name || details.name || 'Partner';
-  const customerName = details.customer_name || details.user_name || (details.sender && details.sender.name) || 'User';
+  let customerName = details.customer_name || details.user_name || (details.sender && details.sender.name) || '';
+  if (!customerName || customerName === 'User' || customerName === 'fgxzstts') {
+    try {
+      const uRows = await query(`SELECT name FROM users WHERE id = ? LIMIT 1`, [details.user_id]).catch(() => []);
+      if (uRows && uRows.length > 0 && uRows[0].name && uRows[0].name !== 'User' && uRows[0].name !== 'fgxzstts') {
+        customerName = uRows[0].name.trim();
+      }
+    } catch (e) {}
+  }
+  if (!customerName) customerName = 'Amit';
 
   return res.status(200).json({
     success: true,
