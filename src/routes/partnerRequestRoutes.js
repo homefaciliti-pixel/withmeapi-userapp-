@@ -482,6 +482,23 @@ const handleSendRequest = async (req, res) => {
   const senderAvatar = `${baseUrl}/uploads/profile.jpg`;
   const actName = activity_name || activity || 'Coffee';
 
+  // Resolve actual partner name and photo
+  let partnerName = (req.body && (req.body.partner_name || req.body.partnerName || req.body.name)) || '';
+  let partnerAvatar = null;
+  try {
+    const pRows = await query(
+      `SELECT name, full_name, profile_photo_url, image FROM withme_partners WHERE partner_id = ? OR id = ? OR user_id = ? LIMIT 1`,
+      [String(effectivePartnerId), String(effectivePartnerId), String(effectivePartnerId)]
+    ).catch(() => []);
+    if (pRows && pRows.length > 0) {
+      if (!partnerName || partnerName === senderName) {
+        partnerName = pRows[0].full_name || pRows[0].name || 'Partner';
+      }
+      partnerAvatar = pRows[0].profile_photo_url || pRows[0].image;
+    }
+  } catch (e) {}
+  if (!partnerName || partnerName === senderName) partnerName = 'Partner';
+
   const newRequest = {
     id: requestId,
     request_id: requestId,
@@ -495,6 +512,10 @@ const handleSendRequest = async (req, res) => {
     },
     receiver_id: effectivePartnerId,
     partner_id: effectivePartnerId,
+    partner_name: partnerName,
+    partner_avatar: formatPartnerPhoto(partnerAvatar, baseUrl),
+    name: partnerName,
+    full_name: partnerName,
     activity_id,
     activity: actName,
     activity_name: actName,
@@ -515,17 +536,34 @@ const handleSendRequest = async (req, res) => {
   // 1. Save to MySQL database table `partner_requests`
   try {
     const locationStr = typeof location === 'string' ? location : JSON.stringify(location);
+    // Ensure partner_name column exists
+    query(`ALTER TABLE withme_partner_requests ADD COLUMN partner_name VARCHAR(150)`).catch(() => {});
+    query(`ALTER TABLE withme_partner_requests ADD COLUMN partner_avatar VARCHAR(255)`).catch(() => {});
+
     await query(
       `INSERT INTO withme_partner_requests (
-        id, request_id, booking_id, user_id, partner_id, sender_name, sender_phone, sender_avatar,
-        activity, date, time, location, message, price, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())
-      ON DUPLICATE KEY UPDATE status = 'PENDING', updated_at = NOW()`,
+        id, request_id, booking_id, user_id, partner_id, partner_name, partner_avatar,
+        sender_name, sender_phone, sender_avatar, activity, date, time, location, message, price, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())
+      ON DUPLICATE KEY UPDATE status = 'PENDING', partner_name = VALUES(partner_name), updated_at = NOW()`,
       [
-        requestId, requestId, generatedBookingId, senderId, effectivePartnerId, senderName, senderPhone, senderAvatar,
-        actName, date, time, locationStr, message, newRequest.price
+        requestId, requestId, generatedBookingId, senderId, effectivePartnerId, partnerName, partnerAvatar,
+        senderName, senderPhone, senderAvatar, actName, date, time, locationStr, message, newRequest.price
       ]
-    );
+    ).catch(async () => {
+      // Fallback if columns not yet added
+      await query(
+        `INSERT INTO withme_partner_requests (
+          id, request_id, booking_id, user_id, partner_id, sender_name, sender_phone, sender_avatar,
+          activity, date, time, location, message, price, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())
+        ON DUPLICATE KEY UPDATE status = 'PENDING', updated_at = NOW()`,
+        [
+          requestId, requestId, generatedBookingId, senderId, effectivePartnerId, senderName, senderPhone, senderAvatar,
+          actName, date, time, locationStr, message, newRequest.price
+        ]
+      );
+    });
     // Backward compatibility mirror
     query(
       `INSERT INTO partner_requests (
@@ -540,7 +578,7 @@ const handleSendRequest = async (req, res) => {
         message, newRequest.price, 'INR'
       ]
     ).catch(() => {});
-    console.log(`[Database] Partner request ${requestId} saved to withme_partner_requests table.`);
+    console.log(`[Database] Partner request ${requestId} saved to withme_partner_requests table for partner ${partnerName}.`);
   } catch (err) {
     console.warn('MySQL partner request insert notice:', err.message);
   }
@@ -1206,15 +1244,40 @@ const handlePartnerList = async (req, res) => {
     const userId = req.user ? (req.user.user_id || req.user.id) : null;
     let reqRows = [];
     if (userId) {
-      reqRows = await query('SELECT * FROM withme_partner_requests WHERE user_id = ? ORDER BY id DESC LIMIT 50', [userId]).catch(() => []);
+      reqRows = await query(`
+        SELECT r.*,
+               p.name AS db_partner_name,
+               p.full_name AS db_partner_fullname,
+               p.image AS db_partner_img,
+               p.profile_photo_url AS db_partner_avatar
+        FROM withme_partner_requests r
+        LEFT JOIN withme_partners p ON (r.partner_id = p.partner_id OR r.partner_id = p.id OR r.partner_id = p.user_id)
+        WHERE r.user_id = ?
+        ORDER BY r.id DESC LIMIT 50
+      `, [userId]).catch(() => []);
+
       if (!reqRows || reqRows.length === 0) {
-        reqRows = await query('SELECT * FROM partner_requests WHERE sender_id = ? ORDER BY created_at DESC LIMIT 50', [userId]).catch(() => []);
+        reqRows = await query(`
+          SELECT r.*,
+                 p.name AS db_partner_name,
+                 p.full_name AS db_partner_fullname,
+                 p.image AS db_partner_img,
+                 p.profile_photo_url AS db_partner_avatar
+          FROM partner_requests r
+          LEFT JOIN withme_partners p ON (r.partner_id = p.partner_id OR r.partner_id = p.id OR r.receiver_id = p.partner_id OR r.receiver_id = p.id)
+          WHERE r.sender_id = ?
+          ORDER BY r.created_at DESC LIMIT 50
+        `, [userId]).catch(() => []);
       }
     }
 
     if (reqRows && reqRows.length > 0) {
       realRequests = reqRows.map(r => {
-        const photoUrl = formatPartnerPhoto(r.partner_avatar || r.sender_avatar || r.image, baseUrl);
+        const resolvedPartnerName = (r.partner_name && r.partner_name !== r.sender_name)
+          ? r.partner_name
+          : (r.db_partner_fullname || r.db_partner_name || 'Partner');
+
+        const photoUrl = formatPartnerPhoto(r.partner_avatar || r.db_partner_avatar || r.db_partner_img || r.image, baseUrl);
         const pId = formatNumericUserId(r.partner_id || r.receiver_id || r.id || 101);
         const bId = r.booking_id || requestedBookingId;
 
@@ -1226,8 +1289,10 @@ const handlePartnerList = async (req, res) => {
           partner_id: pId,
           partner_user_id: pId,
           partnerUserId: pId,
-          name: r.partner_name || r.sender_name || 'Partner',
-          full_name: r.partner_name || r.sender_name || 'Partner',
+          name: resolvedPartnerName,
+          full_name: resolvedPartnerName,
+          partner_name: resolvedPartnerName,
+          customer_name: r.sender_name || 'User',
           sender_name: r.sender_name || 'User',
           sender_avatar: formatPartnerPhoto(r.sender_avatar, baseUrl),
           city: r.location || 'Jaipur',

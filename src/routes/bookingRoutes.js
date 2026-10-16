@@ -101,13 +101,35 @@ const handleCreateBooking = async (req, res) => {
   const userPhone = (req.user && (req.user.phone_number || req.user.full_phone_number)) || '';
   const locationStr = typeof location === 'string' ? location : (location.address || 'Jaipur');
 
+  // Resolve actual partner name from request body or database
+  let partnerName = (req.body && (req.body.partner_name || req.body.partnerName || req.body.name)) || '';
+  let partnerAvatar = null;
+  try {
+    const pRows = await query(
+      `SELECT name, full_name, profile_photo_url, image FROM withme_partners WHERE partner_id = ? OR id = ? OR user_id = ? LIMIT 1`,
+      [String(effectivePartnerId), String(effectivePartnerId), String(effectivePartnerId)]
+    ).catch(() => []);
+    if (pRows && pRows.length > 0) {
+      if (!partnerName || partnerName === userName) {
+        partnerName = pRows[0].full_name || pRows[0].name || 'Partner';
+      }
+      partnerAvatar = pRows[0].profile_photo_url || pRows[0].image;
+    }
+  } catch (e) {}
+  if (!partnerName || partnerName === userName) partnerName = 'Partner';
+
   const newBooking = {
     booking_id: bookingId,
     status: 'Upcoming',
     user_id: userId,
     user_name: userName,
+    customer_name: userName,
     activity_user_id: effectivePartnerId,
     partner_id: effectivePartnerId,
+    partner_name: partnerName,
+    partner_avatar: partnerAvatar,
+    name: partnerName,
+    full_name: partnerName,
     activity,
     date,
     time,
@@ -122,14 +144,27 @@ const handleCreateBooking = async (req, res) => {
 
   // 1. Save to MySQL table `withme_partner_bookings`
   try {
+    // Ensure partner_name column exists
+    query(`ALTER TABLE withme_partner_bookings ADD COLUMN partner_name VARCHAR(150)`).catch(() => {});
+
     await query(
       `INSERT INTO withme_partner_bookings (
-        booking_id, user_id, partner_id, customer_name, customer_phone, activity,
+        booking_id, user_id, partner_id, partner_name, customer_name, customer_phone, activity,
         date, time, duration, location, price, currency, payment_status, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'PENDING', 'PENDING', NOW())
-      ON DUPLICATE KEY UPDATE status = 'PENDING', updated_at = NOW()`,
-      [bookingId, userId, effectivePartnerId, userName, userPhone, activity, date, time, newBooking.duration, locationStr, price]
-    );
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'PENDING', 'PENDING', NOW())
+      ON DUPLICATE KEY UPDATE status = 'PENDING', partner_name = VALUES(partner_name), updated_at = NOW()`,
+      [bookingId, userId, effectivePartnerId, partnerName, userName, userPhone, activity, date, time, newBooking.duration, locationStr, price]
+    ).catch(async () => {
+      // Fallback without partner_name column if alter not ready
+      await query(
+        `INSERT INTO withme_partner_bookings (
+          booking_id, user_id, partner_id, customer_name, customer_phone, activity,
+          date, time, duration, location, price, currency, payment_status, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'PENDING', 'PENDING', NOW())
+        ON DUPLICATE KEY UPDATE status = 'PENDING', updated_at = NOW()`,
+        [bookingId, userId, effectivePartnerId, userName, userPhone, activity, date, time, newBooking.duration, locationStr, price]
+      );
+    });
     // Backward compatibility mirror
     query(
       `INSERT INTO partner_bookings (
@@ -139,7 +174,7 @@ const handleCreateBooking = async (req, res) => {
       ON DUPLICATE KEY UPDATE status = 'Pending', updated_at = NOW()`,
       [bookingId, userId, userName, userPhone, effectivePartnerId, activity, date, time, locationStr, price]
     ).catch(() => {});
-    console.log(`[Database] Booking ${bookingId} saved to MySQL withme_partner_bookings table.`);
+    console.log(`[Database] Booking ${bookingId} saved to MySQL withme_partner_bookings table for partner ${partnerName}.`);
   } catch (err) {
     console.warn('MySQL booking insert notice:', err.message);
   }
@@ -148,7 +183,10 @@ const handleCreateBooking = async (req, res) => {
   syncBookingToPartnerApp({
     booking_id: bookingId,
     partner_id: effectivePartnerId,
+    partner_name: partnerName,
     user_id: userId,
+    user_name: userName,
+    customer_name: userName,
     name: userName,
     interest: activity,
     location: locationStr,
@@ -175,19 +213,56 @@ router.post('/create', authenticateToken, handleCreateBooking);
 
 // 3. User Bookings List API — GET (/bookings/list or /api/v1/bookings/list)
 router.get('/list', authenticateToken, async (req, res) => {
-  let combinedBookings = [...bookingsStore];
+  const userId = req.user ? (req.user.user_id || req.user.id) : null;
+  let combinedBookings = [];
+
+  // Add matching user in-memory bookings
+  bookingsStore.forEach(b => {
+    if (!userId || String(b.user_id) === String(userId)) {
+      combinedBookings.push(b);
+    }
+  });
 
   try {
-    const dbBookings = await query(`SELECT * FROM withme_partner_bookings ORDER BY created_at DESC LIMIT 50`);
+    let dbQuery = `
+      SELECT b.*,
+             p.name AS partner_name_from_db,
+             p.full_name AS partner_fullname_from_db,
+             p.image AS partner_img,
+             p.profile_photo_url AS partner_photo
+      FROM withme_partner_bookings b
+      LEFT JOIN withme_partners p ON (b.partner_id = p.partner_id OR b.partner_id = p.id OR b.partner_id = p.user_id)
+    `;
+    let queryParams = [];
+    if (userId) {
+      dbQuery += ` WHERE b.user_id = ? ORDER BY b.created_at DESC LIMIT 50`;
+      queryParams = [userId];
+    } else {
+      dbQuery += ` ORDER BY b.created_at DESC LIMIT 50`;
+    }
+
+    const dbBookings = await query(dbQuery, queryParams).catch(() => []);
     if (dbBookings && dbBookings.length > 0) {
       dbBookings.forEach(db => {
         if (!combinedBookings.some(b => b.booking_id === db.booking_id)) {
+          const resolvedPartnerName = (db.partner_name && db.partner_name !== db.customer_name)
+            ? db.partner_name
+            : (db.partner_fullname_from_db || db.partner_name_from_db || 'Partner');
+
+          const partnerPhoto = db.partner_photo || db.partner_img || null;
+
           combinedBookings.push({
             booking_id: db.booking_id,
             status: db.status || 'Upcoming',
             activity_user_id: db.partner_id,
             partner_id: db.partner_id,
-            partner_name: db.customer_name,
+            partner_name: resolvedPartnerName,
+            partner_avatar: partnerPhoto,
+            name: resolvedPartnerName,
+            full_name: resolvedPartnerName,
+            customer_name: db.customer_name || 'User',
+            user_name: db.customer_name || 'User',
+            user_id: db.user_id,
             activity: db.activity,
             date: db.date,
             time: db.time,
@@ -200,7 +275,7 @@ router.get('/list', authenticateToken, async (req, res) => {
       });
     }
   } catch (err) {
-    // Fallback to in-memory bookings
+    console.warn('DB Bookings list query notice:', err.message);
   }
 
   return res.status(200).json({
