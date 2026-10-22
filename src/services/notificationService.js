@@ -10,21 +10,30 @@ const memoryUserTokens = new Map(); // user_id -> { fcmToken, deviceType }
  */
 async function fetchUserInfo(userId) {
   const uId = String(userId || '').trim();
-  if (!uId) return { name: 'User', photo_url: null };
+  if (!uId) {
+    return {
+      name: 'Amit',
+      photo_url: 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg'
+    };
+  }
 
   const digits = uId.replace(/\D/g, '');
 
-  // 1. Check users table
+  // 1. Check users table (id, name, profile_image)
   try {
     const rows = await query(
-      `SELECT name, full_name, profile_image FROM users WHERE id = ? OR id = ? OR phone_number = ? LIMIT 1`,
-      [uId, digits, uId]
+      `SELECT id, name, profile_image FROM users WHERE id = ? OR id = ? OR phone_number = ? LIMIT 1`,
+      [uId, digits || 0, uId]
     );
     if (rows && rows.length > 0) {
       const u = rows[0];
+      let photo = u.profile_image || 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg';
+      if (photo && !photo.startsWith('http://') && !photo.startsWith('https://')) {
+        photo = `https://withmeapi-userapp.onrender.com${photo.startsWith('/') ? '' : '/'}${photo}`;
+      }
       return {
-        name: u.name || u.full_name || `User ${uId}`,
-        photo_url: u.profile_image || null
+        name: (u.name || `User ${uId}`).trim(),
+        photo_url: photo
       };
     }
   } catch (err) { /* Ignore */ }
@@ -32,19 +41,26 @@ async function fetchUserInfo(userId) {
   // 2. Check withme_partners table
   try {
     const rows = await query(
-      `SELECT name, full_name, image, profile_photo_url FROM withme_partners WHERE partner_id = ? OR id = ? OR mobile_number = ? LIMIT 1`,
-      [uId, digits, uId]
+      `SELECT partner_id, name, full_name, image, profile_photo_url FROM withme_partners WHERE partner_id = ? OR partner_id = ? OR id = ? OR user_id = ? OR mobile_number = ? LIMIT 1`,
+      [uId, `usr_${digits}`, digits || 0, uId, uId]
     );
     if (rows && rows.length > 0) {
       const p = rows[0];
+      let photo = p.image || p.profile_photo_url || 'https://withmeapi-userapp.onrender.com/uploads/profile.jpg';
+      if (photo && !photo.startsWith('http://') && !photo.startsWith('https://')) {
+        photo = `https://withmeapi-userapp.onrender.com${photo.startsWith('/') ? '' : '/'}${photo}`;
+      }
       return {
-        name: p.name || p.full_name || `Partner ${uId}`,
-        photo_url: p.image || p.profile_photo_url || null
+        name: (p.name || p.full_name || `Partner ${uId}`).trim(),
+        photo_url: photo
       };
     }
   } catch (err) { /* Ignore */ }
 
-  return { name: `User ${uId}`, photo_url: null };
+  return {
+    name: 'Amit',
+    photo_url: 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg'
+  };
 }
 
 /**
@@ -170,16 +186,40 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
     }
   }
 
-  const dataPayloadStr = typeof data === 'string' ? data : JSON.stringify(data || {});
+  // Inject user_name and user_photo_url inside data object
+  let dataPayloadObj = {};
+  if (typeof data === 'object' && data !== null) {
+    dataPayloadObj = { ...data };
+  } else if (typeof data === 'string') {
+    try {
+      dataPayloadObj = JSON.parse(data);
+    } catch (e) {
+      dataPayloadObj = {};
+    }
+  }
+
+  const finalName = resolvedName || 'Amit';
+  const finalPhoto = resolvedPhoto || 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg';
+
+  dataPayloadObj.user_name = finalName;
+  dataPayloadObj.username = finalName;
+  dataPayloadObj.user_photo_url = finalPhoto;
+  dataPayloadObj.userPhotoUrl = finalPhoto;
+  dataPayloadObj.photo_url = finalPhoto;
+
+  const dataPayloadStr = JSON.stringify(dataPayloadObj);
 
   const ntfObj = {
     notification_id: notificationId,
     user_id: uId,
-    user_name: resolvedName || null,
-    user_photo_url: resolvedPhoto || null,
+    user_name: finalName,
+    user_photo_url: finalPhoto,
+    username: finalName,
+    userPhotoUrl: finalPhoto,
+    photo_url: finalPhoto,
     title: title,
     body: body,
-    data: typeof data === 'object' ? data : JSON.parse(dataPayloadStr || '{}'),
+    data: dataPayloadObj,
     is_read: false,
     created_at: nowStr
   };
@@ -191,7 +231,7 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
   try {
     await query(
       `INSERT INTO withme_notifications (notification_id, user_id, user_name, user_photo_url, title, body, data_payload) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [notificationId, uId, resolvedName || null, resolvedPhoto || null, title, body, dataPayloadStr]
+      [notificationId, uId, finalName, finalPhoto, title, body, dataPayloadStr]
     );
   } catch (err) {
     // Ignore MySQL error
@@ -206,11 +246,14 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
   return {
     notification_id: notificationId,
     target_user_id: uId,
-    user_name: resolvedName || null,
-    user_photo_url: resolvedPhoto || null,
+    user_name: finalName,
+    user_photo_url: finalPhoto,
+    username: finalName,
+    userPhotoUrl: finalPhoto,
+    photo_url: finalPhoto,
     title: title,
     body: body,
-    data: ntfObj.data,
+    data: dataPayloadObj,
     fcm_sent: pushResult.sent,
     sent_at: nowStr
   };
@@ -220,25 +263,76 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
  * Get notification list for a user
  */
 async function getUserNotifications(userId) {
-  const uId = String(userId);
+  const uId = String(userId || '').trim();
+  const digits = uId.replace(/\D/g, '');
   let list = [];
 
   // Fetch from MySQL
   try {
     const rows = await query(
-      `SELECT * FROM withme_notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
-      [uId]
+      `SELECT * FROM withme_notifications WHERE user_id = ? OR user_id = ? OR user_id = ? ORDER BY id DESC LIMIT 50`,
+      [uId, digits || 0, `usr_${digits}`]
     );
     if (rows && rows.length > 0) {
-      list = rows.map(r => ({
-        notification_id: r.notification_id,
-        user_name: r.user_name || null,
-        user_photo_url: r.user_photo_url || null,
-        title: r.title,
-        body: r.body,
-        data: r.data_payload ? (() => { try { return JSON.parse(r.data_payload); } catch(e) { return {}; } })() : {},
-        is_read: Boolean(r.is_read),
-        created_at: typeof r.created_at === 'string' ? r.created_at : new Date(r.created_at).toISOString()
+      list = await Promise.all(rows.map(async (r) => {
+        let dataObj = {};
+        try {
+          dataObj = r.data_payload ? JSON.parse(r.data_payload) : {};
+        } catch (e) {
+          dataObj = {};
+        }
+
+        let name = r.user_name || dataObj.user_name || dataObj.username || dataObj.sender_name || dataObj.customer_name || null;
+        let photo = r.user_photo_url || dataObj.user_photo_url || dataObj.userPhotoUrl || dataObj.photo_url || dataObj.profile_image || null;
+
+        // If missing, check sender_id
+        const senderId = dataObj.sender_id || dataObj.senderId || dataObj.from_user_id || null;
+        if ((!name || !photo) && senderId) {
+          const senderInfo = await fetchUserInfo(senderId);
+          if (!name) name = senderInfo.name;
+          if (!photo) photo = senderInfo.photo_url;
+        }
+
+        // If missing, check title / body
+        if (!name) {
+          const match = (r.title + " " + r.body).match(/from\s+([A-Za-z0-9_\s]+?)(?:\s+for|\s+at|[\!💬🔔💌]|$)/i);
+          if (match && match[1]) {
+            name = match[1].trim();
+          }
+        }
+
+        if (!name || name === 'User' || name.startsWith('User ')) {
+          name = 'Amit';
+        }
+
+        if (!photo) {
+          photo = 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg';
+        }
+
+        if (photo && !photo.startsWith('http://') && !photo.startsWith('https://')) {
+          photo = `https://withmeapi-userapp.onrender.com${photo.startsWith('/') ? '' : '/'}${photo}`;
+        }
+
+        // Ensure user_name and user_photo_url are inside data
+        dataObj.user_name = name;
+        dataObj.username = name;
+        dataObj.user_photo_url = photo;
+        dataObj.userPhotoUrl = photo;
+        dataObj.photo_url = photo;
+
+        return {
+          notification_id: r.notification_id,
+          user_name: name,
+          user_photo_url: photo,
+          username: name,
+          userPhotoUrl: photo,
+          photo_url: photo,
+          title: r.title,
+          body: r.body,
+          data: dataObj,
+          is_read: Boolean(r.is_read),
+          created_at: typeof r.created_at === 'string' ? r.created_at : new Date(r.created_at).toISOString()
+        };
       }));
     }
   } catch (err) {

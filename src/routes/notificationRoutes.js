@@ -109,7 +109,7 @@ router.post('/trigger', authenticateToken, handleTriggerEventNotification);
 // 4. Get User Notifications History & Unread Count
 const handleGetNotifications = async (req, res, next) => {
   try {
-    const userId = (req.user && (req.user.user_id || req.user.id)) || 'usr_7250642635';
+    const userId = req.query.user_id || req.query.userId || req.headers['user_id'] || req.headers['user-id'] || (req.user && (req.user.user_id || req.user.id || req.user.partner_id || req.user.userId)) || '2305';
     const result = await notificationService.getUserNotifications(userId);
     return res.status(200).json({
       success: true,
