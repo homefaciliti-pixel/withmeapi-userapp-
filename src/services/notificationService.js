@@ -6,6 +6,48 @@ const memoryNotifications = new Map(); // notification_id -> object
 const memoryUserTokens = new Map(); // user_id -> { fcmToken, deviceType }
 
 /**
+ * Fetch user name and profile photo URL from DB (users or withme_partners table)
+ */
+async function fetchUserInfo(userId) {
+  const uId = String(userId || '').trim();
+  if (!uId) return { name: 'User', photo_url: null };
+
+  const digits = uId.replace(/\D/g, '');
+
+  // 1. Check users table
+  try {
+    const rows = await query(
+      `SELECT name, full_name, profile_image FROM users WHERE id = ? OR id = ? OR phone_number = ? LIMIT 1`,
+      [uId, digits, uId]
+    );
+    if (rows && rows.length > 0) {
+      const u = rows[0];
+      return {
+        name: u.name || u.full_name || `User ${uId}`,
+        photo_url: u.profile_image || null
+      };
+    }
+  } catch (err) { /* Ignore */ }
+
+  // 2. Check withme_partners table
+  try {
+    const rows = await query(
+      `SELECT name, full_name, image, profile_photo_url FROM withme_partners WHERE partner_id = ? OR id = ? OR mobile_number = ? LIMIT 1`,
+      [uId, digits, uId]
+    );
+    if (rows && rows.length > 0) {
+      const p = rows[0];
+      return {
+        name: p.name || p.full_name || `Partner ${uId}`,
+        photo_url: p.image || p.profile_photo_url || null
+      };
+    }
+  } catch (err) { /* Ignore */ }
+
+  return { name: `User ${uId}`, photo_url: null };
+}
+
+/**
  * Save / Update FCM Token for a user
  */
 async function saveUserFcmToken(userId, fcmToken, deviceType = 'android') {
@@ -92,7 +134,7 @@ function sendFcmPushNotification(fcmToken, title, body, dataPayload = {}) {
 /**
  * Create and send a notification to a target user
  */
-async function sendNotification({ userId, title, body, data = {} }) {
+async function sendNotification({ userId, title, body, data = {}, senderUserId = null, userName = null, userPhotoUrl = null }) {
   if (!userId || !title || !body) {
     throw new Error("userId, title, and body are required");
   }
@@ -100,6 +142,15 @@ async function sendNotification({ userId, title, body, data = {} }) {
   const uId = String(userId);
   const notificationId = `ntf_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
   const nowStr = new Date().toISOString();
+
+  // Resolve sender name + photo if not passed in
+  let resolvedName = userName;
+  let resolvedPhoto = userPhotoUrl;
+  if ((!resolvedName || !resolvedPhoto) && senderUserId) {
+    const info = await fetchUserInfo(senderUserId);
+    if (!resolvedName) resolvedName = info.name;
+    if (!resolvedPhoto) resolvedPhoto = info.photo_url;
+  }
 
   // Find target user FCM token
   let fcmToken = null;
@@ -124,6 +175,8 @@ async function sendNotification({ userId, title, body, data = {} }) {
   const ntfObj = {
     notification_id: notificationId,
     user_id: uId,
+    user_name: resolvedName || null,
+    user_photo_url: resolvedPhoto || null,
     title: title,
     body: body,
     data: typeof data === 'object' ? data : JSON.parse(dataPayloadStr || '{}'),
@@ -134,11 +187,11 @@ async function sendNotification({ userId, title, body, data = {} }) {
   // Save to memory
   memoryNotifications.set(notificationId, ntfObj);
 
-  // Save to MySQL
+  // Save to MySQL (including user_name and user_photo_url)
   try {
     await query(
-      `INSERT INTO withme_notifications (notification_id, user_id, title, body, data_payload) VALUES (?, ?, ?, ?, ?)`,
-      [notificationId, uId, title, body, dataPayloadStr]
+      `INSERT INTO withme_notifications (notification_id, user_id, user_name, user_photo_url, title, body, data_payload) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [notificationId, uId, resolvedName || null, resolvedPhoto || null, title, body, dataPayloadStr]
     );
   } catch (err) {
     // Ignore MySQL error
@@ -153,6 +206,8 @@ async function sendNotification({ userId, title, body, data = {} }) {
   return {
     notification_id: notificationId,
     target_user_id: uId,
+    user_name: resolvedName || null,
+    user_photo_url: resolvedPhoto || null,
     title: title,
     body: body,
     data: ntfObj.data,
@@ -177,9 +232,11 @@ async function getUserNotifications(userId) {
     if (rows && rows.length > 0) {
       list = rows.map(r => ({
         notification_id: r.notification_id,
+        user_name: r.user_name || null,
+        user_photo_url: r.user_photo_url || null,
         title: r.title,
         body: r.body,
-        data: r.data_payload ? JSON.parse(r.data_payload) : {},
+        data: r.data_payload ? (() => { try { return JSON.parse(r.data_payload); } catch(e) { return {}; } })() : {},
         is_read: Boolean(r.is_read),
         created_at: typeof r.created_at === 'string' ? r.created_at : new Date(r.created_at).toISOString()
       }));
@@ -252,7 +309,19 @@ async function sendEventNotification(eventType, params = {}) {
       return { sent: false, reason: "NO_RECIPIENT_ID" };
     }
 
-    const name = params.name || params.customer_name || params.sender_name || 'User';
+    // Resolve sender info for user_name and user_photo_url
+    const senderUserId = params.sender_id || params.senderId || params.from_user_id || null;
+    let resolvedName = params.name || params.customer_name || params.sender_name || null;
+    let resolvedPhoto = params.user_photo_url || params.photo_url || params.profile_image || null;
+
+    // Auto-fetch from DB if not supplied
+    if (senderUserId && (!resolvedName || !resolvedPhoto)) {
+      const senderInfo = await fetchUserInfo(senderUserId);
+      if (!resolvedName) resolvedName = senderInfo.name;
+      if (!resolvedPhoto) resolvedPhoto = senderInfo.photo_url;
+    }
+
+    const name = resolvedName || 'User';
     const activity = params.activity || params.interest || 'Date';
     const location = params.location || 'Jaipur';
     const bookingId = params.booking_id || params.bookingId || '';
@@ -376,7 +445,10 @@ async function sendEventNotification(eventType, params = {}) {
       userId: recipientId,
       title,
       body,
-      data: dataPayload
+      data: dataPayload,
+      senderUserId: senderUserId || null,
+      userName: resolvedName || null,
+      userPhotoUrl: resolvedPhoto || null
     });
   } catch (err) {
     console.error("[Event Notification Error]:", err.message);

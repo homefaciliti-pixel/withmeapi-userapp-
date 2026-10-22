@@ -194,6 +194,8 @@ async function initAllWithMeTables() {
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       notification_id VARCHAR(64) UNIQUE,
       user_id VARCHAR(64) NOT NULL,
+      user_name VARCHAR(255) DEFAULT NULL,
+      user_photo_url TEXT DEFAULT NULL,
       title VARCHAR(255) NOT NULL,
       body TEXT NOT NULL,
       data_payload TEXT,
@@ -201,6 +203,15 @@ async function initAllWithMeTables() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Ensure new columns on pre-existing withme_notifications table
+  const notifAlters = [
+    "ALTER TABLE withme_notifications ADD COLUMN user_name VARCHAR(255) DEFAULT NULL",
+    "ALTER TABLE withme_notifications ADD COLUMN user_photo_url TEXT DEFAULT NULL"
+  ];
+  for (const sql of notifAlters) {
+    try { await query(sql); } catch (e) { /* column already exists */ }
+  }
 
   // 11. withme_payments
   await query(`

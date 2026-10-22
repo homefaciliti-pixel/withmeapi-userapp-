@@ -40,6 +40,8 @@ const handleSendNotification = async (req, res, next) => {
     const title = req.body ? (req.body.title || req.body.subject) : null;
     const body = req.body ? (req.body.body || req.body.message || req.body.content) : null;
     const dataPayload = req.body ? (req.body.data || req.body.payload || {}) : {};
+    const userName = req.body ? (req.body.user_name || req.body.username || req.body.sender_name || null) : null;
+    const userPhotoUrl = req.body ? (req.body.user_photo_url || req.body.photo_url || req.body.profile_image || null) : null;
 
     if (!targetUserId || !title || !body) {
       return res.status(400).json({
@@ -53,7 +55,10 @@ const handleSendNotification = async (req, res, next) => {
       userId: targetUserId,
       title,
       body,
-      data: dataPayload
+      data: dataPayload,
+      senderUserId: currentUserId,
+      userName,
+      userPhotoUrl
     });
 
     return res.status(200).json({
