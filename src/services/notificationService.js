@@ -340,7 +340,12 @@ async function sendEventNotification(eventType, params = {}) {
       case 'request':
         title = "New Booking Request 💌";
         body = `You received a new booking request from ${name} for ${activity} at ${location}!`;
-        dataPayload = { type: "booking_request", request_id: requestId || `req_${Date.now()}` };
+        dataPayload = {
+          type: "booking_request",
+          request_id: requestId || `req_${Date.now()}`,
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'booking_confirmed':
@@ -348,7 +353,13 @@ async function sendEventNotification(eventType, params = {}) {
       case 'booking_confirm':
         title = "Booking Confirmed! ✅";
         body = `Your booking ${bookingId} with ${name} for ${activity} is confirmed for ${dateStr} ${timeStr}!`;
-        dataPayload = { type: "booking_confirmed", booking_id: bookingId, request_id: requestId };
+        dataPayload = {
+          type: "booking_confirmed",
+          booking_id: bookingId,
+          request_id: requestId,
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'booking_cancelled':
@@ -358,7 +369,12 @@ async function sendEventNotification(eventType, params = {}) {
       case 'booking_cancle':
         title = "Booking Cancelled ❌";
         body = `Booking ${bookingId} with ${name} has been cancelled.`;
-        dataPayload = { type: "booking_cancelled", booking_id: bookingId };
+        dataPayload = {
+          type: "booking_cancelled",
+          booking_id: bookingId,
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'booking_completed':
@@ -366,7 +382,12 @@ async function sendEventNotification(eventType, params = {}) {
       case 'booking_complete':
         title = "Booking Completed 🎉";
         body = `Booking ${bookingId} with ${name} has been marked as completed. Thank you!`;
-        dataPayload = { type: "booking_completed", booking_id: bookingId };
+        dataPayload = {
+          type: "booking_completed",
+          booking_id: bookingId,
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'request_cancelled':
@@ -374,7 +395,12 @@ async function sendEventNotification(eventType, params = {}) {
       case 'request_cancle':
         title = "Request Cancelled ❌";
         body = `Booking request ${requestId} has been cancelled.`;
-        dataPayload = { type: "request_cancelled", request_id: requestId };
+        dataPayload = {
+          type: "request_cancelled",
+          request_id: requestId,
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'booking_reminder':
@@ -384,14 +410,27 @@ async function sendEventNotification(eventType, params = {}) {
       case 'remind':
         title = "Upcoming Booking Reminder ⏰";
         body = `Reminder: You have an upcoming booking with ${name} on ${dateStr} at ${timeStr}. Location: ${location}.`;
-        dataPayload = { type: "booking_reminder", booking_id: bookingId, date: dateStr, time: timeStr, location };
+        dataPayload = {
+          type: "booking_reminder",
+          booking_id: bookingId,
+          date: dateStr,
+          time: timeStr,
+          location,
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'safe_meet_alert':
       case 'safe_meet':
         title = "Safe Meet Mode Active 🛡️";
         body = `Safe Meet protection is active for booking ${bookingId}. Your emergency contacts and live location monitoring are enabled.`;
-        dataPayload = { type: "safe_meet_alert", booking_id: bookingId };
+        dataPayload = {
+          type: "safe_meet_alert",
+          booking_id: bookingId,
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'wallet_credit':
@@ -400,7 +439,13 @@ async function sendEventNotification(eventType, params = {}) {
       case 'earning_credit':
         title = "Wallet Credited 💰";
         body = `₹${amount} has been credited to your WithMe earnings wallet!`;
-        dataPayload = { type: "wallet_credit", amount: Number(amount), booking_id: bookingId };
+        dataPayload = {
+          type: "wallet_credit",
+          amount: Number(amount),
+          booking_id: bookingId,
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'withdraw_success':
@@ -408,14 +453,25 @@ async function sendEventNotification(eventType, params = {}) {
       case 'withdrawal_success':
         title = "Withdrawal Successful 🏦";
         body = `Your withdrawal payout request of ₹${amount} has been processed successfully to your bank account.`;
-        dataPayload = { type: "withdraw_success", amount: Number(amount) };
+        dataPayload = {
+          type: "withdraw_success",
+          amount: Number(amount),
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'withdraw_failed':
       case 'withdrawal_failed':
         title = "Withdrawal Failed ❌";
         body = `Your withdrawal request of ₹${amount} failed. ${params.reason ? `Reason: ${params.reason}. ` : ''}Amount has been refunded to your wallet.`;
-        dataPayload = { type: "withdraw_failed", amount: Number(amount), reason: params.reason || 'Processing error' };
+        dataPayload = {
+          type: "withdraw_failed",
+          amount: Number(amount),
+          reason: params.reason || 'Processing error',
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'chat_message':
@@ -423,7 +479,13 @@ async function sendEventNotification(eventType, params = {}) {
       case 'message':
         title = `New Message from ${name} 💬`;
         body = params.message ? (params.message.length > 80 ? params.message.substring(0, 80) + '...' : params.message) : "Sent you a new chat message.";
-        dataPayload = { type: "chat_message", conversation_id: params.conversation_id || '', sender_id: params.sender_id || '' };
+        dataPayload = {
+          type: "chat_message",
+          conversation_id: params.conversation_id || '',
+          sender_id: params.sender_id || '',
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       case 'review_rating':
@@ -431,13 +493,24 @@ async function sendEventNotification(eventType, params = {}) {
       case 'rating':
         title = `New Review (${ratingVal}⭐) Received`;
         body = `${name} rated you ${ratingVal} stars${params.review ? `: "${params.review}"` : ''}!`;
-        dataPayload = { type: "review_rating", rating: Number(ratingVal), review: params.review || '' };
+        dataPayload = {
+          type: "review_rating",
+          rating: Number(ratingVal),
+          review: params.review || '',
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null
+        };
         break;
 
       default:
         title = params.title || `WithMe24 Alert: ${eventType}`;
         body = params.body || `Event update for ${eventType}`;
-        dataPayload = { type: eventType, ...params };
+        dataPayload = {
+          type: eventType,
+          user_name: resolvedName || null,
+          user_photo_url: resolvedPhoto || null,
+          ...params
+        };
         break;
     }
 
