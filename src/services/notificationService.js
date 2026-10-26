@@ -64,25 +64,63 @@ async function fetchUserInfo(userId) {
 }
 
 /**
- * Save / Update FCM Token for a user
+ * Save / Update FCM Token for a user.
+ * Tries withme_users first, then falls back to users table.
+ * Both tables' tokens are kept in sync so notifications always reach the device.
  */
 async function saveUserFcmToken(userId, fcmToken, deviceType = 'android') {
   if (!userId || !fcmToken) {
     throw new Error("userId and fcm_token are required");
   }
 
-  const uId = String(userId);
+  const uId = String(userId).trim();
+  const digits = uId.replace(/\D/g, '');
+  const formattedId = uId.startsWith('usr_') ? uId : (digits ? `usr_${digits}` : uId);
 
+  // Always update the in-memory store (all alias forms)
   memoryUserTokens.set(uId, { fcmToken, deviceType });
+  if (digits) {
+    memoryUserTokens.set(digits, { fcmToken, deviceType });
+    memoryUserTokens.set(formattedId, { fcmToken, deviceType });
+  }
 
-  // Update in MySQL if table exists
+  // 1. Upsert into withme_users (the primary FCM store)
+  try {
+    // Try update first
+    const updateRes = await query(
+      `UPDATE withme_users SET fcm_token = ?, device_type = ?, updated_at = NOW()
+       WHERE user_id = ? OR user_id = ? OR user_id = ? OR phone_number = ?`,
+      [fcmToken, deviceType, uId, digits || '', formattedId, uId]
+    );
+
+    // If no row matched, insert a new record
+    if (updateRes && updateRes.affectedRows === 0) {
+      await query(
+        `INSERT INTO withme_users (user_id, fcm_token, device_type, created_at, updated_at)
+         VALUES (?, ?, ?, NOW(), NOW())
+         ON DUPLICATE KEY UPDATE fcm_token = VALUES(fcm_token), device_type = VALUES(device_type), updated_at = NOW()`,
+        [formattedId || uId, fcmToken, deviceType]
+      );
+    }
+  } catch (err) {
+    console.warn('[FCM] withme_users upsert notice:', err.message);
+  }
+
+  // 2. Also update the users table if a matching record exists (belt-and-suspenders)
   try {
     await query(
-      `UPDATE withme_users SET fcm_token = ? WHERE user_id = ? OR id = ? OR phone_number = ?`,
-      [fcmToken, uId, uId, uId]
+      `UPDATE users SET fcm_token = ? WHERE id = ? OR id = ? OR phone_number = ?`,
+      [fcmToken, uId, digits || '', uId]
     );
   } catch (err) {
-    // Ignore MySQL notice if operating on local store
+    // users.fcm_token column may not exist — add it silently then retry
+    try {
+      await query(`ALTER TABLE users ADD COLUMN fcm_token TEXT DEFAULT NULL`);
+      await query(
+        `UPDATE users SET fcm_token = ? WHERE id = ? OR id = ? OR phone_number = ?`,
+        [fcmToken, uId, digits || '', uId]
+      );
+    } catch (e) { /* Ignore */ }
   }
 
   return {
@@ -168,22 +206,44 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
     if (!resolvedPhoto) resolvedPhoto = info.photo_url;
   }
 
-  // Find target user FCM token
+  // Find target user FCM token — check all alias forms and both user tables
   let fcmToken = null;
-  if (memoryUserTokens.has(uId)) {
-    fcmToken = memoryUserTokens.get(uId).fcmToken;
-  } else {
+  const uIdDigits = uId.replace(/\D/g, '');
+  const uIdFormatted = uId.startsWith('usr_') ? uId : (uIdDigits ? `usr_${uIdDigits}` : uId);
+
+  // 1. In-memory store (all aliases)
+  for (const alias of [uId, uIdDigits, uIdFormatted]) {
+    if (alias && memoryUserTokens.has(alias)) {
+      fcmToken = memoryUserTokens.get(alias).fcmToken;
+      break;
+    }
+  }
+
+  if (!fcmToken) {
+    // 2. withme_users table
     try {
       const rows = await query(
-        `SELECT fcm_token FROM withme_users WHERE user_id = ? OR id = ? OR phone_number = ? LIMIT 1`,
-        [uId, uId, uId]
+        `SELECT fcm_token FROM withme_users
+         WHERE user_id = ? OR user_id = ? OR user_id = ? OR phone_number = ? LIMIT 1`,
+        [uId, uIdDigits || '', uIdFormatted, uId]
       );
       if (rows && rows.length > 0 && rows[0].fcm_token) {
         fcmToken = rows[0].fcm_token;
       }
-    } catch (err) {
-      // Ignore MySQL error
-    }
+    } catch (err) { /* Ignore */ }
+  }
+
+  if (!fcmToken) {
+    // 3. users table (may have fcm_token column added later)
+    try {
+      const rows = await query(
+        `SELECT fcm_token FROM users WHERE id = ? OR id = ? OR phone_number = ? LIMIT 1`,
+        [uId, uIdDigits || '', uId]
+      );
+      if (rows && rows.length > 0 && rows[0].fcm_token) {
+        fcmToken = rows[0].fcm_token;
+      }
+    } catch (err) { /* Ignore — column may not exist */ }
   }
 
   // Inject user_name and user_photo_url inside data object
@@ -319,6 +379,20 @@ async function getUserNotifications(userId) {
         dataObj.user_photo_url = photo;
         dataObj.userPhotoUrl = photo;
         dataObj.photo_url = photo;
+
+        // Ensure chat-specific navigation fields are present in dataObj
+        if (dataObj.type === 'chat_message') {
+          if (!dataObj.otherUserName && name) dataObj.otherUserName = name;
+          if (!dataObj.other_user_name && name) dataObj.other_user_name = name;
+          if (!dataObj.otherUserId && (dataObj.sender_id || dataObj.senderId)) {
+            dataObj.otherUserId = dataObj.sender_id || dataObj.senderId;
+            dataObj.other_user_id = dataObj.sender_id || dataObj.senderId;
+          }
+          if (!dataObj.chatId && (dataObj.conversation_id || dataObj.conversationId)) {
+            dataObj.chatId = dataObj.conversation_id || dataObj.conversationId;
+            dataObj.chat_id = dataObj.conversation_id || dataObj.conversationId;
+          }
+        }
 
         return {
           notification_id: r.notification_id,
@@ -571,14 +645,29 @@ async function sendEventNotification(eventType, params = {}) {
       case 'chat_message':
       case 'chat':
       case 'message':
+        const senderId = params.sender_id || params.senderId || '';
+        const convId = params.conversation_id || params.conversationId || params.chat_id || params.chatId || '';
+        const bId = params.booking_id || params.bookingId || '';
         title = `New Message from ${name} 💬`;
         body = params.message ? (params.message.length > 80 ? params.message.substring(0, 80) + '...' : params.message) : "Sent you a new chat message.";
         dataPayload = {
           type: "chat_message",
-          conversation_id: params.conversation_id || '',
-          sender_id: params.sender_id || '',
-          user_name: resolvedName || null,
-          user_photo_url: resolvedPhoto || null
+          conversation_id: convId,
+          conversationId: convId,
+          chat_id: convId,
+          chatId: convId,
+          sender_id: senderId,
+          senderId: senderId,
+          other_user_id: senderId,
+          otherUserId: senderId,
+          other_user_name: resolvedName || name,
+          otherUserName: resolvedName || name,
+          user_name: resolvedName || name,
+          username: resolvedName || name,
+          user_photo_url: resolvedPhoto || null,
+          userPhotoUrl: resolvedPhoto || null,
+          booking_id: bId,
+          bookingId: bId
         };
         break;
 

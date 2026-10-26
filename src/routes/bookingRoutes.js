@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { query } = require('../config/db');
+const chatService = require('../services/chatService');
 
 // Price map by activity name
 const activityPriceMap = {
@@ -211,10 +212,25 @@ const handleCreateBooking = async (req, res) => {
     }
   }).catch(() => {});
 
+  // 3. Auto-create a booking-specific conversation so the chat room is ready immediately
+  let conversationId = null;
+  try {
+    const convResult = await chatService.createOrGetConversation(userId, effectivePartnerId, bookingId);
+    conversationId = convResult.conversationId;
+    newBooking.conversation_id = conversationId;
+    newBooking.conversationId = conversationId;
+  } catch (convErr) {
+    console.warn('[Booking] Auto-conversation create notice:', convErr.message);
+  }
+
   return res.status(200).json({
     success: true,
     message: 'Booking request sent successfully and synced with partner',
-    data: newBooking
+    data: {
+      ...newBooking,
+      conversation_id: conversationId,
+      conversationId: conversationId
+    }
   });
 };
 

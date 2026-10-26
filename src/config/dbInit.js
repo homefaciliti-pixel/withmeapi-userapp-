@@ -141,10 +141,16 @@ async function initAllWithMeTables() {
     CREATE TABLE IF NOT EXISTS conversations (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       type ENUM('private') DEFAULT 'private',
+      booking_id VARCHAR(100) DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_booking_id (booking_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Ensure booking_id column on pre-existing conversations table
+  try { await query(`ALTER TABLE conversations ADD COLUMN booking_id VARCHAR(100) DEFAULT NULL`); } catch (e) {}
+  try { await query(`ALTER TABLE conversations ADD INDEX idx_booking_id (booking_id)`); } catch (e) {}
 
   // 7. conversation_members
   await query(`

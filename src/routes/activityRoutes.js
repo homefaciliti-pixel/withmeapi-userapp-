@@ -379,26 +379,41 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
   const dbPartners = await fetchRegisteredPartnersFromDb(baseUrl);
 
   const mapDbPartnersToCategory = (catName, defaultPrice = 499) => {
-    return dbPartners.map(p => ({
-      id: p.id,
-      type: 'PROFILE',
-      user_id: p.user_id,
-      name: p.name,
-      full_name: p.full_name,
-      age: p.age,
-      gender: p.gender,
-      profile_image: p.profile_image,
-      image: p.image,
-      avatar: p.avatar,
-      rating: p.rating,
-      distance: p.distance,
-      price: (catName.toLowerCase() === 'coffee') ? 1 : defaultPrice,
-      currency: 'INR',
-      interests: p.interests,
-      category: catName,
-      is_verified: true,
-      is_favorite: false
-    }));
+    const target = catName.toLowerCase().trim();
+    return dbPartners
+      .filter(p => {
+        const pCat = (p.category || '').toLowerCase().trim();
+        const pAct = (p.activity || '').toLowerCase().trim();
+        const pInterests = Array.isArray(p.interests)
+          ? p.interests.map(i => String(i).toLowerCase())
+          : [String(p.interests || '').toLowerCase()];
+
+        return (
+          pCat.includes(target) ||
+          pAct.includes(target) ||
+          pInterests.some(i => i.includes(target))
+        );
+      })
+      .map(p => ({
+        id: p.id,
+        type: 'PROFILE',
+        user_id: p.user_id,
+        name: p.name,
+        full_name: p.full_name,
+        age: p.age,
+        gender: p.gender,
+        profile_image: p.profile_image,
+        image: p.image,
+        avatar: p.avatar,
+        rating: p.rating,
+        distance: p.distance,
+        price: (target === 'coffee') ? 1 : defaultPrice,
+        currency: 'INR',
+        interests: p.interests,
+        category: catName,
+        is_verified: true,
+        is_favorite: false
+      }));
   };
 
   // 1. Coffee (cat_01, coffee, 1)

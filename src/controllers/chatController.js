@@ -8,21 +8,30 @@ const { isUserOnline } = require('../sockets/chatSocket');
 async function handleCreateOrGetConversation(req, res, next) {
   try {
     const currentUserId = (req.user && (req.user.user_id || req.user.id)) || 'usr_7250642635';
-    const targetUserId = req.body ? (req.body.userId || req.body.target_user_id || req.body.user_id) : null;
+    // Accept targetUserId from any common key name the client may send
+    const targetUserId = req.body
+      ? (req.body.targetUserId || req.body.target_user_id || req.body.userId || req.body.user_id || req.body.partnerId || req.body.partner_id)
+      : null;
+    // Optional bookingId — when provided each booking gets its own conversation
+    const bookingId = req.body
+      ? (req.body.bookingId || req.body.booking_id || req.body.session_id || req.body.sessionId || null)
+      : null;
 
     if (!targetUserId) {
       return res.status(400).json({
         success: false,
-        message: "Target userId is required in request body",
+        message: "Target userId is required in request body (use targetUserId, partnerId, or userId)",
         error_code: "BAD_REQUEST"
       });
     }
 
-    const result = await chatService.createOrGetConversation(currentUserId, targetUserId);
+    const result = await chatService.createOrGetConversation(currentUserId, targetUserId, bookingId);
     return res.status(200).json({
       success: true,
       conversationId: result.conversationId,
-      conversation_id: result.conversationId
+      conversation_id: result.conversationId,
+      booking_id: result.bookingId || bookingId || null,
+      is_new: result.isNew || false
     });
   } catch (err) {
     if (err.message === "User is blocked" || err.message === "Cannot create conversation with yourself") {

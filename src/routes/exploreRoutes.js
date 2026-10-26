@@ -59,15 +59,31 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
 };
 
 // Fetch real registered partners from dedicated MySQL table `withme_partners`
-const fetchExploreDbPartners = async (baseUrl) => {
+// categoryFilter is optional — when supplied only matching partners are returned from DB
+const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
   try {
-    const rows = await query(`
+    let sql = `
       SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, status, is_approved
       FROM withme_partners
       WHERE (status IS NULL OR status != 'DELETED') AND (is_approved IS NULL OR is_approved != 0)
-      ORDER BY id DESC
-      LIMIT 100
-    `);
+    `;
+    const params = [];
+
+    // Push category filter into the SQL query instead of relying only on JS-side filter.
+    // This avoids returning all partners and discarding them in JS when the DB has many rows.
+    if (categoryFilter) {
+      sql += ` AND (
+        LOWER(category) LIKE ? OR
+        LOWER(activity) LIKE ? OR
+        LOWER(interests) LIKE ?
+      )`;
+      const likeTerm = `%${categoryFilter}%`;
+      params.push(likeTerm, likeTerm, likeTerm);
+    }
+
+    sql += ` ORDER BY id DESC LIMIT 100`;
+
+    const rows = await query(sql, params);
 
     if (!rows || rows.length === 0) return [];
 
@@ -131,7 +147,8 @@ router.get('/explore', authenticateToken, async (req, res) => {
   const limit = parseInt(req.query.limit || '10');
   const categoryFilter = (req.query.category || req.query.activity || req.query.type || '').trim().toLowerCase();
 
-  const dbPartners = await fetchExploreDbPartners(baseUrl);
+  // Pass categoryFilter into DB query so only matching partners are fetched
+  const dbPartners = await fetchExploreDbPartners(baseUrl, categoryFilter);
 
   const defaultExploreFeed = [
     {
@@ -206,16 +223,22 @@ router.get('/explore', authenticateToken, async (req, res) => {
     }
   ];
 
-  const exploreFeed = dbPartners.length > 0 ? dbPartners : defaultExploreFeed;
-
-  let items = exploreFeed;
-  if (categoryFilter) {
-    items = exploreFeed.filter(item => {
+  // Apply JS-side filter on default feed when no DB results came back for the category
+  let items;
+  if (dbPartners.length > 0) {
+    // DB already returned category-filtered results — use them directly
+    items = dbPartners;
+  } else if (categoryFilter) {
+    // DB had no matches for this category — filter the default feed
+    items = defaultExploreFeed.filter(item => {
       if (item.category && item.category.toLowerCase().includes(categoryFilter)) return true;
       if (item.activity && item.activity.toLowerCase().includes(categoryFilter)) return true;
       if (item.interests && item.interests.some(i => i.toLowerCase().includes(categoryFilter))) return true;
       return false;
     });
+  } else {
+    // No category filter — return full default feed
+    items = defaultExploreFeed;
   }
 
   return res.status(200).json({
@@ -223,6 +246,7 @@ router.get('/explore', authenticateToken, async (req, res) => {
     page,
     limit,
     count: items.length,
+    category_filter: categoryFilter || null,
     items: items,
     data: {
       items: items,

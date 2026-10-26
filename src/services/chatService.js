@@ -230,18 +230,19 @@ async function blockUser(blockerId, blockedId) {
 async function isUserInConversation(conversationId, userId) {
   const convId = Number(conversationId);
   const uId = toUserIdStr(userId);
+  const rawId = String(userId).trim();
+  const digits = rawId.replace(/\D/g, '');
+  const formattedId = rawId.startsWith('usr_') ? rawId : (digits ? `usr_${digits}` : rawId);
 
-  const inMem = memoryMembers.some(m => m.conversation_id === convId && toUserIdStr(m.user_id) === uId);
+  const inMem = memoryMembers.some(
+    m => m.conversation_id === convId && (toUserIdStr(m.user_id) === uId || m.user_id === rawId || m.user_id === formattedId)
+  );
   if (inMem) return true;
-
-  if (memoryConversations.has(convId)) {
-    return false;
-  }
 
   try {
     const rows = await query(
-      `SELECT id FROM conversation_members WHERE conversation_id = ? AND user_id = ? LIMIT 1`,
-      [convId, uId]
+      `SELECT id FROM conversation_members WHERE conversation_id = ? AND (user_id = ? OR user_id = ? OR user_id = ?) LIMIT 1`,
+      [convId, uId, rawId, formattedId]
     );
     if (rows && rows.length > 0) {
       return true;
@@ -255,8 +256,11 @@ async function isUserInConversation(conversationId, userId) {
 
 /**
  * API 1 – Create/Get Private Conversation
+ *
+ * If bookingId is supplied, each booking gets its own isolated conversation.
+ * Without bookingId, falls back to the existing single shared conversation per pair.
  */
-async function createOrGetConversation(authenticatedUserId, targetUserId) {
+async function createOrGetConversation(authenticatedUserId, targetUserId, bookingId = null) {
   const currentId = toUserIdStr(authenticatedUserId);
   const targetId = toUserIdStr(targetUserId);
 
@@ -278,34 +282,128 @@ async function createOrGetConversation(authenticatedUserId, targetUserId) {
     throw new Error("Target user not found");
   }
 
+  const bId = bookingId ? String(bookingId).trim() : null;
+
+  // ── PATH A: Booking-specific conversation ──────────────────────────────────
+  if (bId) {
+    // 0. Search existing in memory
+    for (const [id, conv] of memoryConversations.entries()) {
+      if (conv.booking_id === bId) {
+        return { conversationId: Number(id), bookingId: bId, isNew: false };
+      }
+    }
+
+    // 1. Look for an existing conversation tied to this exact booking in MySQL
+    try {
+      const rows = await query(
+        `SELECT id FROM conversations WHERE booking_id = ? LIMIT 1`,
+        [bId]
+      );
+      if (rows && rows.length > 0) {
+        const foundId = Number(rows[0].id);
+        memoryConversations.set(foundId, { id: foundId, type: 'private', booking_id: bId });
+        return { conversationId: foundId, bookingId: bId, isNew: false };
+      }
+    } catch (err) {
+      // Ignore — booking_id column may not exist yet; handled below
+    }
+
+    // 2. Create a new conversation scoped to this booking
+    try {
+      const resConv = await query(
+        `INSERT INTO conversations (type, booking_id, created_at, updated_at) VALUES ('private', ?, NOW(), NOW())`,
+        [bId]
+      );
+      const dbConvId = Number(resConv.insertId);
+
+      await query(
+        `INSERT IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?, ?), (?, ?)`,
+        [dbConvId, currentId, dbConvId, targetId]
+      );
+
+      const now = new Date().toISOString();
+      memoryConversations.set(dbConvId, { id: dbConvId, type: 'private', booking_id: bId, created_at: now, updated_at: now });
+      memoryMembers.push({ id: memoryMembers.length + 1, conversation_id: dbConvId, user_id: currentId, joined_at: now });
+      memoryMembers.push({ id: memoryMembers.length + 1, conversation_id: dbConvId, user_id: targetId, joined_at: now });
+
+      return { conversationId: dbConvId, bookingId: bId, isNew: true };
+    } catch (err) {
+      // booking_id column missing — run migration and retry once
+      await ensureBookingIdColumn();
+      try {
+        const resConv = await query(
+          `INSERT INTO conversations (type, booking_id, created_at, updated_at) VALUES ('private', ?, NOW(), NOW())`,
+          [bId]
+        );
+        const dbConvId = Number(resConv.insertId);
+        await query(
+          `INSERT IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?, ?), (?, ?)`,
+          [dbConvId, currentId, dbConvId, targetId]
+        );
+
+        const now = new Date().toISOString();
+        memoryConversations.set(dbConvId, { id: dbConvId, type: 'private', booking_id: bId, created_at: now, updated_at: now });
+        memoryMembers.push({ id: memoryMembers.length + 1, conversation_id: dbConvId, user_id: currentId, joined_at: now });
+        memoryMembers.push({ id: memoryMembers.length + 1, conversation_id: dbConvId, user_id: targetId, joined_at: now });
+
+        return { conversationId: dbConvId, bookingId: bId, isNew: true };
+      } catch (retryErr) {
+        // Fallback to in-memory store with booking_id so booking isolation still works
+        autoConversationId++;
+        const newConvId = autoConversationId;
+        const now = new Date().toISOString();
+        memoryConversations.set(newConvId, { id: newConvId, type: 'private', booking_id: bId, created_at: now, updated_at: now });
+        memoryMembers.push({ id: memoryMembers.length + 1, conversation_id: newConvId, user_id: currentId, joined_at: now });
+        memoryMembers.push({ id: memoryMembers.length + 1, conversation_id: newConvId, user_id: targetId, joined_at: now });
+        return { conversationId: newConvId, bookingId: bId, isNew: true };
+      }
+    }
+  }
+
+  // ── PATH B: Shared conversation per user pair (legacy behaviour) ───────────
   // 1. Search existing in memory
   const userConvs = memoryMembers.filter(m => toUserIdStr(m.user_id) === currentId).map(m => m.conversation_id);
   const commonMemConv = memoryMembers.find(m => userConvs.includes(m.conversation_id) && toUserIdStr(m.user_id) === targetId);
 
   if (commonMemConv) {
-    return { conversationId: commonMemConv.conversation_id };
+    return { conversationId: commonMemConv.conversation_id, isNew: false };
   }
 
-  // 2. Search existing in MySQL
+  // 2. Search existing in MySQL (no booking filter)
   try {
     const rows = await query(
-      `SELECT cm1.conversation_id 
+      `SELECT cm1.conversation_id
        FROM conversation_members cm1
        JOIN conversation_members cm2 ON cm1.conversation_id = cm2.conversation_id
        JOIN conversations c ON c.id = cm1.conversation_id
        WHERE cm1.user_id = ? AND cm2.user_id = ? AND c.type = 'private'
+         AND (c.booking_id IS NULL OR c.booking_id = '')
        LIMIT 1`,
       [currentId, targetId]
     );
 
     if (rows && rows.length > 0) {
-      return { conversationId: Number(rows[0].conversation_id) };
+      return { conversationId: Number(rows[0].conversation_id), isNew: false };
     }
   } catch (err) {
-    // Ignore MySQL error
+    // If booking_id column doesn't exist yet fall back to old query
+    try {
+      const rows = await query(
+        `SELECT cm1.conversation_id
+         FROM conversation_members cm1
+         JOIN conversation_members cm2 ON cm1.conversation_id = cm2.conversation_id
+         JOIN conversations c ON c.id = cm1.conversation_id
+         WHERE cm1.user_id = ? AND cm2.user_id = ? AND c.type = 'private'
+         LIMIT 1`,
+        [currentId, targetId]
+      );
+      if (rows && rows.length > 0) {
+        return { conversationId: Number(rows[0].conversation_id), isNew: false };
+      }
+    } catch (e) {}
   }
 
-  // 3. Create new conversation
+  // 3. Create new shared conversation
   autoConversationId++;
   const newConvId = autoConversationId;
   const now = new Date().toISOString();
@@ -321,16 +419,16 @@ async function createOrGetConversation(authenticatedUserId, targetUserId) {
     const dbConvId = resConv.insertId || newConvId;
 
     await query(
-      `INSERT INTO conversation_members (conversation_id, user_id) VALUES (?, ?), (?, ?)`,
+      `INSERT IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?, ?), (?, ?)`,
       [dbConvId, currentId, dbConvId, targetId]
     );
 
-    return { conversationId: Number(dbConvId) };
+    return { conversationId: Number(dbConvId), isNew: true };
   } catch (err) {
     // Fallback to memory
   }
 
-  return { conversationId: newConvId };
+  return { conversationId: newConvId, isNew: true };
 }
 
 /**
@@ -444,9 +542,24 @@ async function getUserConversations(authenticatedUserId, req, isUserOnlineFn) {
 
     const lastMsgFormatted = formatISTDateTime(lastMsg ? lastMsg.created_at : new Date());
 
+    let convBookingId = null;
+    try {
+      const cRows = await query(`SELECT booking_id FROM conversations WHERE id = ? LIMIT 1`, [cId]);
+      if (cRows && cRows.length > 0 && cRows[0].booking_id) {
+        convBookingId = cRows[0].booking_id;
+      }
+    } catch (e) {}
+    if (!convBookingId && memoryConversations.has(cId)) {
+      convBookingId = memoryConversations.get(cId).booking_id || null;
+    }
+
     conversationList.push({
       conversationId: cId,
       conversation_id: cId,
+      bookingId: convBookingId,
+      booking_id: convBookingId,
+      sessionId: convBookingId,
+      session_id: convBookingId,
       id: cId,
       otherUserId: formatNumericUserId(otherUserId),
       other_user_id: otherUserId,
@@ -595,12 +708,27 @@ async function getConversationMessages(conversationId, authenticatedUserId, isUs
 
   const finalMessages = Array.from(map.values()).sort((a, b) => (a.id || 0) - (b.id || 0));
 
+  let convBookingId = null;
+  try {
+    const cRows = await query(`SELECT booking_id FROM conversations WHERE id = ? LIMIT 1`, [convId]);
+    if (cRows && cRows.length > 0 && cRows[0].booking_id) {
+      convBookingId = cRows[0].booking_id;
+    }
+  } catch (e) {}
+  if (!convBookingId && memoryConversations.has(convId)) {
+    convBookingId = memoryConversations.get(convId).booking_id || null;
+  }
+
   return {
     success: true,
     data: finalMessages,
     messages: finalMessages,
     conversationId: convId,
     conversation_id: convId,
+    bookingId: convBookingId,
+    booking_id: convBookingId,
+    sessionId: convBookingId,
+    session_id: convBookingId,
     isOnline: Boolean(isOnline),
     is_online: Boolean(isOnline),
     online: Boolean(isOnline),
@@ -818,6 +946,20 @@ async function deleteMessage(messageId, authenticatedUserId) {
   };
 }
 
+/**
+ * One-time migration: add booking_id column to conversations table.
+ * Safe to call multiple times — ALTER fails silently if column already exists.
+ */
+async function ensureBookingIdColumn() {
+  try {
+    await query(`ALTER TABLE conversations ADD COLUMN booking_id VARCHAR(100) DEFAULT NULL`);
+    await query(`ALTER TABLE conversations ADD INDEX idx_booking_id (booking_id)`);
+    console.log('[ChatService] conversations.booking_id column added successfully');
+  } catch (e) {
+    // Column already exists — ignore
+  }
+}
+
 module.exports = {
   createOrGetConversation,
   getUserConversations,
@@ -831,5 +973,6 @@ module.exports = {
   isUserInConversation,
   findUser,
   formatISTDateTime,
-  formatNumericUserId
+  formatNumericUserId,
+  ensureBookingIdColumn
 };
