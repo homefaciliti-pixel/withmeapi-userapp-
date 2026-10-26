@@ -63,9 +63,9 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
 const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
   try {
     let sql = `
-      SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, status, is_approved
+      SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, status, is_approved, is_verified
       FROM withme_partners
-      WHERE (status IS NULL OR status != 'DELETED') AND (is_approved IS NULL OR is_approved != 0)
+      WHERE (status IS NULL OR status NOT IN ('DELETED','REJECTED','SUSPENDED')) AND is_approved = 1 AND is_verified = 1
     `;
     const params = [];
 
@@ -89,17 +89,17 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
 
     return rows.map((r, index) => {
       const photoUrl = formatPartnerPhoto(r.image || r.profile_photo_url, baseUrl);
-      const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : 'Female';
-      const city = r.city ? r.city.trim() : 'Jaipur';
-      const partnerCategory = r.category || r.activity || 'Coffee';
+      const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : ''; 
+      const city = r.city ? r.city.trim() : ''; 
+      const partnerCategory = r.category || r.activity || ''; 
       const isCoffee = partnerCategory.toLowerCase().includes('coffee');
 
-      let parsedInterests = [partnerCategory, 'Music', 'Travel'];
+      let parsedInterests = [];
       try {
         if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
       } catch (e) {}
 
-      let parsedPhotos = [photoUrl];
+      let parsedPhotos = photoUrl ? [photoUrl] : [];
       try {
         if (r.photos) {
           const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
@@ -118,10 +118,10 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
         activity: partnerCategory,
         name: (r.name || r.full_name || 'Partner').trim(),
         full_name: (r.full_name || r.name || 'Partner').trim(),
-        age: r.age || 24,
+        age: r.age || null,
         gender: gender,
         interests: parsedInterests,
-        rating: parseFloat(r.rating || 4.8),
+        rating: r.rating == null ? null : parseFloat(r.rating),
         price: isCoffee ? 1 : 499,
         currency: 'INR',
         category: partnerCategory,
@@ -270,14 +270,14 @@ router.get('/explore', authenticateToken, async (req, res) => {
   let items;
   if (categoryFilter) {
     if (categoryFilter === 'offers' || categoryFilter === 'offer') {
-      items = [...dbPartners, ...defaultExploreFeed].filter(item => {
+      items = dbPartners.filter(item => {
         const cat = (item.category || '').toLowerCase();
         const act = (item.activity || '').toLowerCase();
-        return item.price <= 1 || cat.includes('offer') || act.includes('offer');
+        return cat.includes('offer') || act.includes('offer');
       });
     } else {
       // Filter both dbPartners and default feed for the exact category
-      const combined = dbPartners.length > 0 ? dbPartners : defaultExploreFeed;
+      const combined = dbPartners;
       items = combined.filter(item => {
         if (item.category && item.category.toLowerCase().includes(categoryFilter)) return true;
         if (item.activity && item.activity.toLowerCase().includes(categoryFilter)) return true;
@@ -287,7 +287,7 @@ router.get('/explore', authenticateToken, async (req, res) => {
     }
   } else {
     // No category filter — return full default feed / all partners
-    items = dbPartners.length > 0 ? dbPartners : defaultExploreFeed;
+    items = dbPartners;
   }
 
   return res.status(200).json({
