@@ -502,7 +502,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Cafe', 'Travel'],
         category: 'Coffee',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -522,7 +522,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Music', 'Books'],
         category: 'Coffee',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -542,7 +542,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Cafe', 'Events'],
         category: 'Coffee',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -562,7 +562,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Art', 'Photography'],
         category: 'Coffee',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -582,7 +582,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Music', 'Cafe'],
         category: 'Coffee',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -602,7 +602,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Fitness', 'Gaming'],
         category: 'Coffee',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       }
     ];
@@ -639,7 +639,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Dinner', 'Fine Dining', 'Food'],
         category: 'Dinner',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -659,7 +659,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Dinner', 'Italian', 'Music'],
         category: 'Dinner',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -679,7 +679,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Dinner', 'Buffet', 'Cafe'],
         category: 'Dinner',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       }
     ];
@@ -716,7 +716,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Travel', 'Road Trips', 'Sightseeing'],
         category: 'Travel',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -736,7 +736,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Travel', 'Trekking', 'Mountains'],
         category: 'Travel',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       }
     ];
@@ -773,7 +773,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Movie', 'Cinema', 'Popcorn'],
         category: 'Movie',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -793,7 +793,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Movie', 'Sci-Fi', 'Gaming'],
         category: 'Movie',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       }
     ];
@@ -830,7 +830,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Event', 'Live Music', 'Festivals'],
         category: 'Event',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       }
     ];
@@ -867,7 +867,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Conversation', 'Philosophy', 'Reading'],
         category: 'Conversation',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       }
     ];
@@ -931,7 +931,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['WithMe24 Offers', 'Coffee', 'Special Deal'],
         category: 'Offers',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       },
       {
@@ -951,7 +951,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['WithMe24 Offers', 'Discount', 'Events'],
         category: 'Offers',
-        is_verified: true,
+        is_verified: Boolean(p.is_verified),
         is_favorite: false
       }
     ];
