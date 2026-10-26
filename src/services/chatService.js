@@ -29,6 +29,9 @@ function toUserIdStr(id) {
 
 /**
  * Format IST Date and Time helper
+ * Fixes timezone double conversion bug (+5:30 applied twice on MySQL datetime).
+ * Produces accurate UTC ISO string (ending in Z) for client-side .toLocal() parsing
+ * and exact Asia/Kolkata 12h/24h strings for direct display.
  */
 function formatISTDateTime(dateInput) {
   let dateObj;
@@ -37,10 +40,12 @@ function formatISTDateTime(dateInput) {
   } else if (dateInput instanceof Date) {
     dateObj = dateInput;
   } else if (typeof dateInput === 'string') {
-    if (!dateInput.includes('Z') && !dateInput.includes('+')) {
-      dateObj = new Date(dateInput.replace(' ', 'T') + 'Z');
+    const s = dateInput.trim();
+    if (!s.includes('Z') && !s.includes('+') && !s.match(/-\d{2}:\d{2}$/)) {
+      // MySQL datetime string from IST server: 'YYYY-MM-DD HH:mm:ss' is already in IST (+05:30)
+      dateObj = new Date(s.replace(' ', 'T') + '+05:30');
     } else {
-      dateObj = new Date(dateInput);
+      dateObj = new Date(s);
     }
   } else if (typeof dateInput === 'number') {
     dateObj = new Date(dateInput);
@@ -52,29 +57,40 @@ function formatISTDateTime(dateInput) {
     dateObj = new Date();
   }
 
-  // Convert to IST (+5:30)
-  const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
-  const istDate = new Date(dateObj.getTime() + istOffsetMs);
+  // Format with Intl in Asia/Kolkata timezone
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  const parts = dtf.formatToParts(dateObj);
+  const getPart = (type) => (parts.find(p => p.type === type) || {}).value || '00';
 
-  const hours = istDate.getUTCHours();
-  const minutes = istDate.getUTCMinutes().toString().padStart(2, '0');
-  const seconds = istDate.getUTCSeconds().toString().padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  const hours12 = (hours % 12 || 12).toString().padStart(2, '0');
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hour24 = parseInt(getPart('hour'), 10);
+  const minutes = getPart('minute');
+  const seconds = getPart('second');
+
+  const ampm = hour24 >= 12 ? 'PM' : 'AM';
+  const hours12 = (hour24 % 12 || 12).toString().padStart(2, '0');
 
   const time12 = `${hours12}:${minutes} ${ampm}`;
-  const time24 = `${hours.toString().padStart(2, '0')}:${minutes}`;
-
-  const year = istDate.getUTCFullYear();
-  const month = (istDate.getUTCMonth() + 1).toString().padStart(2, '0');
-  const day = istDate.getUTCDate().toString().padStart(2, '0');
+  const time24 = `${hour24.toString().padStart(2, '0')}:${minutes}`;
   const dateStr = `${year}-${month}-${day}`;
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const formattedDate = `${day} ${monthNames[istDate.getUTCMonth()]} ${year}`;
+  const monthIdx = parseInt(month, 10) - 1;
+  const formattedDate = `${day} ${monthNames[monthIdx] || 'Jan'} ${year}`;
 
   const isoUTC = dateObj.toISOString();
-  const isoIST = `${year}-${month}-${day}T${hours.toString().padStart(2, '0')}:${minutes}:${seconds}+05:30`;
+  const isoIST = `${year}-${month}-${day}T${hour24.toString().padStart(2, '0')}:${minutes}:${seconds}+05:30`;
 
   return {
     iso: isoUTC,

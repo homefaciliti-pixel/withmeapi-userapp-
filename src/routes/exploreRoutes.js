@@ -31,8 +31,8 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
   }
   photo = photo.trim();
 
-  // Return null for generic/placeholder filenames that are the same for all partners
-  const genericNames = ['photo_1.jpg', 'photo_1.jpeg', 'photo_1.png', 'priya.jpg', 'default.jpg', 'placeholder.jpg', 'avatar.jpg', 'user.jpg', 'no_image.jpg', 'no-image.jpg'];
+  // Return null only for generic placeholder filenames (not real uploaded photo_1.jpg etc.)
+  const genericNames = ['default.jpg', 'placeholder.jpg', 'avatar.jpg', 'no_image.jpg', 'no-image.jpg'];
   const fileName = photo.split('/').pop().toLowerCase();
   if (genericNames.includes(fileName)) {
     return null;
@@ -145,7 +145,16 @@ router.get('/explore', authenticateToken, async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const page = parseInt(req.query.page || '1');
   const limit = parseInt(req.query.limit || '10');
-  const categoryFilter = (req.query.category || req.query.activity || req.query.type || '').trim().toLowerCase();
+
+  const rawCat = (req.query.category_id || req.query.categoryId || req.query.id || req.query.category || req.query.activity || req.query.type || '').trim().toLowerCase();
+  let categoryFilter = rawCat;
+  if (rawCat === 'cat_01' || rawCat === '1') categoryFilter = 'coffee';
+  else if (rawCat === 'cat_02' || rawCat === '2') categoryFilter = 'dinner';
+  else if (rawCat === 'cat_03' || rawCat === '3') categoryFilter = 'travel';
+  else if (rawCat === 'cat_04' || rawCat === '4') categoryFilter = 'movie';
+  else if (rawCat === 'cat_05' || rawCat === '5') categoryFilter = 'event';
+  else if (rawCat === 'cat_06' || rawCat === '6') categoryFilter = 'conversation';
+  else if (rawCat === 'cat_07' || rawCat === '7' || rawCat.includes('offer')) categoryFilter = 'offers';
 
   // Pass categoryFilter into DB query so only matching partners are fetched
   const dbPartners = await fetchExploreDbPartners(baseUrl, categoryFilter);
@@ -220,25 +229,65 @@ router.get('/explore', authenticateToken, async (req, res) => {
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`
       ]
+    },
+    {
+      user_id: 'usr_102',
+      id: 'exp_4',
+      type: 'PROFILE',
+      name: 'Anjali Sharma',
+      age: 24,
+      gender: 'Female',
+      interests: ['Dinner', 'Fine Dining', 'Food'],
+      rating: 4.9,
+      price: 499,
+      currency: 'INR',
+      category: 'Dinner',
+      distance: '1.5 km away',
+      image: `${baseUrl}/uploads/anjali.jpg`,
+      avatar: `${baseUrl}/uploads/anjali.jpg`,
+      profile_image: `${baseUrl}/uploads/anjali.jpg`
+    },
+    {
+      user_id: 'usr_305',
+      id: 'exp_5',
+      type: 'PROFILE',
+      name: 'Sneha Verma',
+      age: 23,
+      gender: 'Female',
+      interests: ['Offers', 'Special Deal', 'Discount'],
+      rating: 4.9,
+      price: 1,
+      currency: 'INR',
+      category: 'Offers',
+      distance: '1.1 km away',
+      image: `${baseUrl}/uploads/sneha.jpg`,
+      avatar: `${baseUrl}/uploads/sneha.jpg`,
+      profile_image: `${baseUrl}/uploads/sneha.jpg`
     }
   ];
 
-  // Apply JS-side filter on default feed when no DB results came back for the category
+  // Apply strict category filtering
   let items;
-  if (dbPartners.length > 0) {
-    // DB already returned category-filtered results — use them directly
-    items = dbPartners;
-  } else if (categoryFilter) {
-    // DB had no matches for this category — filter the default feed
-    items = defaultExploreFeed.filter(item => {
-      if (item.category && item.category.toLowerCase().includes(categoryFilter)) return true;
-      if (item.activity && item.activity.toLowerCase().includes(categoryFilter)) return true;
-      if (item.interests && item.interests.some(i => i.toLowerCase().includes(categoryFilter))) return true;
-      return false;
-    });
+  if (categoryFilter) {
+    if (categoryFilter === 'offers' || categoryFilter === 'offer') {
+      items = [...dbPartners, ...defaultExploreFeed].filter(item => {
+        const cat = (item.category || '').toLowerCase();
+        const act = (item.activity || '').toLowerCase();
+        return item.price <= 1 || cat.includes('offer') || act.includes('offer');
+      });
+    } else {
+      // Filter both dbPartners and default feed for the exact category
+      const combined = dbPartners.length > 0 ? dbPartners : defaultExploreFeed;
+      items = combined.filter(item => {
+        if (item.category && item.category.toLowerCase().includes(categoryFilter)) return true;
+        if (item.activity && item.activity.toLowerCase().includes(categoryFilter)) return true;
+        if (item.interests && item.interests.some(i => i.toLowerCase().includes(categoryFilter))) return true;
+        return false;
+      });
+    }
   } else {
-    // No category filter — return full default feed
-    items = defaultExploreFeed;
+    // No category filter — return full default feed / all partners
+    items = dbPartners.length > 0 ? dbPartners : defaultExploreFeed;
   }
 
   return res.status(200).json({

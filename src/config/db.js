@@ -48,6 +48,7 @@ const initializeDatabaseTables = async () => {
     // Ensure pre-existing database tables get updated columns if missing
     const alterStatements = [
       'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20) DEFAULT NULL',
+      'ALTER TABLE users ADD COLUMN nickname VARCHAR(100) DEFAULT NULL',
       'ALTER TABLE users ADD COLUMN dob VARCHAR(20) DEFAULT NULL',
       'ALTER TABLE users ADD COLUMN bio TEXT DEFAULT NULL',
       'ALTER TABLE users ADD COLUMN city VARCHAR(100) DEFAULT NULL',

@@ -123,6 +123,8 @@ const handleGetProfile = async (req, res) => {
         profileData = {
           user_id: u.id || userId,
           name: u.name || 'User',
+          nickname: u.nickname || null,
+          nick_name: u.nickname || null,
           country_code: userCountryCode,
           phone_number: dbPhone || userPhone,
           full_phone_number: u.phone_number
@@ -185,6 +187,13 @@ const handleGetProfile = async (req, res) => {
 
   if (inMemoryProfile && Object.keys(inMemoryProfile).length > 0) {
     if (inMemoryProfile.name) profileData.name = inMemoryProfile.name;
+    if (inMemoryProfile.nickname) {
+      profileData.nickname = inMemoryProfile.nickname;
+      profileData.nick_name = inMemoryProfile.nickname;
+    } else if (inMemoryProfile.nick_name) {
+      profileData.nickname = inMemoryProfile.nick_name;
+      profileData.nick_name = inMemoryProfile.nick_name;
+    }
     if (inMemoryProfile.email) profileData.email = inMemoryProfile.email;
     if (inMemoryProfile.gender) profileData.gender = inMemoryProfile.gender;
     if (inMemoryProfile.interested_in_gender) profileData.interested_in_gender = inMemoryProfile.interested_in_gender;
@@ -287,6 +296,8 @@ const handleGetProfile = async (req, res) => {
     detailed_profile: {
       id: profileData.user_id,
       name: profileData.name,
+      nickname: profileData.nickname || null,
+      nick_name: profileData.nickname || null,
       age: calculatedAge,
       gender: profileData.gender,
       interested_in_gender: interestedGenderVal,
@@ -318,27 +329,173 @@ router.get('/getProfile', authenticateToken, handleGetProfile);
 router.get('/profile', authenticateToken, handleGetProfile);
 
 // 2. Profile Details API (With Profile Image List array & available_for) — GET
-const handleDetailedProfileView = (req, res) => {
+const handleDetailedProfileView = async (req, res) => {
   const baseUrl = getBaseUrl(req);
-  const targetId = req.params.id || req.query.id || 'usr_203';
+  const targetId = req.params.id || req.query.id || (req.user ? (req.user.user_id || req.user.id) : null) || 'usr_203';
   const cleanId = String(targetId).trim().toLowerCase();
+  const rawId = cleanId.replace(/^usr_/, '');
 
-  let catalog = {
-    id: targetId,
-    name: 'Priya Sharma',
-    age: 23,
-    gender: 'Female',
-    verified: true,
-    location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
-    rating: 4.8,
-    total_reviews: 120,
-    about: 'Friendly, outgoing and loves exploring new places and meeting people.',
-    profile_images: [`${baseUrl}/uploads/priya.jpg`, `${baseUrl}/uploads/priya2.jpg`, `${baseUrl}/uploads/priya3.jpg`, `${baseUrl}/uploads/priya4.jpg`],
-    interests: [{ name: 'Coffee', icon: 'coffee' }, { name: 'Travel', icon: 'flight' }],
-    available_for: [{ name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' }, { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }]
-  };
+  // 1. Check MySQL `users` table first so users always see their actual profile data
+  try {
+    const userRows = await query(`SELECT * FROM users WHERE id = ? OR phone_number = ? LIMIT 1`, [targetId, rawId]);
+    if (userRows && userRows.length > 0) {
+      const u = userRows[0];
+      const photoUrl = formatPartnerPhoto(u.profile_image, baseUrl);
+      let parsedPhotos = [photoUrl];
+      try {
+        if (u.profile_images) {
+          const rawP = typeof u.profile_images === 'string' ? JSON.parse(u.profile_images) : u.profile_images;
+          if (Array.isArray(rawP) && rawP.length > 0) parsedPhotos = rawP.map(p => formatPartnerPhoto(p, baseUrl));
+        }
+      } catch (e) {}
 
-  if (cleanId === '102' || cleanId === 'usr_102' || cleanId === 'usr_302' || cleanId.includes('anjali')) {
+      let parsedInterests = [];
+      try {
+        if (u.interests) {
+          const rawI = typeof u.interests === 'string' ? JSON.parse(u.interests) : u.interests;
+          if (Array.isArray(rawI)) parsedInterests = rawI.map(i => typeof i === 'string' ? { name: i, icon: 'coffee' } : i);
+        }
+      } catch (e) {}
+
+      let calcAge = 24;
+      if (u.dob) {
+        const yr = parseInt(u.dob.split('-')[0]);
+        if (!isNaN(yr) && yr > 1940 && yr < 2015) calcAge = new Date().getFullYear() - yr;
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Profile details fetched successfully',
+        data: {
+          id: u.id,
+          user_id: u.id,
+          name: u.name || 'User',
+          full_name: u.name || 'User',
+          nickname: u.nickname || null,
+          nick_name: u.nickname || null,
+          age: calcAge,
+          gender: u.gender || 'Other',
+          verified: u.kyc_status === 'APPROVED' || u.kyc_status === 'VERIFIED',
+          location: {
+            city: u.city || 'Jaipur',
+            state: u.state || 'Rajasthan',
+            country: u.country || 'India',
+            address: u.city || 'Jaipur'
+          },
+          rating: 5.0,
+          total_reviews: 0,
+          profile_image: photoUrl,
+          profile_images: parsedPhotos,
+          photos: parsedPhotos,
+          about: u.bio || '',
+          interests: parsedInterests,
+          available_for: []
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('MySQL handleDetailedProfileView notice:', err.message);
+  }
+
+  // 2. Check MySQL `withme_partners` table
+  try {
+    const pRows = await query(`SELECT * FROM withme_partners WHERE id = ? OR partner_id = ? OR user_id = ? LIMIT 1`, [rawId, targetId, targetId]);
+    if (pRows && pRows.length > 0) {
+      const p = pRows[0];
+      const photoUrl = formatPartnerPhoto(p.image || p.profile_photo_url, baseUrl);
+      let parsedPhotos = [photoUrl];
+      try {
+        if (p.photos) {
+          const rawP = typeof p.photos === 'string' ? JSON.parse(p.photos) : p.photos;
+          if (Array.isArray(rawP) && rawP.length > 0) parsedPhotos = rawP.map(ph => formatPartnerPhoto(ph, baseUrl));
+        }
+      } catch (e) {}
+
+      let parsedInterests = [];
+      try {
+        if (p.interests) {
+          const rawI = typeof p.interests === 'string' ? JSON.parse(p.interests) : p.interests;
+          if (Array.isArray(rawI)) parsedInterests = rawI.map(i => typeof i === 'string' ? { name: i, icon: 'coffee' } : i);
+        }
+      } catch (e) {}
+
+      return res.status(200).json({
+        success: true,
+        message: 'Profile details fetched successfully',
+        data: {
+          id: p.partner_id || `usr_${p.id}`,
+          user_id: p.user_id || `usr_${p.id}`,
+          name: (p.name || p.full_name || 'Partner').trim(),
+          full_name: (p.full_name || p.name || 'Partner').trim(),
+          age: p.age || 24,
+          gender: p.gender || 'Female',
+          verified: true,
+          location: {
+            city: p.city || 'Jaipur',
+            state: p.state || 'Rajasthan',
+            country: 'India',
+            address: p.address || `${p.locality || 'Vaishali Nagar'}, ${p.city || 'Jaipur'}`
+          },
+          rating: parseFloat(p.rating || 4.8),
+          total_reviews: parseInt(p.total_reviews || 120),
+          profile_image: photoUrl,
+          profile_images: parsedPhotos,
+          photos: parsedPhotos,
+          about: p.about || `Friendly partner available in ${p.city || 'Jaipur'}.`,
+          interests: parsedInterests,
+          available_for: []
+        }
+      });
+    }
+  } catch (err) {}
+
+  // 3. Check memory store
+  const memoryP = userProfilesStore[targetId] || userProfilesStore[cleanId];
+  if (memoryP && (memoryP.name || memoryP.bio)) {
+    return res.status(200).json({
+      success: true,
+      message: 'Profile details fetched successfully',
+      data: {
+        id: targetId,
+        user_id: targetId,
+        name: memoryP.name || 'User',
+        nickname: memoryP.nickname || null,
+        nick_name: memoryP.nickname || null,
+        age: 24,
+        gender: memoryP.gender || 'Other',
+        verified: memoryP.kyc_status === 'APPROVED',
+        location: { city: memoryP.city || 'Jaipur', state: 'Rajasthan', country: 'India' },
+        rating: 5.0,
+        total_reviews: 0,
+        profile_image: memoryP.profile_image || `${baseUrl}/uploads/profile.jpg`,
+        profile_images: memoryP.profile_images || [`${baseUrl}/uploads/profile.jpg`],
+        photos: memoryP.profile_images || [`${baseUrl}/uploads/profile.jpg`],
+        about: memoryP.bio || '',
+        interests: memoryP.interests || [],
+        available_for: []
+      }
+    });
+  }
+
+  // 4. Fallback for Demo Profiles only
+  let catalog = null;
+
+  if (cleanId === '101' || cleanId === 'usr_101' || cleanId === 'usr_203' || cleanId === 'usr_301' || cleanId.includes('priya')) {
+    catalog = {
+      id: targetId,
+      name: 'Priya Sharma',
+      age: 23,
+      gender: 'Female',
+      verified: true,
+      location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+      rating: 4.8,
+      total_reviews: 120,
+      about: 'Friendly, outgoing and loves exploring new places and meeting people.',
+      profile_images: [`${baseUrl}/uploads/priya.jpg`, `${baseUrl}/uploads/priya2.jpg`, `${baseUrl}/uploads/priya3.jpg`, `${baseUrl}/uploads/priya4.jpg`],
+      interests: [{ name: 'Coffee', icon: 'coffee' }, { name: 'Travel', icon: 'flight' }],
+      available_for: [{ name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' }, { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' }]
+    };
+  } else if (cleanId === '102' || cleanId === 'usr_102' || cleanId === 'usr_302' || cleanId.includes('anjali')) {
     catalog = {
       id: 'usr_102',
       name: 'Anjali Sharma',
@@ -415,24 +572,52 @@ const handleDetailedProfileView = (req, res) => {
     };
   }
 
+  // If matched a demo catalog
+  if (catalog) {
+    return res.status(200).json({
+      success: true,
+      message: 'Profile details fetched successfully',
+      data: {
+        id: catalog.id,
+        name: catalog.name,
+        age: catalog.age,
+        gender: catalog.gender,
+        verified: catalog.verified,
+        location: catalog.location,
+        rating: catalog.rating,
+        total_reviews: catalog.total_reviews,
+        profile_image: catalog.profile_images[0],
+        profile_images: catalog.profile_images,
+        photos: catalog.profile_images,
+        about: catalog.about,
+        interests: catalog.interests,
+        available_for: catalog.available_for
+      }
+    });
+  }
+
+  // For any other new user ID not found: return clean non-static profile
   return res.status(200).json({
     success: true,
     message: 'Profile details fetched successfully',
     data: {
-      id: catalog.id,
-      name: catalog.name,
-      age: catalog.age,
-      gender: catalog.gender,
-      verified: catalog.verified,
-      location: catalog.location,
-      rating: catalog.rating,
-      total_reviews: catalog.total_reviews,
-      profile_image: catalog.profile_images[0],
-      profile_images: catalog.profile_images,
-      photos: catalog.profile_images,
-      about: catalog.about,
-      interests: catalog.interests,
-      available_for: catalog.available_for
+      id: targetId,
+      user_id: targetId,
+      name: 'User',
+      nickname: null,
+      nick_name: null,
+      age: 24,
+      gender: 'Other',
+      verified: false,
+      location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+      rating: 5.0,
+      total_reviews: 0,
+      profile_image: `${baseUrl}/uploads/profile.jpg`,
+      profile_images: [`${baseUrl}/uploads/profile.jpg`],
+      photos: [`${baseUrl}/uploads/profile.jpg`],
+      about: '',
+      interests: [],
+      available_for: []
     }
   });
 };
@@ -513,6 +698,7 @@ const handleProfileEditCombined = async (req, res) => {
 
   // Extract all possible field name aliases
   const name = body.name !== undefined ? body.name : (body.full_name || body.fullName);
+  const nickname = body.nickname !== undefined ? body.nickname : (body.nick_name !== undefined ? body.nick_name : body.nickName);
   const email = body.email !== undefined ? body.email : (body.email_id || body.emailId || body.emailAddress);
   const gender = body.gender !== undefined ? body.gender : (body.gender_type || body.genderType);
   const interested_in_gender = body.interested_in_gender !== undefined
@@ -573,14 +759,15 @@ const handleProfileEditCombined = async (req, res) => {
     ...existingProfile,
     user_id: userId,
     ...(name !== undefined && { name }),
+    ...(nickname !== undefined && { nickname, nick_name: nickname }),
     ...(email !== undefined && { email }),
     ...(gender !== undefined && { gender }),
     ...(interested_in_gender !== undefined && { interested_in_gender }),
     ...(dob !== undefined && { dob }),
     ...(bio !== undefined && { bio }),
     ...(city !== undefined && { city }),
-    ...(profile_image !== undefined && { profile_image }),
-    ...(profile_images !== undefined && { profile_images }),
+    ...(profile_image !== undefined ? { profile_image } : (existingProfile.profile_image ? { profile_image: existingProfile.profile_image } : {})),
+    ...(profile_images !== undefined ? { profile_images } : (existingProfile.profile_images ? { profile_images: existingProfile.profile_images } : {})),
     ...(kycSubmitted && {
       kyc_status: 'APPROVED',
       status: 'APPROVED',
@@ -607,6 +794,7 @@ const handleProfileEditCombined = async (req, res) => {
     const setParams = [];
 
     if (name !== undefined) { setClauses.push('name = ?'); setParams.push(name ? String(name).trim() : 'User'); }
+    if (nickname !== undefined) { setClauses.push('nickname = ?'); setParams.push(nickname ? String(nickname).trim() : null); }
     if (email !== undefined) { setClauses.push('email = ?'); setParams.push(email ? String(email).trim() : null); }
     if (gender !== undefined) { setClauses.push('gender = ?'); setParams.push(gender ? String(gender).trim() : null); }
     if (interested_in_gender !== undefined) { setClauses.push('interested_in_gender = ?'); setParams.push(interested_in_gender ? String(interested_in_gender).trim() : null); }
@@ -626,32 +814,34 @@ const handleProfileEditCombined = async (req, res) => {
       const updateRes = await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
 
       if (!updateRes || updateRes.affectedRows === 0) {
-        const photosJson = profile_images ? (typeof profile_images === 'string' ? profile_images : JSON.stringify(profile_images)) : null;
+        const photosJson = profile_images !== undefined ? (typeof profile_images === 'string' ? profile_images : JSON.stringify(profile_images)) : (existingProfile.profile_images ? JSON.stringify(existingProfile.profile_images) : null);
         await query(
-          `INSERT INTO users (id, phone_number, name, email, gender, interested_in_gender, dob, city, bio, profile_image, profile_images, kyc_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO users (id, phone_number, name, nickname, email, gender, interested_in_gender, dob, city, bio, profile_image, profile_images, kyc_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE
-             name = COALESCE(VALUES(name), name),
-             email = VALUES(email),
-             gender = VALUES(gender),
-             interested_in_gender = VALUES(interested_in_gender),
-             dob = VALUES(dob),
-             city = VALUES(city),
-             bio = VALUES(bio),
-             profile_image = VALUES(profile_image),
-             profile_images = VALUES(profile_images),
+             name = COALESCE(VALUES(name), users.name),
+             nickname = COALESCE(VALUES(nickname), users.nickname),
+             email = COALESCE(VALUES(email), users.email),
+             gender = COALESCE(VALUES(gender), users.gender),
+             interested_in_gender = COALESCE(VALUES(interested_in_gender), users.interested_in_gender),
+             dob = COALESCE(VALUES(dob), users.dob),
+             city = COALESCE(VALUES(city), users.city),
+             bio = COALESCE(VALUES(bio), users.bio),
+             profile_image = COALESCE(VALUES(profile_image), users.profile_image),
+             profile_images = COALESCE(VALUES(profile_images), users.profile_images),
              updated_at = NOW()`,
           [
             userId,
             userFullPhone || userPhone,
             name ? String(name).trim() : 'User',
+            nickname ? String(nickname).trim() : null,
             email ? String(email).trim() : null,
             gender ? String(gender).trim() : null,
             interested_in_gender ? String(interested_in_gender).trim() : null,
             dob ? String(dob).trim() : null,
             city ? String(city).trim() : null,
             bio ? String(bio).trim() : null,
-            profile_image ? String(profile_image).trim() : null,
+            profile_image ? String(profile_image).trim() : (existingProfile.profile_image || null),
             photosJson,
             kycSubmitted ? 'APPROVED' : 'NOT_VERIFIED'
           ]
@@ -659,7 +849,7 @@ const handleProfileEditCombined = async (req, res) => {
       }
     }
   } catch (err) {
-    console.warn('MySQL Profile Update notice:', err.message);
+    console.warn('MySQL Combined Profile update notice:', err.message);
   }
 
   return res.status(200).json({

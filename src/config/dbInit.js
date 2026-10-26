@@ -127,14 +127,39 @@ async function initAllWithMeTables() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Ensure fcm_token column exists on pre-existing withme_users
-  const usersAlter = [
-    'ALTER TABLE withme_users ADD COLUMN fcm_token TEXT DEFAULT NULL',
-    "ALTER TABLE withme_users ADD COLUMN device_type VARCHAR(20) DEFAULT 'android'"
+  // Ensure pre-existing database tables get updated columns if missing
+  const userAlters = [
+    'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20) DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN nickname VARCHAR(100) DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN dob VARCHAR(20) DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN bio TEXT DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN city VARCHAR(100) DEFAULT NULL',
+    "ALTER TABLE users ADD COLUMN interested_in_gender VARCHAR(20) DEFAULT NULL",
+    'ALTER TABLE users ADD COLUMN profile_image VARCHAR(255) DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN profile_images TEXT DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN interests TEXT DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN available_for TEXT DEFAULT NULL',
+    'ALTER TABLE users ADD COLUMN state VARCHAR(100) DEFAULT NULL',
+    "ALTER TABLE users ADD COLUMN country VARCHAR(100) DEFAULT 'India'",
+    'ALTER TABLE users ADD COLUMN fcm_token TEXT DEFAULT NULL',
+    "ALTER TABLE users ADD COLUMN device_type VARCHAR(20) DEFAULT 'android'"
   ];
-  for (const sql of usersAlter) {
+  for (const sql of userAlters) {
     try { await query(sql); } catch (e) { /* already exists */ }
   }
+
+  // 12. withme_uploaded_files (Persistent storage backup for Render ephemeral disk)
+  await query(`
+    CREATE TABLE IF NOT EXISTS withme_uploaded_files (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      filename VARCHAR(255) UNIQUE NOT NULL,
+      mimetype VARCHAR(100) DEFAULT 'image/jpeg',
+      data MEDIUMBLOB NOT NULL,
+      size INT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_filename (filename)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 
   // 6. conversations
   await query(`

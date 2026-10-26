@@ -208,6 +208,7 @@ const getCombinedActivitiesData = async (req) => {
     id: p.id,
     user_id: p.user_id,
     name: p.name,
+    full_name: p.full_name || p.name,
     city: p.city || location || 'Jaipur',
     rating: p.rating,
     price: 1,
@@ -217,10 +218,74 @@ const getCombinedActivitiesData = async (req) => {
     profile_image: p.profile_image,
     is_verified: true,
     interests: p.interests,
+    category: p.category,
+    activity: p.activity,
     status: 'available'
   }));
 
-  const search = [...dbSearch, ...defaultSearch];
+  const allCandidates = [...dbSearch, ...defaultSearch];
+
+  const {
+    q: queryTerm = '',
+    query: queryParam = '',
+    name: nameParam = '',
+    search: searchParam = '',
+    interest: interestParam = '',
+    interests: interestsParam = '',
+    category: categoryParam = '',
+    location: locationParam = ''
+  } = (req.query || {});
+
+  const nameFilter = (nameParam || queryTerm || queryParam || searchParam || '').trim().toLowerCase();
+  const interestFilter = (interestParam || interestsParam || '').trim().toLowerCase();
+  const categoryFilter = (categoryParam || '').trim().toLowerCase();
+  const locationFilter = (locationParam || '').trim().toLowerCase();
+
+  const hasFilter = Boolean(nameFilter || interestFilter || categoryFilter || locationFilter);
+
+  let search = allCandidates;
+  if (hasFilter) {
+    search = allCandidates.filter(p => {
+      // 1. Name Filter (case-insensitive partial match)
+      if (nameFilter) {
+        const pName = (p.name || '').toLowerCase();
+        const pFullName = (p.full_name || '').toLowerCase();
+        const pInterests = Array.isArray(p.interests)
+          ? p.interests.map(i => String(typeof i === 'object' ? (i.name || '') : i).toLowerCase())
+          : [String(p.interests || '').toLowerCase()];
+
+        const matchesName = pName.includes(nameFilter) || pFullName.includes(nameFilter);
+        const matchesInterestInQuery = pInterests.some(i => i.includes(nameFilter));
+        if (!matchesName && !matchesInterestInQuery) return false;
+      }
+
+      // 2. Interest Filter (case-insensitive match against saved user interests)
+      if (interestFilter) {
+        const pInterests = Array.isArray(p.interests)
+          ? p.interests.map(i => String(typeof i === 'object' ? (i.name || '') : i).toLowerCase())
+          : [String(p.interests || '').toLowerCase()];
+
+        const terms = interestFilter.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        const matchesInterest = terms.some(term => pInterests.some(i => i.includes(term)));
+        if (!matchesInterest) return false;
+      }
+
+      // 3. Category Filter
+      if (categoryFilter) {
+        const pCat = (p.category || '').toLowerCase();
+        const pAct = (p.activity || '').toLowerCase();
+        if (!pCat.includes(categoryFilter) && !pAct.includes(categoryFilter)) return false;
+      }
+
+      // 4. Location Filter
+      if (locationFilter) {
+        const pCity = (p.city || '').toLowerCase();
+        if (!pCity.includes(locationFilter)) return false;
+      }
+
+      return true;
+    });
+  }
 
   const popular_activities = [
     {
@@ -818,8 +883,100 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
     };
   }
 
-  // Default fallback to Coffee
-  return await getCategoryItemsData('cat_01', baseUrl);
+  // 7. Offers / WithMe24 Offers (cat_07, offers, offer, withme24 offers, 7)
+  if (param === 'cat_07' || param === 'offers' || param === 'offer' || param.includes('offer') || param === '7') {
+    const offerDbItems = dbPartners
+      .filter(p => {
+        const pCat = (p.category || '').toLowerCase();
+        const pAct = (p.activity || '').toLowerCase();
+        return p.price <= 1 || pCat.includes('offer') || pAct.includes('offer');
+      })
+      .map(p => ({
+        id: p.id,
+        type: 'PROFILE',
+        user_id: p.user_id,
+        name: p.name,
+        full_name: p.full_name,
+        age: p.age,
+        gender: p.gender,
+        profile_image: p.profile_image,
+        image: p.image,
+        avatar: p.avatar,
+        rating: p.rating,
+        distance: p.distance,
+        price: 1,
+        currency: 'INR',
+        interests: p.interests,
+        category: 'Offers',
+        is_verified: true,
+        is_favorite: false
+      }));
+
+    const defaultOfferItems = [
+      {
+        id: 'OFF001',
+        type: 'PROFILE',
+        user_id: 'usr_203',
+        name: 'Priya',
+        full_name: 'Priya Sharma',
+        age: 23,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/priya.jpg`,
+        image: `${baseUrl}/uploads/priya.jpg`,
+        avatar: `${baseUrl}/uploads/priya.jpg`,
+        rating: 4.8,
+        distance: '1.2 km',
+        price: 1,
+        currency: 'INR',
+        interests: ['WithMe24 Offers', 'Coffee', 'Special Deal'],
+        category: 'Offers',
+        is_verified: true,
+        is_favorite: false
+      },
+      {
+        id: 'OFF002',
+        type: 'PROFILE',
+        user_id: 'usr_201',
+        name: 'Ananya',
+        full_name: 'Ananya Verma',
+        age: 24,
+        gender: 'Female',
+        profile_image: `${baseUrl}/uploads/ananya.jpg`,
+        image: `${baseUrl}/uploads/ananya.jpg`,
+        avatar: `${baseUrl}/uploads/ananya.jpg`,
+        rating: 4.9,
+        distance: '1.8 km',
+        price: 1,
+        currency: 'INR',
+        interests: ['WithMe24 Offers', 'Discount', 'Events'],
+        category: 'Offers',
+        is_verified: true,
+        is_favorite: false
+      }
+    ];
+
+    const allItems = [...offerDbItems, ...defaultOfferItems];
+
+    return {
+      category_id: 'cat_07',
+      category: 'Offers',
+      title: 'WithMe24 Offers',
+      image: `${baseUrl}/uploads/categories/offers.png`,
+      count: allItems.length,
+      items: allItems
+    };
+  }
+
+  // Dynamic category: filter registered DB partners strictly by category name; return empty list if none match
+  const dynamicItems = mapDbPartnersToCategory(categoryIdOrName, 499);
+  return {
+    category_id: param,
+    category: categoryIdOrName,
+    title: `${categoryIdOrName} WithMe`,
+    image: `${baseUrl}/uploads/categories/${param}.png`,
+    count: dynamicItems.length,
+    items: dynamicItems
+  };
 };
 
 // Category Items Handler for GET requests
@@ -955,21 +1112,43 @@ router.get('/planning-today', authenticateToken, (req, res) => {
 });
 
 // 2. Search API — GET
-router.get('/search', authenticateToken, async (req, res) => {
-  const { q = '', location = '', category = '' } = req.query;
+const handleSearch = async (req, res) => {
+  const {
+    q = '',
+    query = '',
+    name = '',
+    interest = '',
+    interests = '',
+    location = '',
+    category = ''
+  } = (req.query || {});
   const combinedData = await getCombinedActivitiesData(req);
 
   return res.status(200).json({
     success: true,
     message: 'Search results found',
     query: {
-      q,
+      q: q || query || name,
+      name: name || q || query,
+      interest: interest || interests,
       location,
       category
     },
     count: combinedData.search.length,
-    results: combinedData.search
+    results: combinedData.search,
+    data: {
+      results: combinedData.search,
+      count: combinedData.search.length
+    }
   });
+};
+
+router.get('/search', authenticateToken, handleSearch);
+router.get('/', (req, res, next) => {
+  if (req.baseUrl && req.baseUrl.includes('search')) {
+    return handleSearch(req, res);
+  }
+  return next();
 });
 
 // 3. Popular Activities List API — GET
@@ -1075,6 +1254,63 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
         photos: parsedPhotos,
         interests: parsedInterests,
         available_for: parsedAvailableFor
+      };
+    }
+
+    // 2. Also check MySQL `users` table so user profile IDs match their own real data
+    const uRows = await query('SELECT * FROM users WHERE id = ? OR phone_number = ? LIMIT 1', [targetId, rawId]);
+    if (uRows && uRows.length > 0) {
+      const u = uRows[0];
+      const photoUrl = formatPartnerPhoto(u.profile_image, baseUrl);
+      let parsedPhotos = [photoUrl];
+      try {
+        if (u.profile_images) {
+          const rawP = typeof u.profile_images === 'string' ? JSON.parse(u.profile_images) : u.profile_images;
+          if (Array.isArray(rawP) && rawP.length > 0) parsedPhotos = rawP.map(p => formatPartnerPhoto(p, baseUrl));
+        }
+      } catch (e) {}
+
+      let parsedInterests = [];
+      try {
+        if (u.interests) {
+          const rawI = typeof u.interests === 'string' ? JSON.parse(u.interests) : u.interests;
+          if (Array.isArray(rawI)) parsedInterests = rawI.map(i => typeof i === 'string' ? { name: i, icon: 'coffee' } : i);
+        }
+      } catch (e) {}
+
+      let calcAge = 24;
+      if (u.dob) {
+        const yr = parseInt(u.dob.split('-')[0]);
+        if (!isNaN(yr) && yr > 1940 && yr < 2015) calcAge = new Date().getFullYear() - yr;
+      }
+
+      return {
+        id: u.id,
+        partner_id: u.id,
+        db_id: u.id,
+        name: u.name || 'User',
+        full_name: u.name || 'User',
+        nickname: u.nickname || null,
+        age: calcAge,
+        gender: u.gender || 'Other',
+        verified: u.kyc_status === 'APPROVED' || u.kyc_status === 'VERIFIED',
+        city: u.city || 'Jaipur',
+        location: {
+          city: u.city || 'Jaipur',
+          state: u.state || 'Rajasthan',
+          country: u.country || 'India',
+          address: u.city || 'Jaipur'
+        },
+        rating: 5.0,
+        total_reviews: 0,
+        about: u.bio || '',
+        profile_image: photoUrl,
+        image: photoUrl,
+        avatar: photoUrl,
+        profile_images: parsedPhotos,
+        photos: parsedPhotos,
+        interests: parsedInterests,
+        available_for: []
       };
     }
   } catch (err) {
@@ -1307,44 +1543,70 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
     };
   }
 
-  // Default Fallback: Priya Sharma
+  // Specific Demo Fallback: Priya Sharma for demo IDs
+  if (cleanId === '101' || cleanId === 'usr_101' || cleanId === 'usr_203' || cleanId === 'usr_301' || cleanId.includes('priya')) {
+    return {
+      id: targetId || 'usr_203',
+      partner_id: 101,
+      name: 'Priya Sharma',
+      age: 23,
+      gender: 'Female',
+      verified: true,
+      city: 'Jaipur',
+      location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
+      rating: 4.8,
+      total_reviews: 120,
+      about: 'Friendly, outgoing and loves exploring new places, coffee meetups, and meeting people.',
+      profile_image: `${baseUrl}/uploads/priya.jpg`,
+      image: `${baseUrl}/uploads/priya.jpg`,
+      avatar: `${baseUrl}/uploads/priya.jpg`,
+      profile_images: [
+        `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya2.jpg`,
+        `${baseUrl}/uploads/priya3.jpg`,
+        `${baseUrl}/uploads/priya4.jpg`
+      ],
+      photos: [
+        `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya2.jpg`,
+        `${baseUrl}/uploads/priya3.jpg`,
+        `${baseUrl}/uploads/priya4.jpg`
+      ],
+      interests: [
+        { name: 'Coffee', icon: 'coffee' },
+        { name: 'Travel', icon: 'flight' },
+        { name: 'Music', icon: 'music_note' }
+      ],
+      available_for: [
+        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
+        { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
+      ]
+    };
+  }
+
+  // Default clean profile for non-demo users (never inherit Priya Sharma about or interests)
   return {
-    id: targetId || 'usr_203',
-    partner_id: 101,
-    name: 'Priya Sharma',
-    age: 23,
-    gender: 'Female',
-    verified: true,
+    id: targetId,
+    partner_id: targetId,
+    db_id: targetId,
+    name: 'User',
+    full_name: 'User',
+    age: 24,
+    gender: 'Other',
+    verified: false,
     city: 'Jaipur',
     location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
-    rating: 4.8,
-    total_reviews: 120,
-    about: 'Friendly, outgoing and loves exploring new places, coffee meetups, and meeting people.',
-    profile_image: `${baseUrl}/uploads/priya.jpg`,
-    image: `${baseUrl}/uploads/priya.jpg`,
-    avatar: `${baseUrl}/uploads/priya.jpg`,
-    profile_images: [
-      `${baseUrl}/uploads/priya.jpg`,
-      `${baseUrl}/uploads/priya2.jpg`,
-      `${baseUrl}/uploads/priya3.jpg`,
-      `${baseUrl}/uploads/priya4.jpg`
-    ],
-    photos: [
-      `${baseUrl}/uploads/priya.jpg`,
-      `${baseUrl}/uploads/priya2.jpg`,
-      `${baseUrl}/uploads/priya3.jpg`,
-      `${baseUrl}/uploads/priya4.jpg`
-    ],
-    interests: [
-      { name: 'Coffee', icon: 'coffee' },
-      { name: 'Travel', icon: 'flight' },
-      { name: 'Music', icon: 'music_note' }
-    ],
-    available_for: [
-      { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
-      { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
-      { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
-    ]
+    rating: 5.0,
+    total_reviews: 0,
+    about: '',
+    profile_image: `${baseUrl}/uploads/profile.jpg`,
+    image: `${baseUrl}/uploads/profile.jpg`,
+    avatar: `${baseUrl}/uploads/profile.jpg`,
+    profile_images: [`${baseUrl}/uploads/profile.jpg`],
+    photos: [`${baseUrl}/uploads/profile.jpg`],
+    interests: [],
+    available_for: []
   };
 };
 

@@ -92,7 +92,27 @@ function crc32Fallback(buf) {
 
 const fallbackImageBuf = generateFallback400Image();
 
-app.use('/uploads', (req, res) => {
+app.use('/uploads', async (req, res) => {
+  const filename = req.path.replace(/^\//, '').split('?')[0];
+  if (filename) {
+    try {
+      const { query } = require('./src/config/db');
+      const rows = await query('SELECT mimetype, data FROM withme_uploaded_files WHERE filename = ? LIMIT 1', [filename]);
+      if (rows && rows.length > 0) {
+        const fileRow = rows[0];
+        // Restore to local disk for fast subsequent reads
+        try {
+          if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+          fs.writeFileSync(path.join(uploadsDir, filename), fileRow.data);
+        } catch (e) {}
+        res.setHeader('Content-Type', fileRow.mimetype || 'image/jpeg');
+        return res.status(200).send(fileRow.data);
+      }
+    } catch (e) {
+      console.warn('DB upload restore notice:', e.message);
+    }
+  }
+
   res.setHeader('Content-Type', 'image/png');
   return res.status(200).send(fallbackImageBuf);
 });
@@ -133,6 +153,9 @@ app.use('/api/v1/uploads', uploadRoutes);
 app.use('/upload', uploadRoutes);
 app.use('/file-upload', uploadRoutes);
 app.use('/api/v1/profile-live', profileLiveRoutes);
+app.use('/api/v1/search', activityRoutes);
+app.use('/api/search', activityRoutes);
+app.use('/search', activityRoutes);
 app.use('/api/v1/activities', activityRoutes);
 app.use('/activities', activityRoutes);
 app.use('/api/v1/category', activityRoutes);

@@ -77,8 +77,8 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
   }
   photo = photo.trim();
 
-  // Return null for generic/placeholder filenames that are the same for all partners
-  const genericNames = ['photo_1.jpg', 'photo_1.jpeg', 'photo_1.png', 'priya.jpg', 'default.jpg', 'placeholder.jpg', 'avatar.jpg', 'user.jpg', 'no_image.jpg', 'no-image.jpg'];
+  // Return null only for generic placeholder filenames (not real uploaded photo_1.jpg etc.)
+  const genericNames = ['default.jpg', 'placeholder.jpg', 'avatar.jpg', 'no_image.jpg', 'no-image.jpg'];
   const fileName = photo.split('/').pop().toLowerCase();
   if (genericNames.includes(fileName)) {
     return null;
@@ -1770,6 +1770,21 @@ const handleRegisterPartner = async (req, res) => {
   }
   if (!Array.isArray(rawPhotosInput)) rawPhotosInput = [];
 
+  // Also collect up to 5 individual photo fields if passed
+  const individualPhotoFields = [
+    pData.photo_1, pData.photo_2, pData.photo_3, pData.photo_4, pData.photo_5,
+    pData.photo1, pData.photo2, pData.photo3, pData.photo4, pData.photo5,
+    pData.image_1, pData.image_2, pData.image_3, pData.image_4, pData.image_5,
+    ...(Array.isArray(pData.images) ? pData.images : []),
+    ...(Array.isArray(pData.additional_images) ? pData.additional_images : [])
+  ].filter(Boolean);
+
+  for (const extra of individualPhotoFields) {
+    if (!rawPhotosInput.includes(extra)) {
+      rawPhotosInput.push(extra);
+    }
+  }
+
   const extractedPhoto = pData.profile_image || pData.profileImage ||
                          pData.profile_photo_url || pData.profilePhotoUrl ||
                          pData.profile_photo || pData.profilePhoto ||
@@ -1781,7 +1796,10 @@ const handleRegisterPartner = async (req, res) => {
   const photoUrl = formatPartnerPhoto(extractedPhoto, baseUrl);
 
   let parsedPhotos = rawPhotosInput.map(p => formatPartnerPhoto(p, baseUrl)).filter(Boolean);
-  if (parsedPhotos.length === 0) {
+  if (photoUrl && !parsedPhotos.includes(photoUrl)) {
+    parsedPhotos.unshift(photoUrl);
+  }
+  if (parsedPhotos.length === 0 && photoUrl) {
     parsedPhotos = [photoUrl];
   }
   const photosJson = JSON.stringify(parsedPhotos);

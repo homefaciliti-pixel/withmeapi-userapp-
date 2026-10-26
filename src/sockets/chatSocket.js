@@ -443,43 +443,42 @@ function initChatSocket(server) {
             conversationId: convId,
             conversation_id: convId
           });
-        } else {
-          // Receiver is offline — fetch sender info from DB then trigger push notification
-          // Do this asynchronously so it never blocks the socket response
-          (async () => {
-            try {
-              const senderInfo = await chatService.findUser(senderId);
-              const senderName = (senderInfo && (senderInfo.name || senderInfo.full_name)) || null;
-              const senderPhoto = (senderInfo && senderInfo.profile_image) || null;
-
-              // Resolve bookingId from conversation if available
-              let bookingId = null;
-              try {
-                const convRows = await query(
-                  `SELECT booking_id FROM conversations WHERE id = ? LIMIT 1`,
-                  [convId]
-                );
-                if (convRows && convRows.length > 0 && convRows[0].booking_id) {
-                  bookingId = convRows[0].booking_id;
-                }
-              } catch (e) {}
-
-              notificationService.sendEventNotification('chat_message', {
-                userId: rId,
-                sender_id: senderId,
-                conversation_id: convId,
-                booking_id: bookingId,
-                message: cleanMessage,
-                user_name: senderName,
-                user_photo_url: senderPhoto,
-                name: senderName,
-                photo_url: senderPhoto
-              });
-            } catch (e) {
-              console.warn('[Socket] Notification dispatch error:', e.message);
-            }
-          })();
         }
+
+        // 5. Always trigger push notification asynchronously to wake backgrounded / locked devices
+        (async () => {
+          try {
+            const senderInfo = await chatService.findUser(senderId);
+            const senderName = (senderInfo && (senderInfo.name || senderInfo.full_name)) || null;
+            const senderPhoto = (senderInfo && senderInfo.profile_image) || null;
+
+            // Resolve bookingId from conversation if available
+            let bookingId = null;
+            try {
+              const convRows = await query(
+                `SELECT booking_id FROM conversations WHERE id = ? LIMIT 1`,
+                [convId]
+              );
+              if (convRows && convRows.length > 0 && convRows[0].booking_id) {
+                bookingId = convRows[0].booking_id;
+              }
+            } catch (e) {}
+
+            notificationService.sendEventNotification('chat_message', {
+              userId: rId,
+              sender_id: senderId,
+              conversation_id: convId,
+              booking_id: bookingId,
+              message: cleanMessage,
+              user_name: senderName,
+              user_photo_url: senderPhoto,
+              name: senderName,
+              photo_url: senderPhoto
+            });
+          } catch (e) {
+            console.warn('[Socket] Notification dispatch error:', e.message);
+          }
+        })();
 
         if (typeof callback === 'function') {
           callback({ success: true, message: savedMessage });

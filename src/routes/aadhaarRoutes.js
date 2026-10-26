@@ -13,96 +13,159 @@ const getBaseUrl = (req) => {
   return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
 
+const userAttemptsStore = new Map(); // key -> [timestamp1, timestamp2, ...]
+const activeLocks = new Set(); // In-flight request lock to prevent race condition parallel submissions
+
 // Helper for Aadhaar KYC Submission & OTP trigger
 const handleAadhaarKycSubmit = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const body = req.body || {};
-  const rawAadhaar = body.aadhaar_number || body.document_number || body.aadhaarNumber || body.number || body.id_number || '123456789012';
-  const full_name = body.full_name || body.fullName || body.name || (req.user && req.user.name) || 'Amit';
-  const nick_name = body.nick_name || body.nickname || 'Amit';
-  const age = body.age;
+  const rawAadhaar = body.aadhaar_number || body.document_number || body.aadhaarNumber || body.number || body.id_number || (body.data && (body.data.aadhaar_number || body.data.number)) || null;
 
-  const cleanAadhaar = rawAadhaar.toString().replace(/[^0-9]/g, '') || '123456789012';
-
-  const frontFile = req.files && req.files['front_image'] ? req.files['front_image'][0] : null;
-  const backFile = req.files && req.files['back_image'] ? req.files['back_image'][0] : null;
-
-  const frontUrl = frontFile
-    ? `${baseUrl}/uploads/${frontFile.filename}`
-    : (req.body.front_url ? req.body.front_url.replace(/http:\/\/localhost:\d+/, baseUrl) : `${baseUrl}/uploads/mock_aadhaar_front.jpg`);
-  const backUrl = backFile
-    ? `${baseUrl}/uploads/${backFile.filename}`
-    : (req.body.back_url ? req.body.back_url.replace(/http:\/\/localhost:\d+/, baseUrl) : `${baseUrl}/uploads/mock_aadhaar_back.jpg`);
-
-  const userId = req.user ? (req.user.id || req.user.user_id || 'usr_998877') : 'usr_998877';
-  const refId = `adh_ref_${Date.now()}`;
-  const maskedAadhaar = cleanAadhaar.length >= 4 ? `XXXXXXXX${cleanAadhaar.slice(-4)}` : 'XXXXXXXX9012';
-
-  // Save to MySQL DB
-  try {
-    await query(
-      `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, 'AADHAAR', ?, ?, 'APPROVED')`,
-      [userId, cleanAadhaar, full_name]
-    );
-    await query(
-      `UPDATE users SET name = COALESCE(?, name), kyc_status = 'APPROVED' WHERE id = ?`,
-      [full_name || null, userId]
-    );
-  } catch (err) {
-    console.warn('MySQL Aadhaar KYC submit notice:', err.message);
+  if (!rawAadhaar) {
+    return res.status(400).json({
+      success: false,
+      message: "Aadhaar number is required (12 digits)",
+      error_code: "AADHAAR_REQUIRED"
+    });
   }
 
-  const resultData = {
-    ...body,
-    body: body,
-    request_body: body,
-    received_body: body,
-    full_name,
-    nick_name,
-    aadhaar_number: maskedAadhaar,
-    raw_aadhaar_number: cleanAadhaar,
-    age: age ? parseInt(age) : 25,
-    front_url: frontUrl,
-    back_url: backUrl,
-    status: 'APPROVED',
-    kyc_status: 'APPROVED',
-    approval_status: 'APPROVED',
-    is_approved: true,
-    is_kyc_completed: true,
-    is_verified: true,
-    adhar_otp: 'PENDING',
-    aadhaar_otp: 'PENDING',
-    aadhaar_otp_status: 'PENDING',
-    adhar_otp_status: 'PENDING',
-    aadhaar_status: 'PENDING',
-    otp_status: 'PENDING'
-  };
+  const cleanAadhaar = String(rawAadhaar).replace(/\D/g, '');
+  if (cleanAadhaar.length !== 12) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid Aadhaar number: must be exactly 12 digits",
+      error_code: "INVALID_AADHAAR_FORMAT"
+    });
+  }
 
-  return res.status(200).json({
-    success: true,
-    api_name: 'aadhaarKycSubmit',
-    message: 'KYC approved successfully. Aadhaar OTP verification is pending.',
-    status: 'APPROVED',
-    kyc_status: 'APPROVED',
-    approval_status: 'APPROVED',
-    is_approved: true,
-    is_kyc_completed: true,
-    is_verified: true,
-    adhar_otp: 'PENDING',
-    aadhaar_otp: 'PENDING',
-    aadhaar_otp_status: 'PENDING',
-    adhar_otp_status: 'PENDING',
-    aadhaar_status: 'PENDING',
-    otp_status: 'PENDING',
-    ref_id: refId,
-    expires_in_seconds: 300,
-    body: body,
-    request_body: body,
-    received_body: body,
-    data: resultData,
-    submitted_data: resultData,
-    kyc_details: resultData
-  });
+  // Reject all repeating dummy digits (e.g. 000000000000, 111111111111)
+  if (/^(\d)\1{11}$/.test(cleanAadhaar)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid Aadhaar number: repetitive dummy digits not permitted",
+      error_code: "INVALID_AADHAAR_NUMBER"
+    });
+  }
+
+  const userId = req.user ? (req.user.id || req.user.user_id || 'usr_998877') : 'usr_998877';
+  const lockKey = `${userId}_${cleanAadhaar}`;
+
+  // Idempotency lock against duplicate parallel clicks
+  if (activeLocks.has(lockKey)) {
+    return res.status(409).json({
+      success: false,
+      message: "An Aadhaar verification request is already in progress. Please wait.",
+      error_code: "REQUEST_IN_PROGRESS"
+    });
+  }
+
+  // Rate Limiting: Max 3 attempts per 24 hours per user/aadhaar
+  const now = Date.now();
+  const oneDayAgo = now - 24 * 60 * 60 * 1000;
+  let attempts = userAttemptsStore.get(lockKey) || [];
+  attempts = attempts.filter(ts => ts > oneDayAgo);
+
+  if (attempts.length >= 3) {
+    const oldest = attempts[0];
+    const retryAfter = Math.max(1, Math.ceil((oldest + 24 * 60 * 60 * 1000 - now) / 1000));
+    return res.status(429).json({
+      success: false,
+      message: "Maximum Aadhaar verification limit exceeded (3 attempts per 24 hours). Please try again after 24 hours.",
+      error_code: "AADHAAR_LIMIT_EXCEEDED",
+      retry_after_seconds: retryAfter
+    });
+  }
+
+  activeLocks.add(lockKey);
+  attempts.push(now);
+  userAttemptsStore.set(lockKey, attempts);
+
+  try {
+    const full_name = body.full_name || body.fullName || body.name || (req.user && req.user.name) || 'User';
+    const nick_name = body.nick_name || body.nickname || 'User';
+    const age = body.age;
+
+    const frontFile = req.files && req.files['front_image'] ? req.files['front_image'][0] : null;
+    const backFile = req.files && req.files['back_image'] ? req.files['back_image'][0] : null;
+
+    const frontUrl = frontFile
+      ? `${baseUrl}/uploads/${frontFile.filename}`
+      : (req.body.front_url ? req.body.front_url.replace(/http:\/\/localhost:\d+/, baseUrl) : `${baseUrl}/uploads/mock_aadhaar_front.jpg`);
+    const backUrl = backFile
+      ? `${baseUrl}/uploads/${backFile.filename}`
+      : (req.body.back_url ? req.body.back_url.replace(/http:\/\/localhost:\d+/, baseUrl) : `${baseUrl}/uploads/mock_aadhaar_back.jpg`);
+
+    const refId = `adh_ref_${Date.now()}`;
+    const maskedAadhaar = `XXXXXXXX${cleanAadhaar.slice(-4)}`;
+
+    // Save to MySQL DB
+    try {
+      await query(
+        `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, 'AADHAAR', ?, ?, 'APPROVED')`,
+        [userId, cleanAadhaar, full_name]
+      );
+      await query(
+        `UPDATE users SET name = COALESCE(?, name), kyc_status = 'APPROVED' WHERE id = ?`,
+        [full_name || null, userId]
+      );
+    } catch (err) {
+      console.warn('MySQL Aadhaar KYC submit notice:', err.message);
+    }
+
+    const resultData = {
+      ...body,
+      body: body,
+      request_body: body,
+      received_body: body,
+      full_name,
+      nick_name,
+      aadhaar_number: maskedAadhaar,
+      age: age ? parseInt(age) : 25,
+      front_url: frontUrl,
+      back_url: backUrl,
+      status: 'APPROVED',
+      kyc_status: 'APPROVED',
+      approval_status: 'APPROVED',
+      is_approved: true,
+      is_kyc_completed: true,
+      is_verified: true,
+      adhar_otp: 'PENDING',
+      aadhaar_otp: 'PENDING',
+      aadhaar_otp_status: 'PENDING',
+      adhar_otp_status: 'PENDING',
+      aadhaar_status: 'PENDING',
+      otp_status: 'PENDING'
+    };
+
+    return res.status(200).json({
+      success: true,
+      api_name: 'aadhaarKycSubmit',
+      message: 'KYC approved successfully. Aadhaar OTP verification is pending.',
+      status: 'APPROVED',
+      kyc_status: 'APPROVED',
+      approval_status: 'APPROVED',
+      is_approved: true,
+      is_kyc_completed: true,
+      is_verified: true,
+      adhar_otp: 'PENDING',
+      aadhaar_otp: 'PENDING',
+      aadhaar_otp_status: 'PENDING',
+      adhar_otp_status: 'PENDING',
+      aadhaar_status: 'PENDING',
+      otp_status: 'PENDING',
+      ref_id: refId,
+      expires_in_seconds: 300,
+      body: body,
+      request_body: body,
+      received_body: body,
+      data: resultData,
+      submitted_data: resultData,
+      kyc_details: resultData
+    });
+  } finally {
+    activeLocks.delete(lockKey);
+  }
 };
 
 const safeUploadFields = (req, res, next) => {

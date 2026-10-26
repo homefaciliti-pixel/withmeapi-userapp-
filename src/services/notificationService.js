@@ -133,22 +133,47 @@ async function saveUserFcmToken(userId, fcmToken, deviceType = 'android') {
 /**
  * Dispatch Push Notification via Firebase FCM HTTP API if Server Key present
  */
+/**
+ * Helper to sanitize FCM data payload
+ * Firebase Cloud Messaging strictly requires all values in the 'data' map to be strings.
+ */
+function sanitizeFcmData(data) {
+  const result = {};
+  if (!data || typeof data !== 'object') return result;
+  for (const [k, v] of Object.entries(data)) {
+    if (v === null || v === undefined) {
+      result[k] = '';
+    } else if (typeof v === 'object') {
+      result[k] = JSON.stringify(v);
+    } else {
+      result[k] = String(v);
+    }
+  }
+  return result;
+}
+
+/**
+ * Send raw push notification via Firebase Cloud Messaging HTTP endpoint
+ */
 function sendFcmPushNotification(fcmToken, title, body, dataPayload = {}) {
-  const serverKey = process.env.FIREBASE_SERVER_KEY || process.env.FCM_SERVER_KEY;
+  const serverKey = process.env.FIREBASE_SERVER_KEY || process.env.FCM_SERVER_KEY || 'AIzaSyDFBUhNlPjsnkfVA4auuznMeyoTz-AhJDQ';
   if (!serverKey) {
     console.log(`[FCM Notice] Notification stored. To enable Firebase push delivery, set FIREBASE_SERVER_KEY in .env`);
     return Promise.resolve({ sent: false, reason: "NO_SERVER_KEY" });
   }
 
+  const sanitizedData = sanitizeFcmData(dataPayload);
+
   return new Promise((resolve) => {
     const payload = JSON.stringify({
       to: fcmToken,
+      priority: "high",
       notification: {
         title: title,
         body: body,
         sound: "default"
       },
-      data: dataPayload
+      data: sanitizedData
     });
 
     const options = {

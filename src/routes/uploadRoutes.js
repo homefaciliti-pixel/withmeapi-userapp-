@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const upload = require('../middleware/uploadMiddleware');
 const { authenticateToken } = require('../middleware/authMiddleware');
+const { query } = require('../config/db');
 
 const getBaseUrl = (req) => {
   if (req) {
@@ -138,6 +139,25 @@ const handleFileUpload = async (req, res) => {
   }
 
   const primary = filesList[0];
+
+  // Persist all uploaded files in MySQL to survive Render container restarts
+  for (const f of filesList) {
+    if (f.filename) {
+      try {
+        const filePath = path.join(uploadsDir, f.filename);
+        if (fs.existsSync(filePath)) {
+          const buf = fs.readFileSync(filePath);
+          await query(
+            `INSERT INTO withme_uploaded_files (filename, mimetype, data, size) VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE data = VALUES(data), size = VALUES(size), mimetype = VALUES(mimetype)`,
+            [f.filename, f.mimetype || 'image/jpeg', buf, buf.length]
+          );
+        }
+      } catch (err) {
+        console.warn('MySQL persistent upload backup notice:', err.message);
+      }
+    }
+  }
 
   // Update user profile image in MySQL DB if user is authenticated
   if (req.user && primary && primary.url) {

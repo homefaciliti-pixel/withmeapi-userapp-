@@ -1,12 +1,25 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const notificationService = require('../services/notificationService');
+
+// Optional Auth Middleware for FCM token saving (handles pre-auth and post-auth scenarios)
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) return next();
+  const token = authHeader.split(' ')[1];
+  if (!token) return next();
+  jwt.verify(token, process.env.JWT_SECRET || 'witme_secure_jwt_secret_key_2026_super_safe', (err, user) => {
+    if (!err && user) req.user = user;
+    next();
+  });
+};
 
 // 1. Save Device FCM Token
 const handleSaveFcmToken = async (req, res, next) => {
   try {
-    const userId = (req.user && (req.user.user_id || req.user.id)) || (req.body ? req.body.user_id : null) || 'usr_7250642635';
+    const userId = (req.user && (req.user.user_id || req.user.id)) || (req.body ? (req.body.user_id || req.body.userId || req.body.phone_number || req.body.id) : null) || 'usr_7250642635';
     const fcmToken = req.body ? (req.body.fcm_token || req.body.fcmToken || req.body.token || req.body.device_token) : null;
     const deviceType = req.body ? (req.body.device_type || req.body.platform || 'android') : 'android';
 
@@ -29,8 +42,15 @@ const handleSaveFcmToken = async (req, res, next) => {
   }
 };
 
-router.post('/fcm-token', authenticateToken, handleSaveFcmToken);
-router.post('/token', authenticateToken, handleSaveFcmToken);
+router.post('/fcm-token', optionalAuth, handleSaveFcmToken);
+router.post('/token', optionalAuth, handleSaveFcmToken);
+router.post('/save-token', optionalAuth, handleSaveFcmToken);
+router.post('/save-fcm-token', optionalAuth, handleSaveFcmToken);
+router.post('/update-fcm-token', optionalAuth, handleSaveFcmToken);
+router.post('/device-token', optionalAuth, handleSaveFcmToken);
+router.put('/fcm-token', optionalAuth, handleSaveFcmToken);
+router.put('/token', optionalAuth, handleSaveFcmToken);
+
 
 // 2. Send Custom Push Notification
 const handleSendNotification = async (req, res, next) => {
