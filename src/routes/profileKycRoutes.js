@@ -946,6 +946,24 @@ const handleKycSubmit = async (req, res) => {
       } else if (f.fieldname === 'aadhaar_back' || f.fieldname === 'back_image' || f.fieldname === 'back') {
         backUrl = fileUrl;
       }
+
+      // Persist document into MySQL database for Render restart durability
+      if (f.filename) {
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const filePath = path.join(__dirname, '../../uploads', f.filename);
+          if (fs.existsSync(filePath)) {
+            const buf = fs.readFileSync(filePath);
+            query(
+              `INSERT INTO withme_uploaded_files (filename, mimetype, data, size) VALUES (?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE data = VALUES(data), size = VALUES(size), mimetype = VALUES(mimetype)`,
+              [f.filename, f.mimetype || 'image/jpeg', buf, buf.length]
+            ).catch(e => console.warn('MySQL KYC file backup notice:', e.message));
+          }
+        } catch (e) {}
+      }
+
       return fileUrl;
     });
     if (uploadedFiles[0] && frontUrl.includes('mock_aadhaar_front.jpg')) {

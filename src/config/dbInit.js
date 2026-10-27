@@ -154,12 +154,15 @@ async function initAllWithMeTables() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       filename VARCHAR(255) UNIQUE NOT NULL,
       mimetype VARCHAR(100) DEFAULT 'image/jpeg',
-      data MEDIUMBLOB NOT NULL,
+      data LONGBLOB NOT NULL,
       size INT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_filename (filename)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+  try {
+    await query(`ALTER TABLE withme_uploaded_files MODIFY COLUMN data LONGBLOB NOT NULL`);
+  } catch (e) {}
 
   // 6. conversations
   await query(`

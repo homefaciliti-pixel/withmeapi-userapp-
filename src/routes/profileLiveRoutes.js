@@ -57,6 +57,26 @@ router.post('/photo-upload', authenticateToken, upload.single('photo'), async (r
   const baseUrl = getBaseUrl(req);
   const photoFile = req.file;
 
+  // Persist file into MySQL database to survive Render container restarts
+  if (photoFile && photoFile.filename) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const { query } = require('../config/db');
+      const filePath = path.join(__dirname, '../../uploads', photoFile.filename);
+      if (fs.existsSync(filePath)) {
+        const buf = fs.readFileSync(filePath);
+        await query(
+          `INSERT INTO withme_uploaded_files (filename, mimetype, data, size) VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE data = VALUES(data), size = VALUES(size), mimetype = VALUES(mimetype)`,
+          [photoFile.filename, photoFile.mimetype || 'image/jpeg', buf, buf.length]
+        );
+      }
+    } catch (dbErr) {
+      console.warn('MySQL live photo-upload backup notice:', dbErr.message);
+    }
+  }
+
   const photoUrl = photoFile
     ? `${baseUrl}/uploads/${photoFile.filename}`
     : `${baseUrl}/uploads/default_uploaded_photo.jpg`;
