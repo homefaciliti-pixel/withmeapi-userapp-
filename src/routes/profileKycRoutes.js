@@ -96,7 +96,7 @@ const handleGetProfile = async (req, res) => {
           try {
             const parsed = JSON.parse(u.profile_images);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              dbProfileImages = parsed.map(img => img.replace(/http:\/\/localhost:\d+/, baseUrl));
+              dbProfileImages = parsed.map(img => img.replace(/http:\/\/localhost:\d+/, baseUrl)).filter(Boolean);
             }
           } catch (e) {}
         }
@@ -104,7 +104,10 @@ const handleGetProfile = async (req, res) => {
         // If profile_images is empty but profile_image exists, build a single-item array
         if (dbProfileImages.length === 0 && dbProfileImage) {
           dbProfileImages = [dbProfileImage];
+        } else if (dbProfileImage && !dbProfileImages.includes(dbProfileImage)) {
+          dbProfileImages.unshift(dbProfileImage);
         }
+        dbProfileImages = [...new Set(dbProfileImages.filter(Boolean))].slice(0, 5);
 
         // Parse interests & available_for from DB JSON
         let parsedInterests = [];
@@ -143,7 +146,7 @@ const handleGetProfile = async (req, res) => {
           profileImages: dbProfileImages,
           photos: dbProfileImages,
           images: dbProfileImages,
-          secondary_photos: dbProfileImages.slice(1),
+          secondary_photos: dbProfileImages.slice(1, 5),
           is_photo_verified: isKycApproved || Boolean(dbProfileImage),
           photo_verification_status: (isKycApproved || Boolean(dbProfileImage)) ? 'VERIFIED' : 'NOT_VERIFIED',
           kyc_status: isKycApproved ? 'APPROVED' : (u.kyc_status || 'NOT_VERIFIED'),
@@ -341,13 +344,15 @@ const handleDetailedProfileView = async (req, res) => {
     if (userRows && userRows.length > 0) {
       const u = userRows[0];
       const photoUrl = formatPartnerPhoto(u.profile_image, baseUrl);
-      let parsedPhotos = [photoUrl];
+      let parsedPhotos = [];
       try {
-        if (u.profile_images) {
-          const rawP = typeof u.profile_images === 'string' ? JSON.parse(u.profile_images) : u.profile_images;
-          if (Array.isArray(rawP) && rawP.length > 0) parsedPhotos = rawP.map(p => formatPartnerPhoto(p, baseUrl));
+        const rawP = u.profile_images || u.photos || u.images;
+        if (rawP) {
+          const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
+          if (Array.isArray(photoValues) && photoValues.length > 0) parsedPhotos = photoValues.map(p => formatPartnerPhoto(p, baseUrl)).filter(Boolean);
         }
       } catch (e) {}
+      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
       let parsedInterests = [];
       try {
@@ -403,13 +408,15 @@ const handleDetailedProfileView = async (req, res) => {
     if (pRows && pRows.length > 0) {
       const p = pRows[0];
       const photoUrl = formatPartnerPhoto(p.image || p.profile_photo_url, baseUrl);
-      let parsedPhotos = [photoUrl];
+      let parsedPhotos = [];
       try {
-        if (p.photos) {
-          const rawP = typeof p.photos === 'string' ? JSON.parse(p.photos) : p.photos;
-          if (Array.isArray(rawP) && rawP.length > 0) parsedPhotos = rawP.map(ph => formatPartnerPhoto(ph, baseUrl));
+        const rawP = p.photos || p.profile_images || p.images;
+        if (rawP) {
+          const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
+          if (Array.isArray(photoValues) && photoValues.length > 0) parsedPhotos = photoValues.map(ph => formatPartnerPhoto(ph, baseUrl)).filter(Boolean);
         }
       } catch (e) {}
+      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
       let parsedInterests = [];
       try {

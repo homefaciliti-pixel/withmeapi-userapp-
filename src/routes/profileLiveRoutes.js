@@ -84,7 +84,7 @@ router.post('/photo-upload', authenticateToken, upload.single('photo'), async (r
         } catch (e) {}
       }
 
-      const mergedImages = [...new Set([...existingImages, photoUrl])].slice(0, 6);
+      const mergedImages = [...new Set([...existingImages, photoUrl])].slice(0, 5);
       const mainPhoto = (userRows && userRows[0] && userRows[0].profile_image) ? userRows[0].profile_image : photoUrl;
 
       await query(

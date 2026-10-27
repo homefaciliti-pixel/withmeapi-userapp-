@@ -185,8 +185,8 @@ const handleFileUpload = async (req, res) => {
       }
 
       const newUrls = filesList.map(f => f.url).filter(Boolean);
-      // Merge unique URLs, preserving existing secondary photos (up to 6 photos)
-      const mergedImages = [...new Set([...existingImages, ...newUrls])].slice(0, 6);
+      // Merge unique URLs, preserving existing secondary photos (up to 5 photos)
+      const mergedImages = [...new Set([...existingImages, ...newUrls])].slice(0, 5);
       const mainPhoto = (userRows && userRows[0] && userRows[0].profile_image) ? userRows[0].profile_image : primary.url;
 
       await query(

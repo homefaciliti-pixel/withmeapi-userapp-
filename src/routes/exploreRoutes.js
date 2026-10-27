@@ -109,8 +109,8 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
             .filter(Boolean);
         }
       } catch (e) {}
-      // Include the primary image once, then preserve the uploaded gallery order.
-      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))];
+      // Include the primary image once, then preserve the uploaded gallery order (max 5 images).
+      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
       return {
         user_id: r.user_id || `usr_${r.id}`,

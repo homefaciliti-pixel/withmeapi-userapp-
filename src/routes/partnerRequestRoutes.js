@@ -150,15 +150,17 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
         const partnerCategory = r.category || r.activity || 'Coffee';
         const pId = formatNumericUserId(r.partner_id || r.user_id || r.id);
 
-        let parsedPhotos = [photoUrl];
-        if (r.photos) {
-          try {
-            const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
-            if (Array.isArray(rawP) && rawP.length > 0) {
-              parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p.url || p.uri), baseUrl));
+        let parsedPhotos = [];
+        try {
+          const rawP = r.photos || r.profile_images || r.images;
+          if (rawP) {
+            const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
+            if (Array.isArray(photoValues) && photoValues.length > 0) {
+              parsedPhotos = photoValues.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p && (p.url || p.uri || p.path || p.image)), baseUrl)).filter(Boolean);
             }
-          } catch (e) {}
-        }
+          }
+        } catch (e) {}
+        parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
         return {
           id: pId,
@@ -834,15 +836,17 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
         if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
       } catch (e) {}
 
-      let parsedPhotos = [photoUrl];
+      let parsedPhotos = [];
       try {
-        if (r.photos) {
-          const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
-          if (Array.isArray(rawP) && rawP.length > 0) {
-            parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p.url || p.uri), baseUrl));
+        const rawP = r.photos || r.profile_images || r.images;
+        if (rawP) {
+          const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
+          if (Array.isArray(photoValues) && photoValues.length > 0) {
+            parsedPhotos = photoValues.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p && (p.url || p.uri || p.path || p.image)), baseUrl)).filter(Boolean);
           }
         }
       } catch (e) {}
+      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
       let parsedAvailableFor = [
         { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
@@ -1802,6 +1806,7 @@ const handleRegisterPartner = async (req, res) => {
   if (parsedPhotos.length === 0 && photoUrl) {
     parsedPhotos = [photoUrl];
   }
+  parsedPhotos = [...new Set(parsedPhotos.filter(Boolean))].slice(0, 5);
   const photosJson = JSON.stringify(parsedPhotos);
 
   const priceVal = pData.price !== undefined ? parseFloat(pData.price) : 1;

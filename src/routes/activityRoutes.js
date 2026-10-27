@@ -73,15 +73,17 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
         if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
       } catch (e) {}
 
-      let parsedPhotos = photoUrl ? [photoUrl] : [];
+      let parsedPhotos = [];
       try {
-        if (r.photos) {
-          const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
-          if (Array.isArray(rawP) && rawP.length > 0) {
-            parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p.url || p.uri), baseUrl));
-          }
+        const rawP = r.photos || r.profile_images || r.images || [];
+        const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
+        if (Array.isArray(photoValues)) {
+          parsedPhotos = photoValues
+            .map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p && (p.url || p.uri || p.path || p.image)), baseUrl))
+            .filter(Boolean);
         }
       } catch (e) {}
+      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
       let parsedAvailableFor = [
         { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
@@ -1219,15 +1221,17 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
         }
       } catch (e) {}
 
-      let parsedPhotos = photoUrl ? [photoUrl] : [];
+      let parsedPhotos = [];
       try {
-        if (r.photos) {
-          const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
-          if (Array.isArray(rawP) && rawP.length > 0) {
-            parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p.url || p.uri), baseUrl));
-          }
+        const rawP = r.photos || r.profile_images || r.images || [];
+        const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
+        if (Array.isArray(photoValues)) {
+          parsedPhotos = photoValues
+            .map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p && (p.url || p.uri || p.path || p.image)), baseUrl))
+            .filter(Boolean);
         }
       } catch (e) {}
+      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
       let parsedAvailableFor = [
         { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
@@ -1272,13 +1276,15 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
     if (uRows && uRows.length > 0) {
       const u = uRows[0];
       const photoUrl = formatPartnerPhoto(u.profile_image, baseUrl);
-      let parsedPhotos = photoUrl ? [photoUrl] : [];
+      let parsedPhotos = [];
       try {
-        if (u.profile_images) {
-          const rawP = typeof u.profile_images === 'string' ? JSON.parse(u.profile_images) : u.profile_images;
-          if (Array.isArray(rawP) && rawP.length > 0) parsedPhotos = rawP.map(p => formatPartnerPhoto(p, baseUrl));
+        const rawP = u.profile_images || u.photos || u.images;
+        if (rawP) {
+          const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
+          if (Array.isArray(photoValues)) parsedPhotos = photoValues.map(p => formatPartnerPhoto(p, baseUrl)).filter(Boolean);
         }
       } catch (e) {}
+      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
       let parsedInterests = [];
       try {
