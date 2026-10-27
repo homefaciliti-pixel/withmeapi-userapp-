@@ -441,7 +441,16 @@ const getCombinedActivitiesData = async (req) => {
 
 // Category Items Data Generator
 const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'https://withmeapi-userapp.onrender.com') => {
-  const param = String(categoryIdOrName || 'cat_01').trim().toLowerCase();
+  let param = String(categoryIdOrName || 'cat_01').trim().toLowerCase();
+  // Popular activity IDs are used by the home screen as well as category IDs.
+  // Resolve known activity aliases before querying registered partners.
+  const categoryAliases = {
+    act_top1: 'cat_01', act_top2: 'cat_02', act_top3: 'cat_04',
+    act_top4: 'cat_03', act_top5: 'cat_05', act_top6: 'cat_06',
+    withme24_offers: 'cat_07', offers: 'cat_07', offer: 'cat_07',
+    'withme24 offers': 'cat_07', dinner: 'cat_02', coffee: 'cat_01'
+  };
+  param = categoryAliases[param] || param;
   const dbPartners = await fetchRegisteredPartnersFromDb(baseUrl);
 
   const mapDbPartnersToCategory = (catName, defaultPrice = 499) => {
@@ -502,7 +511,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Cafe', 'Travel'],
         category: 'Coffee',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -522,7 +531,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Music', 'Books'],
         category: 'Coffee',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -542,7 +551,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Cafe', 'Events'],
         category: 'Coffee',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -562,7 +571,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Art', 'Photography'],
         category: 'Coffee',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -582,7 +591,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Music', 'Cafe'],
         category: 'Coffee',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -602,7 +611,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Coffee', 'Fitness', 'Gaming'],
         category: 'Coffee',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       }
     ];
@@ -639,7 +648,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Dinner', 'Fine Dining', 'Food'],
         category: 'Dinner',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -659,7 +668,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Dinner', 'Italian', 'Music'],
         category: 'Dinner',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -679,7 +688,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Dinner', 'Buffet', 'Cafe'],
         category: 'Dinner',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       }
     ];
@@ -716,7 +725,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Travel', 'Road Trips', 'Sightseeing'],
         category: 'Travel',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -736,7 +745,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Travel', 'Trekking', 'Mountains'],
         category: 'Travel',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       }
     ];
@@ -773,7 +782,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Movie', 'Cinema', 'Popcorn'],
         category: 'Movie',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -793,7 +802,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Movie', 'Sci-Fi', 'Gaming'],
         category: 'Movie',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       }
     ];
@@ -830,7 +839,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Event', 'Live Music', 'Festivals'],
         category: 'Event',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       }
     ];
@@ -867,7 +876,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['Conversation', 'Philosophy', 'Reading'],
         category: 'Conversation',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       }
     ];
@@ -931,7 +940,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['WithMe24 Offers', 'Coffee', 'Special Deal'],
         category: 'Offers',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       },
       {
@@ -951,7 +960,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         currency: 'INR',
         interests: ['WithMe24 Offers', 'Discount', 'Events'],
         category: 'Offers',
-        is_verified: Boolean(p.is_verified),
+        is_verified: true,
         is_favorite: false
       }
     ];

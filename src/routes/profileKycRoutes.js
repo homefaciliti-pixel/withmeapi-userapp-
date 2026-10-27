@@ -123,8 +123,8 @@ const handleGetProfile = async (req, res) => {
         profileData = {
           user_id: u.id || userId,
           name: u.name || 'User',
-          nickname: u.nickname || u.name || 'User',
-          nick_name: u.nickname || u.name || 'User',
+          nickname: u.nickname || null,
+          nick_name: u.nickname || null,
           country_code: userCountryCode,
           phone_number: dbPhone || userPhone,
           full_phone_number: u.phone_number
@@ -296,8 +296,8 @@ const handleGetProfile = async (req, res) => {
     detailed_profile: {
       id: profileData.user_id,
       name: profileData.name,
-      nickname: profileData.nickname || profileData.name || 'User',
-      nick_name: profileData.nickname || profileData.name || 'User',
+      nickname: profileData.nickname || null,
+      nick_name: profileData.nickname || null,
       age: calculatedAge,
       gender: profileData.gender,
       interested_in_gender: interestedGenderVal,
@@ -371,8 +371,8 @@ const handleDetailedProfileView = async (req, res) => {
           user_id: u.id,
           name: u.name || 'User',
           full_name: u.name || 'User',
-          nickname: u.nickname || u.name || 'User',
-          nick_name: u.nickname || u.name || 'User',
+          nickname: u.nickname || null,
+          nick_name: u.nickname || null,
           age: calcAge,
           gender: u.gender || 'Other',
           verified: u.kyc_status === 'APPROVED' || u.kyc_status === 'VERIFIED',
@@ -459,8 +459,8 @@ const handleDetailedProfileView = async (req, res) => {
         id: targetId,
         user_id: targetId,
         name: memoryP.name || 'User',
-        nickname: memoryP.nickname || memoryP.name || 'User',
-        nick_name: memoryP.nickname || memoryP.name || 'User',
+        nickname: memoryP.nickname || null,
+        nick_name: memoryP.nickname || null,
         age: 24,
         gender: memoryP.gender || 'Other',
         verified: memoryP.kyc_status === 'APPROVED',
@@ -604,8 +604,8 @@ const handleDetailedProfileView = async (req, res) => {
       id: targetId,
       user_id: targetId,
       name: 'User',
-      nickname: 'User',
-      nick_name: 'User',
+      nickname: null,
+      nick_name: null,
       age: 24,
       gender: 'Other',
       verified: false,
@@ -891,7 +891,7 @@ const handleKycSubmit = async (req, res) => {
 
   // Only use values explicitly provided in body — no auto-defaults that overwrite existing DB data
   const name   = body.name || body.full_name || body.fullName || null;
-  const nick_name = body.nick_name || body.nickname || null;
+  const nick_name = body.nickname !== undefined ? body.nickname : (body.nick_name !== undefined ? body.nick_name : (body.nickName !== undefined ? body.nickName : null));
   const email  = body.email || null;                          // NO auto phone@withme.app
   const gender = body.gender || null;                         // NO auto 'Male' default
   const dob    = body.dob || body.date_of_birth || body.birth_date || null;

@@ -99,15 +99,18 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
         if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
       } catch (e) {}
 
-      let parsedPhotos = photoUrl ? [photoUrl] : [];
+      let parsedPhotos = [];
       try {
-        if (r.photos) {
-          const rawP = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
-          if (Array.isArray(rawP) && rawP.length > 0) {
-            parsedPhotos = rawP.map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p.url || p.uri), baseUrl));
-          }
+        const rawP = r.photos || r.profile_images || r.images || [];
+        const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
+        if (Array.isArray(photoValues)) {
+          parsedPhotos = photoValues
+            .map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p && (p.url || p.uri || p.path || p.image)), baseUrl))
+            .filter(Boolean);
         }
       } catch (e) {}
+      // Include the primary image once, then preserve the uploaded gallery order.
+      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))];
 
       return {
         user_id: r.user_id || `usr_${r.id}`,
