@@ -92,9 +92,29 @@ function crc32Fallback(buf) {
 
 const fallbackImageBuf = generateFallback400Image();
 
+// KYC/Aadhaar sensitive file prefixes — require authentication to serve
+const KYC_PREFIXES = ['aadhar_front_', 'aadhar_back_', 'aadhaar_front_', 'aadhaar_back_', 'mock_aadhaar'];
+
 app.use('/uploads', async (req, res) => {
   const filename = req.path.replace(/^\//, '').split('?')[0];
   if (filename) {
+    // Block unauthenticated access to KYC/Aadhaar documents
+    const isKycFile = KYC_PREFIXES.some(prefix => filename.startsWith(prefix));
+    if (isKycFile) {
+      const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, message: 'Unauthorized: authentication required to access this document' });
+      }
+      // Optionally verify token validity
+      try {
+        const jwt = require('jsonwebtoken');
+        const token = authHeader.slice(7);
+        jwt.verify(token, process.env.JWT_SECRET || process.env.SECRET_KEY || 'withme_secret_key');
+      } catch (jwtErr) {
+        return res.status(403).json({ success: false, message: 'Forbidden: invalid or expired token' });
+      }
+    }
+
     try {
       const { query } = require('./src/config/db');
       const rows = await query('SELECT mimetype, data FROM withme_uploaded_files WHERE filename = ? LIMIT 1', [filename]);
