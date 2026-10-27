@@ -447,10 +447,14 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
   // Popular activity IDs are used by the home screen as well as category IDs.
   // Resolve known activity aliases before querying registered partners.
   const categoryAliases = {
-    act_top1: 'cat_01', act_top2: 'cat_02', act_top3: 'cat_04',
-    act_top4: 'cat_03', act_top5: 'cat_05', act_top6: 'cat_06',
-    withme24_offers: 'cat_07', offers: 'cat_07', offer: 'cat_07',
-    'withme24 offers': 'cat_07', dinner: 'cat_02', coffee: 'cat_01'
+    act_top1: 'cat_01', 'act-top1': 'cat_01', coffee: 'cat_01', 'coffee withme': 'cat_01',
+    act_top2: 'cat_02', 'act-top2': 'cat_02', dinner: 'cat_02', 'dinner withme': 'cat_02',
+    act_top3: 'cat_04', 'act-top3': 'cat_04', movie: 'cat_04', movies: 'cat_04', 'movie withme': 'cat_04',
+    act_top4: 'cat_03', 'act-top4': 'cat_03', travel: 'cat_03', 'travel withme': 'cat_03',
+    act_top5: 'cat_05', 'act-top5': 'cat_05', event: 'cat_05', events: 'cat_05', 'event withme': 'cat_05',
+    act_top6: 'cat_06', 'act-top6': 'cat_06', conversation: 'cat_06', 'conversation withme': 'cat_06',
+    withme24_offers: 'cat_07', 'withme24-offers': 'cat_07', withme_offers: 'cat_07',
+    offers: 'cat_07', offer: 'cat_07', 'withme24 offers': 'cat_07'
   };
   param = categoryAliases[param] || param;
   const dbPartners = await fetchRegisteredPartnersFromDb(baseUrl);
@@ -901,7 +905,10 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
       .filter(p => {
         const pCat = (p.category || '').toLowerCase();
         const pAct = (p.activity || '').toLowerCase();
-        return pCat.includes('offer') || pAct.includes('offer');
+        const pInterests = Array.isArray(p.interests)
+          ? p.interests.map(i => String(i).toLowerCase())
+          : [String(p.interests || '').toLowerCase()];
+        return pCat.includes('offer') || pAct.includes('offer') || pInterests.some(i => i.includes('offer'));
       })
       .map(p => ({
         id: p.id,
@@ -1071,6 +1078,14 @@ router.get('/event', authenticateToken, async (req, res) => {
 });
 router.get('/conversation', authenticateToken, async (req, res) => {
   req.params.id = 'cat_06';
+  return handleCategoryDetailsOrList(req, res);
+});
+router.get('/offers', authenticateToken, async (req, res) => {
+  req.params.id = 'cat_07';
+  return handleCategoryDetailsOrList(req, res);
+});
+router.get('/withme24_offers', authenticateToken, async (req, res) => {
+  req.params.id = 'cat_07';
   return handleCategoryDetailsOrList(req, res);
 });
 
@@ -1294,10 +1309,12 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
         }
       } catch (e) {}
 
-      let calcAge = 24;
+      let calcAge = null;
       if (u.dob) {
         const yr = parseInt(u.dob.split('-')[0]);
-        if (!isNaN(yr) && yr > 1940 && yr < 2015) calcAge = new Date().getFullYear() - yr;
+        if (!isNaN(yr) && yr > 1940 && yr < new Date().getFullYear()) calcAge = new Date().getFullYear() - yr;
+      } else if (u.age) {
+        calcAge = parseInt(u.age, 10) || null;
       }
 
       return {

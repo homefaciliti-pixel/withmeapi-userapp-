@@ -362,10 +362,12 @@ const handleDetailedProfileView = async (req, res) => {
         }
       } catch (e) {}
 
-      let calcAge = 24;
+      let calcAge = null;
       if (u.dob) {
         const yr = parseInt(u.dob.split('-')[0]);
-        if (!isNaN(yr) && yr > 1940 && yr < 2015) calcAge = new Date().getFullYear() - yr;
+        if (!isNaN(yr) && yr > 1940 && yr < new Date().getFullYear()) calcAge = new Date().getFullYear() - yr;
+      } else if (u.age) {
+        calcAge = parseInt(u.age, 10) || null;
       }
 
       return res.status(200).json({
@@ -392,6 +394,7 @@ const handleDetailedProfileView = async (req, res) => {
           profile_image: photoUrl,
           profile_images: parsedPhotos,
           photos: parsedPhotos,
+          secondary_photos: parsedPhotos.slice(1, 5),
           about: u.bio || '',
           interests: parsedInterests,
           available_for: []
@@ -434,7 +437,7 @@ const handleDetailedProfileView = async (req, res) => {
           user_id: p.user_id || `usr_${p.id}`,
           name: (p.name || p.full_name || 'Partner').trim(),
           full_name: (p.full_name || p.name || 'Partner').trim(),
-          age: p.age || 24,
+          age: p.age || null,
           gender: p.gender || 'Female',
           verified: true,
           location: {
@@ -448,6 +451,7 @@ const handleDetailedProfileView = async (req, res) => {
           profile_image: photoUrl,
           profile_images: parsedPhotos,
           photos: parsedPhotos,
+          secondary_photos: parsedPhotos.slice(1, 5),
           about: p.about || `Friendly partner available in ${p.city || 'Jaipur'}.`,
           interests: parsedInterests,
           available_for: []
@@ -468,7 +472,7 @@ const handleDetailedProfileView = async (req, res) => {
         name: memoryP.name || 'User',
         nickname: memoryP.nickname || null,
         nick_name: memoryP.nickname || null,
-        age: 24,
+        age: memoryP.age || null,
         gender: memoryP.gender || 'Other',
         verified: memoryP.kyc_status === 'APPROVED',
         location: { city: memoryP.city || 'Jaipur', state: 'Rajasthan', country: 'India' },
@@ -613,7 +617,7 @@ const handleDetailedProfileView = async (req, res) => {
       name: 'User',
       nickname: null,
       nick_name: null,
-      age: 24,
+      age: null,
       gender: 'Other',
       verified: false,
       location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
@@ -963,12 +967,13 @@ const handleKycSubmit = async (req, res) => {
   userProfilesStore[userId] = {
     ...userProfilesStore[userId],
     user_id: userId,
-    ...(name   && { name }),
-    ...(email  && { email }),
-    ...(gender && { gender }),
-    ...(dob    && { dob }),
-    ...(city   && { city }),
-    ...(bio    && { bio }),
+    ...(name      && { name }),
+    ...(nick_name !== null && { nickname: nick_name, nick_name }),
+    ...(email     && { email }),
+    ...(gender    && { gender }),
+    ...(dob       && { dob }),
+    ...(city      && { city }),
+    ...(bio       && { bio }),
     kyc_status: 'APPROVED',
     status: 'APPROVED',
     approval_status: 'APPROVED',
@@ -990,30 +995,32 @@ const handleKycSubmit = async (req, res) => {
     const setClauses = ["kyc_status = 'APPROVED'", 'updated_at = NOW()'];
     const setParams = [];
 
-    if (name)   { setClauses.unshift('name = ?');   setParams.push(name); }
-    if (email)  { setClauses.unshift('email = ?');  setParams.push(email); }
-    if (gender) { setClauses.unshift('gender = ?'); setParams.push(gender); }
-    if (dob)    { setClauses.unshift('dob = ?');    setParams.push(dob); }
-    if (city)   { setClauses.unshift('city = ?');   setParams.push(city); }
-    if (bio)    { setClauses.unshift('bio = ?');    setParams.push(bio); }
+    if (name)              { setClauses.unshift('name = ?');     setParams.push(name); }
+    if (nick_name !== null) { setClauses.unshift('nickname = ?'); setParams.push(nick_name); }
+    if (email)             { setClauses.unshift('email = ?');    setParams.push(email); }
+    if (gender)            { setClauses.unshift('gender = ?');   setParams.push(gender); }
+    if (dob)               { setClauses.unshift('dob = ?');      setParams.push(dob); }
+    if (city)              { setClauses.unshift('city = ?');     setParams.push(city); }
+    if (bio)               { setClauses.unshift('bio = ?');      setParams.push(bio); }
 
     const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
     const updateRes = await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
 
     if (!updateRes || updateRes.affectedRows === 0) {
       await query(
-        `INSERT INTO users (id, phone_number, name, email, gender, dob, city, bio, kyc_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED')
+        `INSERT INTO users (id, phone_number, name, nickname, email, gender, dob, city, bio, kyc_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED')
          ON DUPLICATE KEY UPDATE
            kyc_status = 'APPROVED',
            name = COALESCE(VALUES(name), name),
+           nickname = COALESCE(VALUES(nickname), nickname),
            email = COALESCE(VALUES(email), email),
            gender = COALESCE(VALUES(gender), gender),
            dob = COALESCE(VALUES(dob), dob),
            city = COALESCE(VALUES(city), city),
            bio = COALESCE(VALUES(bio), bio),
            updated_at = NOW()`,
-        [userId, userFullPhone || userPhone, name || 'User', email || null, gender || null, dob || null, city || null, bio || null]
+        [userId, userFullPhone || userPhone, name || 'User', nick_name || null, email || null, gender || null, dob || null, city || null, bio || null]
       );
     }
 

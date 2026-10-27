@@ -89,8 +89,29 @@ async function runCategoryTests() {
     }
     console.log(`  ✅ PASS: /activities/dinner returns strictly Dinner items (${dinnerActivities.body.items.length} items verified)`);
 
+    // 5. Test Activity Category Aliases: /activities/category/act_top1 (Coffee alias)
+    const actTop1 = await makeRequest(server, '/api/v1/activities/category/act_top1');
+    assert.strictEqual(actTop1.status, 200);
+    assert.strictEqual(actTop1.body.category_id, 'cat_01');
+    assert(actTop1.body.items.length > 0, 'act_top1 should resolve to cat_01 and return items');
+    console.log(`  ✅ PASS: /activities/category/act_top1 resolves to cat_01 Coffee (${actTop1.body.items.length} items verified)`);
+
+    // 6. Test Activity Category Aliases: /activities/category/act_top2 (Dinner alias)
+    const actTop2 = await makeRequest(server, '/api/v1/activities/category/act_top2');
+    assert.strictEqual(actTop2.status, 200);
+    assert.strictEqual(actTop2.body.category_id, 'cat_02');
+    assert(actTop2.body.items.length > 0, 'act_top2 should resolve to cat_02 and return items');
+    console.log(`  ✅ PASS: /activities/category/act_top2 resolves to cat_02 Dinner (${actTop2.body.items.length} items verified)`);
+
+    // 7. Test Activity Category Aliases: /activities/category/withme24_offers (Offers alias)
+    const offersRes = await makeRequest(server, '/api/v1/activities/category/withme24_offers');
+    assert.strictEqual(offersRes.status, 200);
+    assert.strictEqual(offersRes.body.category_id, 'cat_07');
+    assert(offersRes.body.items.length > 0, 'withme24_offers should resolve to cat_07 and return items');
+    console.log(`  ✅ PASS: /activities/category/withme24_offers resolves to cat_07 Offers (${offersRes.body.items.length} items verified)`);
+
     console.log('\n========================================================');
-    console.log('📊 CATEGORY TESTS: ALL 4 SUITES PASSED');
+    console.log('📊 CATEGORY TESTS: ALL 7 SUITES PASSED');
     console.log('========================================================\n');
     process.exit(0);
   } finally {

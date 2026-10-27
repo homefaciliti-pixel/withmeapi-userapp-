@@ -111,6 +111,7 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
       } catch (e) {}
       // Include the primary image once, then preserve the uploaded gallery order (max 5 images).
       parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
+      const primaryPhoto = photoUrl || (parsedPhotos.length > 0 ? parsedPhotos[0] : null);
 
       return {
         user_id: r.user_id || `usr_${r.id}`,
@@ -130,9 +131,9 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
         category: partnerCategory,
         distance: '1.5 km away',
         location: city,
-        image: photoUrl,
-        avatar: photoUrl,
-        profile_image: photoUrl,
+        image: primaryPhoto,
+        avatar: primaryPhoto,
+        profile_image: primaryPhoto,
         profile_images: parsedPhotos,
         photos: parsedPhotos
       };
