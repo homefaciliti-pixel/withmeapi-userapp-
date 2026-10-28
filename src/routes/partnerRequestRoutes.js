@@ -283,7 +283,7 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
       full_name: p.full_name || p.name,
       city: p.city || 'Jaipur',
       rating: parseFloat(p.rating || 4.8),
-      price: 1,
+      price: (p.price && Number(p.price) > 1) ? Number(p.price) : 999,
       currency: 'INR',
       price_type: 'session',
       activity: p.category || p.activity || 'Coffee',
@@ -335,7 +335,7 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
           full_name: lp.name || 'Partner User',
           city: lp.city || 'Jaipur',
           rating: parseFloat(lp.rating || 4.8),
-          price: 1,
+          price: (lp.price && Number(lp.price) > 1) ? Number(lp.price) : 999,
           currency: 'INR',
           price_type: 'session',
           activity: lp.category || lp.activity || 'Coffee',
@@ -532,7 +532,7 @@ const handleSendRequest = async (req, res) => {
     date = '2026-09-25',
     time = '06:00 PM',
     location = 'Jaipur',
-    price = 1
+    price = 999
   } = req.body || {};
 
   const effectivePartnerId = receiver_id || partner_id || '101';
@@ -600,7 +600,7 @@ const handleSendRequest = async (req, res) => {
     date_time: `${date} ${time}`,
     location: typeof location === 'string' ? location : (location.address || 'Jaipur'),
     message,
-    price: typeof price === 'number' ? price : parseFloat(price) || 1,
+    price: (price && Number(price) > 1) ? Number(price) : (String(actName).toLowerCase().includes('coffee') ? 999 : 499),
     currency: 'INR',
     status: 'Pending',
     pending_status: 'Pending',
@@ -750,7 +750,8 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
       const timeVal = reqData.time || '06:00 PM';
       const dateVal = reqData.date || currentDateStr;
       const timeSlotStr = `${timeVal} - 07:00 PM`;
-      const priceVal = reqData.price !== undefined && reqData.price !== null ? parseFloat(reqData.price) : 1;
+      const rawPrice = (reqData.price !== undefined && reqData.price !== null) ? parseFloat(reqData.price) : 0;
+      const priceVal = rawPrice > 1 ? rawPrice : (categoryName.toLowerCase().includes('coffee') ? 999 : 499);
 
       const pId = reqData.partner_id || reqData.receiver_id || 101;
       let resolvedPartnerName = (reqData.partner_name && reqData.partner_name !== reqData.sender_name) ? reqData.partner_name : '';
@@ -908,13 +909,24 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
       parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
       let parsedAvailableFor = [
-        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ];
       try {
-        if (r.available_for) parsedAvailableFor = typeof r.available_for === 'string' ? JSON.parse(r.available_for) : r.available_for;
+        if (r.available_for) {
+          const rawAf = typeof r.available_for === 'string' ? JSON.parse(r.available_for) : r.available_for;
+          if (Array.isArray(rawAf)) {
+            parsedAvailableFor = rawAf.map(item => {
+              let p = Number(item.price || 0);
+              if (p <= 1) p = (item.name && item.name.toLowerCase().includes('coffee')) ? 999 : 499;
+              return { ...item, price: p, currency: item.currency || 'INR' };
+            });
+          }
+        }
       } catch (e) {}
+
+      const partnerPrice = (r.price && Number(r.price) > 1) ? Number(r.price) : 999;
 
       return {
         id: r.id,
@@ -938,10 +950,10 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
         address: meetupLoc,
         rating: parseFloat(r.rating || 4.8),
         total_reviews: parseInt(r.total_reviews || 120),
-        price: 1,
-        booking_price: 1,
-        total_price: 1,
-        amount: 1,
+        price: partnerPrice,
+        booking_price: partnerPrice,
+        total_price: partnerPrice,
+        amount: partnerPrice,
         currency: 'INR',
         price_type: 'session',
         activity: partnerCategory,
@@ -1010,10 +1022,10 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
       address: 'Malviya Nagar, Jaipur, Rajasthan',
       rating: 4.8,
       total_reviews: 120,
-      price: 1,
-      booking_price: 1,
-      total_price: 1,
-      amount: 1,
+      price: 999,
+      booking_price: 999,
+      total_price: 999,
+      amount: 999,
       currency: 'INR',
       price_type: 'session',
       activity: 'Coffee',
@@ -1049,19 +1061,21 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
       avatar: `${baseUrl}/uploads/priya.jpg`,
       profile_images: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`
       ],
       photos: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`
       ],
       interests: ['Coffee', 'Travel', 'Music'],
       available_for: [
-        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ],
@@ -1141,7 +1155,7 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
       interests: ['Coffee', 'Events', 'Dinner'],
       available_for: [
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
-        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
         { name: 'Event', icon: 'event', price: 599, currency: 'INR' }
       ],
       sender: {
@@ -1219,7 +1233,7 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
       ],
       interests: ['Music', 'Coffee', 'Trekking'],
       available_for: [
-        { name: 'Coffee & Code', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Coffee & Code', icon: 'coffee', price: 999, currency: 'INR' },
         { name: 'Trekking', icon: 'hiking', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ],
@@ -1444,7 +1458,7 @@ const handlePartnerList = async (req, res) => {
           sender_avatar: formatPartnerPhoto(r.sender_avatar, baseUrl),
           city: r.location || 'Jaipur',
           rating: 4.8,
-          price: parseFloat(r.price || 1),
+          price: parseFloat((r.price && Number(r.price) > 1) ? r.price : 999),
           currency: 'INR',
           price_type: 'session',
           activity: r.activity || r.activity_name || 'Coffee',
@@ -1509,7 +1523,7 @@ const handlePartnerList = async (req, res) => {
           full_name: b.partner_name || b.name || 'Partner',
           city: b.city || 'Jaipur',
           rating: parseFloat(b.rating || 4.8),
-          price: parseFloat(b.amount || b.price || 1),
+          price: parseFloat((b.amount && Number(b.amount) > 1) ? b.amount : ((b.price && Number(b.price) > 1) ? b.price : 999)),
           currency: 'INR',
           price_type: 'session',
           activity: b.activity || 'Coffee',
@@ -1565,7 +1579,7 @@ const handlePartnerList = async (req, res) => {
           full_name: p.partner_name || 'Priya Sharma',
           city: p.city || 'Jaipur',
           rating: 4.8,
-          price: parseFloat(p.amount || 1),
+          price: parseFloat((p.amount && Number(p.amount) > 1) ? p.amount : 999),
           currency: p.currency || 'INR',
           price_type: 'session',
           activity: p.activity || 'Coffee',
@@ -1621,7 +1635,7 @@ const handlePartnerList = async (req, res) => {
           full_name: p.partner_name || p.name || 'Priya Sharma',
           city: p.city || 'Jaipur',
           rating: 4.8,
-          price: parseFloat(p.amount || 1),
+          price: parseFloat((p.amount && Number(p.amount) > 1) ? p.amount : 999),
           currency: p.currency || 'INR',
           price_type: 'session',
           activity: p.activity || 'Coffee',
@@ -1868,7 +1882,7 @@ const handleRegisterPartner = async (req, res) => {
   parsedPhotos = [...new Set(parsedPhotos.filter(Boolean))].slice(0, 5);
   const photosJson = JSON.stringify(parsedPhotos);
 
-  const priceVal = pData.price !== undefined ? parseFloat(pData.price) : 1;
+  const priceVal = (pData.price !== undefined && Number(pData.price) > 1) ? parseFloat(pData.price) : 999;
   const categoryVal = pData.category || pData.activity || 'Coffee';
 
   const partnerRecord = {

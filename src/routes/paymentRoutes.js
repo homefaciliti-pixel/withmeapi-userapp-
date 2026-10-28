@@ -80,7 +80,7 @@ const handlePaymentInitiate = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const {
     booking_id = 'BK197860',
-    amount = 1,
+    amount = 999,
     currency = 'INR',
     payment_method = 'UPI',
     partner_id,
@@ -90,18 +90,24 @@ const handlePaymentInitiate = async (req, res) => {
   const razorpayKey = getRazorpayKey(req);
   const razorpaySecret = getRazorpaySecret(req);
 
-  const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 1;
-  const amountInPaise = Math.round(numericAmount * 100);
+  let resolvedAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
+  let resolvedActivity = activity || '';
 
-  // Check if request is accepted by partner before allowing payment
+  // Check if request is accepted by partner before allowing payment & resolve correct price
   try {
     const existingRequests = await query(
-      `SELECT status, is_accepted FROM withme_partner_requests WHERE booking_id = ? OR id = ? OR request_id = ? ORDER BY id DESC LIMIT 1`,
+      `SELECT status, is_accepted, price, activity FROM withme_partner_requests WHERE booking_id = ? OR id = ? OR request_id = ? ORDER BY id DESC LIMIT 1`,
       [booking_id, booking_id, booking_id]
     ).catch(() => []);
 
     if (existingRequests && existingRequests.length > 0) {
       const reqRecord = existingRequests[0];
+      if (!resolvedActivity) resolvedActivity = reqRecord.activity || '';
+      const dbPrice = parseFloat(reqRecord.price || 0);
+      if (dbPrice > 1 && resolvedAmount <= 1) {
+        resolvedAmount = dbPrice;
+      }
+
       const isAccepted = reqRecord.is_accepted === 1 || reqRecord.is_accepted === true || ['accepted', 'approved', 'confirmed'].includes(String(reqRecord.status || '').toLowerCase());
       const isAlreadyPaid = String(reqRecord.status || '').toLowerCase() === 'paid';
 
@@ -115,9 +121,32 @@ const handlePaymentInitiate = async (req, res) => {
         });
       }
     }
+
+    if (resolvedAmount <= 1) {
+      const bRows = await query(
+        `SELECT price, activity FROM withme_partner_bookings WHERE booking_id = ? OR id = ? ORDER BY id DESC LIMIT 1`,
+        [booking_id, booking_id]
+      ).catch(() => []);
+      if (bRows && bRows.length > 0) {
+        if (!resolvedActivity) resolvedActivity = bRows[0].activity || '';
+        const bPrice = parseFloat(bRows[0].price || 0);
+        if (bPrice > 1 && resolvedAmount <= 1) {
+          resolvedAmount = bPrice;
+        }
+      }
+    }
   } catch (chkErr) {
     // Continue if DB check fails
   }
+
+  // Ensure default price is always actual (999 for Coffee, 499 for others)
+  if (resolvedAmount <= 1) {
+    const isCoffee = !resolvedActivity || resolvedActivity.toLowerCase().includes('coffee');
+    resolvedAmount = isCoffee ? 999 : 499;
+  }
+
+  const numericAmount = resolvedAmount;
+  const amountInPaise = Math.round(numericAmount * 100);
 
   // Try creating official order from Razorpay server if live secret is available
   const liveOrder = await createRazorpayLiveOrder(amountInPaise, currency, booking_id, razorpayKey, razorpaySecret);
@@ -583,9 +612,9 @@ const handleGetPaymentsList = async (req, res) => {
         partner_id: p.partner_id || '101',
         partner_name: p.partner_name || 'Priya Sharma',
         partner_image: p.partner_image || `${baseUrl}/uploads/priya.jpg`,
-        amount: p.amount || 1,
-        price: p.amount || 1,
-        amount_in_paise: p.amount_in_paise || Math.round((p.amount || 1) * 100),
+        amount: (p.amount && Number(p.amount) > 1) ? p.amount : 999,
+        price: (p.amount && Number(p.amount) > 1) ? p.amount : 999,
+        amount_in_paise: (p.amount_in_paise && Number(p.amount_in_paise) > 100) ? p.amount_in_paise : Math.round(((p.amount && Number(p.amount) > 1) ? p.amount : 999) * 100),
         currency: p.currency || 'INR',
         payment_method: p.payment_method || 'UPI',
         method: p.payment_method || 'UPI',
@@ -624,9 +653,9 @@ const handleGetPaymentsList = async (req, res) => {
             partner_id: b.partner_id || '101',
             partner_name: b.customer_name || 'Priya Sharma',
             partner_image: `${baseUrl}/uploads/priya.jpg`,
-            amount: parseFloat(b.price || 1),
-            price: parseFloat(b.price || 1),
-            amount_in_paise: Math.round(parseFloat(b.price || 1) * 100),
+            amount: parseFloat((b.price && Number(b.price) > 1) ? b.price : 999),
+            price: parseFloat((b.price && Number(b.price) > 1) ? b.price : 999),
+            amount_in_paise: Math.round(parseFloat((b.price && Number(b.price) > 1) ? b.price : 999) * 100),
             currency: b.currency || 'INR',
             payment_method: 'UPI',
             method: 'UPI',
@@ -662,9 +691,9 @@ const handleGetPaymentsList = async (req, res) => {
         partner_id: '101',
         partner_name: 'Priya Sharma',
         partner_image: `${baseUrl}/uploads/priya.jpg`,
-        amount: 1,
-        price: 1,
-        amount_in_paise: 100,
+        amount: 999,
+        price: 999,
+        amount_in_paise: 99900,
         currency: 'INR',
         payment_method: 'UPI',
         method: 'UPI',
@@ -829,9 +858,9 @@ const handleGetPaymentDetails = (req, res) => {
     activity: existing.activity || 'Coffee',
     partner_name: existing.partner_name || 'Priya Sharma',
     partner_image: existing.partner_image || `${baseUrl}/uploads/priya.jpg`,
-    amount: existing.amount || 1,
-    price: existing.amount || 1,
-    amount_in_paise: existing.amount_in_paise || 100,
+    amount: (existing.amount && Number(existing.amount) > 1) ? existing.amount : 999,
+    price: (existing.amount && Number(existing.amount) > 1) ? existing.amount : 999,
+    amount_in_paise: (existing.amount_in_paise && Number(existing.amount_in_paise) > 100) ? existing.amount_in_paise : Math.round(((existing.amount && Number(existing.amount) > 1) ? existing.amount : 999) * 100),
     currency: existing.currency || 'INR',
     payment_method: existing.payment_method || 'UPI',
     status: existing.status || 'COMPLETED',

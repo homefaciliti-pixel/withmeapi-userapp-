@@ -6,7 +6,7 @@ const chatService = require('../services/chatService');
 
 // Price map by activity name
 const activityPriceMap = {
-  'Coffee': 1,
+  'Coffee': 999,
   'Dinner': 499,
   'Travel': 699,
   'Movie': 399,
@@ -92,10 +92,9 @@ const handleCreateBooking = async (req, res) => {
 
   const effectivePartnerId = partner_id || activity_user_id || 'usr_201';
   const bookingId = `BK${Math.floor(100000 + Math.random() * 900000)}`;
-  let price = (req.body && req.body.price) ? parseInt(req.body.price) : (activityPriceMap[activity] || 1);
-  if (activity === 'Coffee' || String(activity).toLowerCase().includes('coffee')) {
-    price = 1;
-  }
+  const requestedPrice = (req.body && req.body.price) ? parseInt(req.body.price) : 0;
+  const isCoffeeAct = activity === 'Coffee' || String(activity).toLowerCase().includes('coffee');
+  let price = requestedPrice > 1 ? requestedPrice : (activityPriceMap[activity] || (isCoffeeAct ? 999 : 499));
 
   const userId = (req.user && (req.user.user_id || req.user.id)) || `usr_${Date.now()}`;
   let userName = (req.user && req.user.name && req.user.name !== 'User') ? req.user.name : null;
@@ -293,7 +292,7 @@ router.get('/list', authenticateToken, async (req, res) => {
             date: db.date,
             time: db.time,
             location: db.location,
-            price: parseFloat(db.price || 1),
+            price: parseFloat((db.price && Number(db.price) > 1) ? db.price : 999),
             currency: db.currency || 'INR',
             created_at: db.created_at
           });
