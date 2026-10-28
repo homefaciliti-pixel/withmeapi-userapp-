@@ -12,12 +12,16 @@ const getBaseUrl = (req) => {
   return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
 
-// Pool of unique placeholder images for partners without real photos
-// Each is served from /uploads/ on this server
-const PARTNER_PLACEHOLDER_POOL = [
+// Pools of unique placeholder images for partners without real photos (all served from /uploads/)
+const FEMALE_PLACEHOLDER_POOL = [
   'priya.jpg', 'ananya.jpg', 'anjali.jpg', 'riya.jpg', 'neha.jpg',
   'sneha.jpg', 'kavya.jpg', 'priya1.jpg', 'priya2.jpg', 'priya3.jpg',
-  'priya4.jpg', 'neha.jpg', 'amit_1.jpg', 'anjali.jpg', 'ananya.jpg'
+  'priya4.jpg', 'live1.jpg'
+];
+
+const MALE_PLACEHOLDER_POOL = [
+  'aarav.jpg', 'rohan.jpg', 'amit_1.jpg', 'amit_2.jpg', 'amit_3.jpg',
+  'user101.jpg', 'user102.jpg', 'profile1.jpg', 'profile2.jpg', 'profile3.jpg'
 ];
 
 /**
@@ -26,33 +30,41 @@ const PARTNER_PLACEHOLDER_POOL = [
  */
 function isGenericPlaceholder(url) {
   if (!url || typeof url !== 'string') return true;
+  const clean = url.toLowerCase().trim();
   return (
-    url.includes('photo_1.jpg') ||
-    url.includes('example.com') ||
-    url === '' ||
-    url === 'null' ||
-    url === 'undefined'
+    clean === '' ||
+    clean === 'null' ||
+    clean === 'undefined' ||
+    clean.includes('photo_1.jpg') ||
+    clean.includes('example.com') ||
+    clean.includes('default.jpg') ||
+    clean.includes('placeholder.jpg') ||
+    clean.includes('no_image.jpg') ||
+    clean.includes('no-image.jpg') ||
+    clean.includes('avatar.jpg')
   );
 }
 
 /**
- * Get a deterministic unique placeholder for a partner by name/id
- * so each partner consistently gets a different image.
+ * Get a deterministic unique gender-appropriate placeholder for a partner by name/id
+ * so each partner consistently gets a different image without repetition.
  */
-function getUniquePartnerPlaceholder(nameOrId, baseUrl) {
-  const key = String(nameOrId || 'partner').toLowerCase();
+function getUniquePartnerPlaceholder(nameOrId, baseUrl, gender = '') {
+  const isMale = String(gender || '').toLowerCase().startsWith('m');
+  const pool = isMale ? MALE_PLACEHOLDER_POOL : FEMALE_PLACEHOLDER_POOL;
+  const key = String(nameOrId || 'partner').toLowerCase().trim();
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
     hash = (hash * 31 + key.charCodeAt(i)) & 0xfffffff;
   }
-  const idx = hash % PARTNER_PLACEHOLDER_POOL.length;
-  return `${baseUrl}/uploads/${PARTNER_PLACEHOLDER_POOL[idx]}`;
+  const idx = Math.abs(hash) % pool.length;
+  return `${baseUrl}/uploads/${pool[idx]}`;
 }
 
-// Helper to format partner image
-const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com', nameOrId = '') => {
+// Helper to format partner image — NEVER returns null
+const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com', nameOrId = '', gender = '') => {
   if (!photo || photo === '' || photo === 'null' || photo === 'undefined') {
-    return getUniquePartnerPlaceholder(nameOrId, baseUrl);
+    return getUniquePartnerPlaceholder(nameOrId, baseUrl, gender);
   }
   if (Array.isArray(photo)) {
     photo = photo.find(p => p && typeof p === 'string' && p.trim() !== '' && !isGenericPlaceholder(p)) || photo[0];
@@ -61,13 +73,13 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
     photo = photo.url || photo.uri || photo.path || photo.profile_image || photo.image || photo.profile_photo_url;
   }
   if (typeof photo !== 'string' || !photo.trim()) {
-    return getUniquePartnerPlaceholder(nameOrId, baseUrl);
+    return getUniquePartnerPlaceholder(nameOrId, baseUrl, gender);
   }
   photo = photo.trim();
 
-  // Generic placeholder detected — use deterministic unique one
+  // Generic placeholder detected — use deterministic unique gender-matched photo
   if (isGenericPlaceholder(photo)) {
-    return getUniquePartnerPlaceholder(nameOrId, baseUrl);
+    return getUniquePartnerPlaceholder(nameOrId, baseUrl, gender);
   }
 
   if (photo.startsWith('http://') || photo.startsWith('https://')) {
@@ -96,18 +108,30 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
     const rows = await query(`
       SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, status, is_approved, is_verified
       FROM withme_partners
-      WHERE (status IS NULL OR status NOT IN ('DELETED','REJECTED','SUSPENDED')) AND is_approved = 1 AND is_verified = 1
+      WHERE (status IS NULL OR status NOT IN ('DELETED','REJECTED','SUSPENDED','DUPLICATE_DELETED')) AND is_approved = 1 AND is_verified = 1
       ORDER BY id DESC
       LIMIT 100
     `);
 
     if (!rows || rows.length === 0) return [];
 
-    return rows.map(r => {
+    // Deduplicate partners by normalized name and ID so duplicates never appear
+    const seenNames = new Set();
+    const uniqueRows = [];
+    for (const r of rows) {
+      const normName = String(r.name || r.full_name || '').toLowerCase().trim();
+      if (normName && seenNames.has(normName)) {
+        continue; // Skip duplicate record
+      }
+      if (normName) seenNames.add(normName);
+      uniqueRows.push(r);
+    }
+
+    return uniqueRows.map(r => {
       const nameOrId = r.name || r.full_name || r.partner_id || String(r.id);
-      const rawPhoto = r.image || r.profile_photo_url;
-      const photoUrl = formatPartnerPhoto(rawPhoto, baseUrl, nameOrId);
       const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : ''; 
+      const rawPhoto = r.image || r.profile_photo_url;
+      const photoUrl = formatPartnerPhoto(rawPhoto, baseUrl, nameOrId, gender);
       const city = r.city ? r.city.trim() : ''; 
       const locality = r.locality ? r.locality.trim() : ''; 
       const partnerCategory = r.category || r.activity || ''; 
@@ -507,7 +531,9 @@ const getCombinedActivitiesData = async (req) => {
     profile_images: p.profile_images
   }));
 
-  const recommended_partners = [...dbRecommended, ...defaultRecommended];
+  const existingRecNames = new Set(dbRecommended.map(p => (p.name || '').toLowerCase().trim()));
+  const filteredDefaultRec = defaultRecommended.filter(p => !existingRecNames.has((p.name || '').toLowerCase().trim()));
+  const recommended_partners = [...dbRecommended, ...filteredDefaultRec];
 
   return {
     planning_today,

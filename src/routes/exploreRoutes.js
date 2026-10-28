@@ -12,30 +12,66 @@ const getBaseUrl = (req) => {
   return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
 
-// Helper to format partner image
-// Returns null if no real image found — prevents all partners showing same fallback photo
-const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+// Pools of unique placeholder images for partners without real photos (all served from /uploads/)
+const FEMALE_PLACEHOLDER_POOL = [
+  'priya.jpg', 'ananya.jpg', 'anjali.jpg', 'riya.jpg', 'neha.jpg',
+  'sneha.jpg', 'kavya.jpg', 'priya1.jpg', 'priya2.jpg', 'priya3.jpg',
+  'priya4.jpg', 'live1.jpg'
+];
+
+const MALE_PLACEHOLDER_POOL = [
+  'aarav.jpg', 'rohan.jpg', 'amit_1.jpg', 'amit_2.jpg', 'amit_3.jpg',
+  'user101.jpg', 'user102.jpg', 'profile1.jpg', 'profile2.jpg', 'profile3.jpg'
+];
+
+function isGenericPlaceholder(url) {
+  if (!url || typeof url !== 'string') return true;
+  const clean = url.toLowerCase().trim();
+  return (
+    clean === '' ||
+    clean === 'null' ||
+    clean === 'undefined' ||
+    clean.includes('photo_1.jpg') ||
+    clean.includes('example.com') ||
+    clean.includes('default.jpg') ||
+    clean.includes('placeholder.jpg') ||
+    clean.includes('no_image.jpg') ||
+    clean.includes('no-image.jpg') ||
+    clean.includes('avatar.jpg')
+  );
+}
+
+function getUniquePartnerPlaceholder(nameOrId, baseUrl, gender = '') {
+  const isMale = String(gender || '').toLowerCase().startsWith('m');
+  const pool = isMale ? MALE_PLACEHOLDER_POOL : FEMALE_PLACEHOLDER_POOL;
+  const key = String(nameOrId || 'partner').toLowerCase().trim();
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) & 0xfffffff;
+  }
+  const idx = Math.abs(hash) % pool.length;
+  return `${baseUrl}/uploads/${pool[idx]}`;
+}
+
+// Helper to format partner image — NEVER returns null
+const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com', nameOrId = '', gender = '') => {
   if (!photo || photo === '' || photo === 'null' || photo === 'undefined') {
-    return null;
+    return getUniquePartnerPlaceholder(nameOrId, baseUrl, gender);
   }
   if (Array.isArray(photo)) {
-    photo = photo.find(p => p && typeof p === 'string' && p.trim() !== '' && p !== 'null' && p !== 'undefined') || null;
-    if (!photo) return null;
+    photo = photo.find(p => p && typeof p === 'string' && p.trim() !== '' && !isGenericPlaceholder(p)) || photo[0];
   }
   if (typeof photo === 'object' && photo !== null) {
-    photo = photo.url || photo.uri || photo.path || photo.profile_image || photo.image || photo.profile_photo_url || null;
-    if (!photo) return null;
+    photo = photo.url || photo.uri || photo.path || photo.profile_image || photo.image || photo.profile_photo_url;
   }
   if (typeof photo !== 'string' || !photo.trim()) {
-    return null;
+    return getUniquePartnerPlaceholder(nameOrId, baseUrl, gender);
   }
   photo = photo.trim();
 
-  // Return null only for generic placeholder filenames (not real uploaded photo_1.jpg etc.)
-  const genericNames = ['default.jpg', 'placeholder.jpg', 'avatar.jpg', 'no_image.jpg', 'no-image.jpg'];
-  const fileName = photo.split('/').pop().toLowerCase();
-  if (genericNames.includes(fileName)) {
-    return null;
+  // Generic placeholder detected — use deterministic unique gender-matched photo
+  if (isGenericPlaceholder(photo)) {
+    return getUniquePartnerPlaceholder(nameOrId, baseUrl, gender);
   }
 
   if (photo.startsWith('http://') || photo.startsWith('https://')) {
@@ -65,7 +101,7 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
     let sql = `
       SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, status, is_approved, is_verified
       FROM withme_partners
-      WHERE (status IS NULL OR status NOT IN ('DELETED','REJECTED','SUSPENDED')) AND is_approved = 1 AND is_verified = 1
+      WHERE (status IS NULL OR status NOT IN ('DELETED','REJECTED','SUSPENDED','DUPLICATE_DELETED')) AND is_approved = 1 AND is_verified = 1
     `;
     const params = [];
 
@@ -87,9 +123,23 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
 
     if (!rows || rows.length === 0) return [];
 
-    return rows.map((r, index) => {
-      const photoUrl = formatPartnerPhoto(r.image || r.profile_photo_url, baseUrl);
+    // Deduplicate partners by normalized name so duplicates never appear
+    const seenNames = new Set();
+    const uniqueRows = [];
+    for (const r of rows) {
+      const normName = String(r.name || r.full_name || '').toLowerCase().trim();
+      if (normName && seenNames.has(normName)) {
+        continue;
+      }
+      if (normName) seenNames.add(normName);
+      uniqueRows.push(r);
+    }
+
+    return uniqueRows.map((r, index) => {
+      const nameOrId = r.name || r.full_name || r.partner_id || String(r.id);
       const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : ''; 
+      const rawPhoto = r.image || r.profile_photo_url;
+      const photoUrl = formatPartnerPhoto(rawPhoto, baseUrl, nameOrId, gender);
       const city = r.city ? r.city.trim() : ''; 
       const partnerCategory = r.category || r.activity || ''; 
       const isCoffee = partnerCategory.toLowerCase().includes('coffee');
@@ -105,13 +155,20 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
         const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
         if (Array.isArray(photoValues)) {
           parsedPhotos = photoValues
-            .map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p && (p.url || p.uri || p.path || p.image)), baseUrl))
+            .map(p => {
+              const pUrl = typeof p === 'string' ? p : (p && (p.url || p.uri || p.path || p.image));
+              if (!pUrl || isGenericPlaceholder(pUrl)) return null;
+              return formatPartnerPhoto(pUrl, baseUrl, nameOrId, gender);
+            })
             .filter(Boolean);
         }
       } catch (e) {}
       // Include the primary image once, then preserve the uploaded gallery order (max 5 images).
-      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
-      const primaryPhoto = photoUrl || (parsedPhotos.length > 0 ? parsedPhotos[0] : null);
+      const allPhotos = (!isGenericPlaceholder(rawPhoto) && photoUrl)
+        ? [photoUrl, ...parsedPhotos]
+        : (parsedPhotos.length > 0 ? parsedPhotos : [photoUrl]);
+      parsedPhotos = [...new Set(allPhotos.filter(Boolean))].slice(0, 5);
+      const primaryPhoto = photoUrl || parsedPhotos[0] || getUniquePartnerPlaceholder(nameOrId, baseUrl, gender);
 
       return {
         user_id: r.user_id || `usr_${r.id}`,
