@@ -126,7 +126,7 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '') => {
         gender: gender,
         interests: parsedInterests,
         rating: r.rating == null ? null : parseFloat(r.rating),
-        price: isCoffee ? 1 : 499,
+        price: (r.price && Number(r.price) > 1) ? Number(r.price) : (isCoffee ? 999 : 499),
         currency: 'INR',
         category: partnerCategory,
         distance: '1.5 km away',
@@ -173,7 +173,7 @@ router.get('/explore', authenticateToken, async (req, res) => {
       gender: 'Female',
       interests: ['Music', 'Coffee', 'Trekking'],
       rating: 4.9,
-      price: 1,
+      price: 999,
       currency: 'INR',
       category: 'Coffee',
       distance: '2.4 km away',
@@ -213,7 +213,7 @@ router.get('/explore', authenticateToken, async (req, res) => {
       gender: 'Female',
       interests: ['Coffee', 'Travel', 'Music'],
       rating: 4.8,
-      price: 1,
+      price: 999,
       currency: 'INR',
       category: 'Coffee',
       distance: '1.5 km away',
@@ -223,12 +223,14 @@ router.get('/explore', authenticateToken, async (req, res) => {
       profile_image: `${baseUrl}/uploads/priya.jpg`,
       profile_images: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`
       ],
       photos: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`

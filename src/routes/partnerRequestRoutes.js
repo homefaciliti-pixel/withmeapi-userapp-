@@ -327,7 +327,7 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
       full_name: 'Priya Sharma',
       city: 'Jaipur',
       rating: 4.8,
-      price: 1,
+      price: 999,
       currency: 'INR',
       price_type: 'session',
       activity: 'Coffee',
@@ -336,12 +336,14 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
       avatar: `${baseUrl}/uploads/priya.jpg`,
       profile_images: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`
       ],
       photos: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`

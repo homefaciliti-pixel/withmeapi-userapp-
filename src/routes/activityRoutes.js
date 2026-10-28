@@ -12,21 +12,63 @@ const getBaseUrl = (req) => {
   return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
 
+// Pool of unique placeholder images for partners without real photos
+// Each is served from /uploads/ on this server
+const PARTNER_PLACEHOLDER_POOL = [
+  'priya.jpg', 'ananya.jpg', 'anjali.jpg', 'riya.jpg', 'neha.jpg',
+  'sneha.jpg', 'kavya.jpg', 'priya1.jpg', 'priya2.jpg', 'priya3.jpg',
+  'priya4.jpg', 'neha.jpg', 'amit_1.jpg', 'anjali.jpg', 'ananya.jpg'
+];
+
+/**
+ * Returns true if the URL is a known generic placeholder that provides NO
+ * partner-specific identity (e.g. photo_1.jpg, example.com images, etc.)
+ */
+function isGenericPlaceholder(url) {
+  if (!url || typeof url !== 'string') return true;
+  return (
+    url.includes('photo_1.jpg') ||
+    url.includes('example.com') ||
+    url === '' ||
+    url === 'null' ||
+    url === 'undefined'
+  );
+}
+
+/**
+ * Get a deterministic unique placeholder for a partner by name/id
+ * so each partner consistently gets a different image.
+ */
+function getUniquePartnerPlaceholder(nameOrId, baseUrl) {
+  const key = String(nameOrId || 'partner').toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) & 0xfffffff;
+  }
+  const idx = hash % PARTNER_PLACEHOLDER_POOL.length;
+  return `${baseUrl}/uploads/${PARTNER_PLACEHOLDER_POOL[idx]}`;
+}
+
 // Helper to format partner image
-const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender.com', nameOrId = '') => {
   if (!photo || photo === '' || photo === 'null' || photo === 'undefined') {
-    return `${baseUrl}/uploads/priya.jpg`;
+    return getUniquePartnerPlaceholder(nameOrId, baseUrl);
   }
   if (Array.isArray(photo)) {
-    photo = photo.find(p => p && typeof p === 'string' && p.trim() !== '') || photo[0];
+    photo = photo.find(p => p && typeof p === 'string' && p.trim() !== '' && !isGenericPlaceholder(p)) || photo[0];
   }
   if (typeof photo === 'object' && photo !== null) {
     photo = photo.url || photo.uri || photo.path || photo.profile_image || photo.image || photo.profile_photo_url;
   }
   if (typeof photo !== 'string' || !photo.trim()) {
-    return `${baseUrl}/uploads/priya.jpg`;
+    return getUniquePartnerPlaceholder(nameOrId, baseUrl);
   }
   photo = photo.trim();
+
+  // Generic placeholder detected — use deterministic unique one
+  if (isGenericPlaceholder(photo)) {
+    return getUniquePartnerPlaceholder(nameOrId, baseUrl);
+  }
 
   if (photo.startsWith('http://') || photo.startsWith('https://')) {
     if (photo.includes('localhost') || photo.includes('127.0.0.1') || photo.includes('10.0.2.2')) {
@@ -62,7 +104,9 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
     if (!rows || rows.length === 0) return [];
 
     return rows.map(r => {
-      const photoUrl = formatPartnerPhoto(r.image || r.profile_photo_url, baseUrl);
+      const nameOrId = r.name || r.full_name || r.partner_id || String(r.id);
+      const rawPhoto = r.image || r.profile_photo_url;
+      const photoUrl = formatPartnerPhoto(rawPhoto, baseUrl, nameOrId);
       const gender = r.gender ? (r.gender.charAt(0).toUpperCase() + r.gender.slice(1).toLowerCase()) : ''; 
       const city = r.city ? r.city.trim() : ''; 
       const locality = r.locality ? r.locality.trim() : ''; 
@@ -73,26 +117,50 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
         if (r.interests) parsedInterests = typeof r.interests === 'string' ? JSON.parse(r.interests) : r.interests;
       } catch (e) {}
 
+      // Parse multi-photo array, skip generic photo_1.jpg placeholders
       let parsedPhotos = [];
       try {
         const rawP = r.photos || r.profile_images || r.images || [];
         const photoValues = typeof rawP === 'string' ? JSON.parse(rawP) : rawP;
         if (Array.isArray(photoValues)) {
           parsedPhotos = photoValues
-            .map(p => formatPartnerPhoto(typeof p === 'string' ? p : (p && (p.url || p.uri || p.path || p.image)), baseUrl))
+            .map(p => {
+              const pUrl = typeof p === 'string' ? p : (p && (p.url || p.uri || p.path || p.image));
+              // Only include non-generic URLs
+              if (!pUrl || isGenericPlaceholder(pUrl)) return null;
+              return formatPartnerPhoto(pUrl, baseUrl, nameOrId);
+            })
             .filter(Boolean);
         }
       } catch (e) {}
-      parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
+
+      // If the profile photo is real (not generic), include it as first
+      const allPhotos = (!isGenericPlaceholder(rawPhoto) && photoUrl)
+        ? [photoUrl, ...parsedPhotos]
+        : parsedPhotos;
+
+      // Ensure at least 1 unique photo; if still empty, use unique placeholder
+      if (allPhotos.length === 0) {
+        allPhotos.push(getUniquePartnerPlaceholder(nameOrId, baseUrl));
+      }
+
+      // Deduplicate and limit to 5
+      parsedPhotos = [...new Set(allPhotos.filter(Boolean))].slice(0, 5);
 
       let parsedAvailableFor = [
-        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ];
       try {
         if (r.available_for) parsedAvailableFor = typeof r.available_for === 'string' ? JSON.parse(r.available_for) : r.available_for;
       } catch (e) {}
+
+      // Price from DB takes precedence; if DB has placeholder price=1, use category default
+      const categoryPriceMap = { coffee: 999, dinner: 499, travel: 699, movie: 399, event: 499, conversation: 199 };
+      const catKey = partnerCategory.toLowerCase().trim();
+      const defaultPrice = categoryPriceMap[catKey] || 499;
+      const partnerPrice = (r.price && Number(r.price) > 1) ? Number(r.price) : defaultPrice;
 
       return {
         id: r.partner_id || `usr_${r.id}`,
@@ -117,7 +185,7 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
         total_reviews: parseInt(r.total_reviews || 120),
         match_score: '93%',
         distance: '1.5 km away',
-        price: 1,
+        price: partnerPrice,
         currency: 'INR',
         price_type: 'session',
         activity: partnerCategory,
@@ -213,7 +281,7 @@ const getCombinedActivitiesData = async (req) => {
     full_name: p.full_name || p.name,
     city: p.city || location || 'Jaipur',
     rating: p.rating,
-    price: 1,
+    price: (p.price && Number(p.price) > 1) ? Number(p.price) : 999,
     currency: 'INR',
     price_type: 'session',
     image: p.image,
@@ -298,7 +366,7 @@ const getCombinedActivitiesData = async (req) => {
       category: 'Social',
       participants_count: 1420,
       rating: 4.9,
-      price: 1,
+      price: 999,
       currency: 'INR',
       banner: `${baseUrl}/uploads/categories/coffee.png`,
       image: `${baseUrl}/uploads/categories/coffee.png`,
@@ -418,17 +486,25 @@ const getCombinedActivitiesData = async (req) => {
 
   const dbRecommended = dbPartners.map(p => ({
     user_id: p.user_id,
+    id: p.id,
     name: p.name,
+    full_name: p.full_name || p.name,
     age: p.age,
     rating: p.rating,
-    price: 1,
+    price: p.price || 999,
     currency: 'INR',
-    match_score: p.match_score,
+    match_score: p.match_score || '90%',
     interests: p.interests,
-    location: p.city,
+    location: p.city || 'Jaipur',
+    category: p.category,
+    activity: p.activity,
+    is_verified: true,
+    status: 'available',
     profile_image: p.profile_image,
     image: p.image,
-    avatar: p.avatar
+    avatar: p.avatar,
+    photos: p.photos,
+    profile_images: p.profile_images
   }));
 
   const recommended_partners = [...dbRecommended, ...defaultRecommended];
@@ -486,10 +562,13 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         profile_image: p.profile_image,
         image: p.image,
         avatar: p.avatar,
+        photos: p.photos || [p.profile_image],
+        profile_images: p.profile_images || p.photos || [p.profile_image],
         rating: p.rating,
         distance: p.distance,
-        price: (target === 'coffee') ? 1 : defaultPrice,
+        price: p.price || defaultPrice,
         currency: 'INR',
+        about: p.about || '',
         interests: p.interests,
         category: catName,
         is_verified: Boolean(p.is_verified),
@@ -511,9 +590,23 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         profile_image: `${baseUrl}/uploads/priya.jpg`,
         image: `${baseUrl}/uploads/priya.jpg`,
         avatar: `${baseUrl}/uploads/priya.jpg`,
+        profile_images: [
+          `${baseUrl}/uploads/priya.jpg`,
+          `${baseUrl}/uploads/priya1.jpg`,
+          `${baseUrl}/uploads/priya2.jpg`,
+          `${baseUrl}/uploads/priya3.jpg`,
+          `${baseUrl}/uploads/priya4.jpg`
+        ],
+        photos: [
+          `${baseUrl}/uploads/priya.jpg`,
+          `${baseUrl}/uploads/priya1.jpg`,
+          `${baseUrl}/uploads/priya2.jpg`,
+          `${baseUrl}/uploads/priya3.jpg`,
+          `${baseUrl}/uploads/priya4.jpg`
+        ],
         rating: 4.8,
         distance: '1.2 km',
-        price: 1,
+        price: 999,
         currency: 'INR',
         interests: ['Coffee', 'Cafe', 'Travel'],
         category: 'Coffee',
@@ -531,9 +624,11 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         profile_image: `${baseUrl}/uploads/ananya.jpg`,
         image: `${baseUrl}/uploads/ananya.jpg`,
         avatar: `${baseUrl}/uploads/ananya.jpg`,
+        profile_images: [`${baseUrl}/uploads/ananya.jpg`, `${baseUrl}/uploads/anjali.jpg`],
+        photos: [`${baseUrl}/uploads/ananya.jpg`, `${baseUrl}/uploads/anjali.jpg`],
         rating: 4.9,
         distance: '2.4 km',
-        price: 1,
+        price: 999,
         currency: 'INR',
         interests: ['Coffee', 'Music', 'Books'],
         category: 'Coffee',
@@ -551,9 +646,11 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         profile_image: `${baseUrl}/uploads/anjali.jpg`,
         image: `${baseUrl}/uploads/anjali.jpg`,
         avatar: `${baseUrl}/uploads/anjali.jpg`,
+        profile_images: [`${baseUrl}/uploads/anjali.jpg`, `${baseUrl}/uploads/ananya.jpg`],
+        photos: [`${baseUrl}/uploads/anjali.jpg`, `${baseUrl}/uploads/ananya.jpg`],
         rating: 4.9,
         distance: '1.8 km',
-        price: 1,
+        price: 999,
         currency: 'INR',
         interests: ['Coffee', 'Cafe', 'Events'],
         category: 'Coffee',
@@ -571,9 +668,11 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         profile_image: `${baseUrl}/uploads/riya.jpg`,
         image: `${baseUrl}/uploads/riya.jpg`,
         avatar: `${baseUrl}/uploads/riya.jpg`,
+        profile_images: [`${baseUrl}/uploads/riya.jpg`, `${baseUrl}/uploads/neha.jpg`],
+        photos: [`${baseUrl}/uploads/riya.jpg`, `${baseUrl}/uploads/neha.jpg`],
         rating: 4.8,
         distance: '3.1 km',
-        price: 1,
+        price: 999,
         currency: 'INR',
         interests: ['Coffee', 'Art', 'Photography'],
         category: 'Coffee',
@@ -591,9 +690,11 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         profile_image: `${baseUrl}/uploads/neha.jpg`,
         image: `${baseUrl}/uploads/neha.jpg`,
         avatar: `${baseUrl}/uploads/neha.jpg`,
+        profile_images: [`${baseUrl}/uploads/neha.jpg`, `${baseUrl}/uploads/kavya.jpg`],
+        photos: [`${baseUrl}/uploads/neha.jpg`, `${baseUrl}/uploads/kavya.jpg`],
         rating: 4.9,
         distance: '2.0 km',
-        price: 1,
+        price: 999,
         currency: 'INR',
         interests: ['Coffee', 'Music', 'Cafe'],
         category: 'Coffee',
@@ -611,9 +712,11 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         profile_image: `${baseUrl}/uploads/sneha.jpg`,
         image: `${baseUrl}/uploads/sneha.jpg`,
         avatar: `${baseUrl}/uploads/sneha.jpg`,
+        profile_images: [`${baseUrl}/uploads/sneha.jpg`, `${baseUrl}/uploads/priya2.jpg`],
+        photos: [`${baseUrl}/uploads/sneha.jpg`, `${baseUrl}/uploads/priya2.jpg`],
         rating: 4.7,
         distance: '2.7 km',
-        price: 1,
+        price: 999,
         currency: 'INR',
         interests: ['Coffee', 'Fitness', 'Gaming'],
         category: 'Coffee',
@@ -622,7 +725,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
       }
     ];
 
-    const allItems = mapDbPartnersToCategory('Coffee', 1);
+    const allItems = mapDbPartnersToCategory('Coffee', 999);
 
     return {
       category_id: 'cat_01',
@@ -1249,13 +1352,26 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
       parsedPhotos = [...new Set([photoUrl, ...parsedPhotos].filter(Boolean))].slice(0, 5);
 
       let parsedAvailableFor = [
-        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ];
       try {
-        if (r.available_for) parsedAvailableFor = typeof r.available_for === 'string' ? JSON.parse(r.available_for) : r.available_for;
+        if (r.available_for) {
+          const rawAf = typeof r.available_for === 'string' ? JSON.parse(r.available_for) : r.available_for;
+          if (Array.isArray(rawAf)) {
+            parsedAvailableFor = rawAf.map(item => {
+              let p = Number(item.price || 0);
+              if (p <= 1) {
+                p = (item.name && item.name.toLowerCase().includes('coffee')) ? 999 : 499;
+              }
+              return { ...item, price: p, currency: item.currency || 'INR' };
+            });
+          }
+        }
       } catch (e) {}
+
+      const partnerPrice = (r.price && Number(r.price) > 1) ? Number(r.price) : 999;
 
       return {
         id: r.partner_id || `usr_${r.id}`,
@@ -1266,6 +1382,8 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
         age: r.age || null,
         gender: gender,
         verified: true,
+        price: partnerPrice,
+        currency: 'INR',
         city: city,
         location: {
           city: city,
@@ -1356,9 +1474,12 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
       id: 'usr_203',
       partner_id: 101,
       name: 'Priya Sharma',
+      full_name: 'Priya Sharma',
       age: 23,
       gender: 'Female',
       verified: true,
+      price: 999,
+      currency: 'INR',
       city: 'Jaipur',
       location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
       rating: 4.8,
@@ -1369,12 +1490,14 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
       avatar: `${baseUrl}/uploads/priya.jpg`,
       profile_images: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`
       ],
       photos: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`
@@ -1385,7 +1508,7 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
         { name: 'Music', icon: 'music_note' }
       ],
       available_for: [
-        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ]
@@ -1582,9 +1705,12 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
       id: targetId || 'usr_203',
       partner_id: 101,
       name: 'Priya Sharma',
+      full_name: 'Priya Sharma',
       age: 23,
       gender: 'Female',
       verified: true,
+      price: 999,
+      currency: 'INR',
       city: 'Jaipur',
       location: { city: 'Jaipur', state: 'Rajasthan', country: 'India' },
       rating: 4.8,
@@ -1595,12 +1721,14 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
       avatar: `${baseUrl}/uploads/priya.jpg`,
       profile_images: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`
       ],
       photos: [
         `${baseUrl}/uploads/priya.jpg`,
+        `${baseUrl}/uploads/priya1.jpg`,
         `${baseUrl}/uploads/priya2.jpg`,
         `${baseUrl}/uploads/priya3.jpg`,
         `${baseUrl}/uploads/priya4.jpg`
@@ -1611,7 +1739,7 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
         { name: 'Music', icon: 'music_note' }
       ],
       available_for: [
-        { name: 'Coffee', icon: 'coffee', price: 1, currency: 'INR' },
+        { name: 'Coffee', icon: 'coffee', price: 999, currency: 'INR' },
         { name: 'Dinner', icon: 'restaurant', price: 499, currency: 'INR' },
         { name: 'Travel', icon: 'flight', price: 699, currency: 'INR' }
       ]
@@ -1653,6 +1781,8 @@ const handleProductDetails = async (req, res) => {
     success: true,
     message: 'Profile details fetched successfully',
     available_for: partnerProfile.available_for,
+    price: partnerProfile.price || 999,
+    currency: partnerProfile.currency || 'INR',
     data: partnerProfile,
     id: partnerProfile.id,
     name: partnerProfile.name,

@@ -1,9 +1,119 @@
 const https = require('https');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { query } = require('../config/db');
 
 // In-memory notifications store
 const memoryNotifications = new Map(); // notification_id -> object
 const memoryUserTokens = new Map(); // user_id -> { fcmToken, deviceType }
+
+// Firebase Service Account Credentials & Token Cache
+let serviceAccountCreds = null;
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      serviceAccountCreds = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch (parseErr) {
+      const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString('utf8');
+      serviceAccountCreds = JSON.parse(decoded);
+    }
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+    const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8');
+    serviceAccountCreds = JSON.parse(decoded);
+  } else {
+    const saPath = path.join(__dirname, '../config/firebase-service-account.json');
+    if (fs.existsSync(saPath)) {
+      serviceAccountCreds = JSON.parse(fs.readFileSync(saPath, 'utf8'));
+    }
+  }
+} catch (e) {
+  console.warn('[FCM] Service account load notice:', e.message);
+}
+
+let cachedOAuthToken = null;
+let tokenExpiresAt = 0;
+
+async function getFirebaseAccessToken() {
+  if (!serviceAccountCreds) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedOAuthToken && tokenExpiresAt > now + 60) {
+    return cachedOAuthToken;
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      const header = { alg: 'RS256', typ: 'JWT' };
+      const claim = {
+        iss: serviceAccountCreds.client_email,
+        scope: 'https://www.googleapis.com/auth/firebase.messaging',
+        aud: 'https://oauth2.googleapis.com/token',
+        exp: now + 3600,
+        iat: now
+      };
+
+      const encodeBase64Url = (obj) => {
+        return Buffer.from(JSON.stringify(obj))
+          .toString('base64')
+          .replace(/=/g, '')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_');
+      };
+
+      const encodedHeader = encodeBase64Url(header);
+      const encodedClaim = encodeBase64Url(claim);
+      const signInput = `${encodedHeader}.${encodedClaim}`;
+
+      const signer = crypto.createSign('RSA-SHA256');
+      signer.update(signInput);
+      const signature = signer.sign(serviceAccountCreds.private_key, 'base64')
+        .replace(/=/g, '')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
+
+      const jwt = `${signInput}.${signature}`;
+      const postData = `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`;
+
+      const req = https.request({
+        hostname: 'oauth2.googleapis.com',
+        path: '/token',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(body);
+            if (json.access_token) {
+              cachedOAuthToken = json.access_token;
+              tokenExpiresAt = now + (json.expires_in || 3600);
+              resolve(cachedOAuthToken);
+            } else {
+              console.warn('[FCM OAuth2 Error]:', body);
+              resolve(null);
+            }
+          } catch (err) {
+            resolve(null);
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        console.warn('[FCM OAuth2 Request Error]:', err.message);
+        resolve(null);
+      });
+      req.write(postData);
+      req.end();
+    } catch (err) {
+      console.warn('[FCM Sign Error]:', err.message);
+      resolve(null);
+    }
+  });
+}
 
 /**
  * Fetch user name and profile photo URL from DB (users or withme_partners table)
@@ -13,7 +123,7 @@ async function fetchUserInfo(userId) {
   if (!uId) {
     return {
       name: 'Amit',
-      photo_url: 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg'
+      photo_url: 'https://withmeapi-userapp.onrender.com/uploads/amit_1.jpg'
     };
   }
 
@@ -27,7 +137,7 @@ async function fetchUserInfo(userId) {
     );
     if (rows && rows.length > 0) {
       const u = rows[0];
-      let photo = u.profile_image || 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg';
+      let photo = u.profile_image || 'https://withmeapi-userapp.onrender.com/uploads/amit_1.jpg';
       if (photo && !photo.startsWith('http://') && !photo.startsWith('https://')) {
         photo = `https://withmeapi-userapp.onrender.com${photo.startsWith('/') ? '' : '/'}${photo}`;
       }
@@ -46,7 +156,7 @@ async function fetchUserInfo(userId) {
     );
     if (rows && rows.length > 0) {
       const p = rows[0];
-      let photo = p.image || p.profile_photo_url || 'https://withmeapi-userapp.onrender.com/uploads/profile.jpg';
+      let photo = p.image || p.profile_photo_url || 'https://withmeapi-userapp.onrender.com/uploads/priya.jpg';
       if (photo && !photo.startsWith('http://') && !photo.startsWith('https://')) {
         photo = `https://withmeapi-userapp.onrender.com${photo.startsWith('/') ? '' : '/'}${photo}`;
       }
@@ -59,7 +169,7 @@ async function fetchUserInfo(userId) {
 
   return {
     name: 'Amit',
-    photo_url: 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg'
+    photo_url: 'https://withmeapi-userapp.onrender.com/uploads/amit_1.jpg'
   };
 }
 
@@ -153,16 +263,76 @@ function sanitizeFcmData(data) {
 }
 
 /**
- * Send raw push notification via Firebase Cloud Messaging HTTP endpoint
+ * Send push notification via modern Firebase Cloud Messaging HTTP v1 API
+ * Falls back to legacy HTTP API if service account is unavailable.
  */
-function sendFcmPushNotification(fcmToken, title, body, dataPayload = {}) {
+async function sendFcmPushNotification(fcmToken, title, body, dataPayload = {}) {
+  const sanitizedData = sanitizeFcmData(dataPayload);
+
+  // Try modern FCM HTTP v1 using Service Account JSON
+  try {
+    const accessToken = await getFirebaseAccessToken();
+    if (accessToken && serviceAccountCreds && serviceAccountCreds.project_id) {
+      const payload = JSON.stringify({
+        message: {
+          token: fcmToken,
+          notification: {
+            title: title,
+            body: body
+          },
+          data: sanitizedData,
+          android: {
+            priority: 'high',
+            notification: {
+              channel_id: 'chat_messages',
+              sound: 'default'
+            }
+          }
+        }
+      });
+
+      return new Promise((resolve) => {
+        const req = https.request({
+          hostname: 'fcm.googleapis.com',
+          path: `/v1/projects/${serviceAccountCreds.project_id}/messages:send`,
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+          }
+        }, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              resolve({ sent: res.statusCode === 200, status: res.statusCode, response: parsed });
+            } catch (e) {
+              resolve({ sent: res.statusCode === 200, status: res.statusCode, raw: data });
+            }
+          });
+        });
+
+        req.on('error', (err) => {
+          console.error('[FCM v1 Push Error]:', err.message);
+          resolve({ sent: false, error: err.message });
+        });
+
+        req.write(payload);
+        req.end();
+      });
+    }
+  } catch (err) {
+    console.warn('[FCM v1 Attempt Error]:', err.message);
+  }
+
+  // Fallback to legacy FCM Server Key
   const serverKey = process.env.FIREBASE_SERVER_KEY || process.env.FCM_SERVER_KEY || 'AIzaSyDFBUhNlPjsnkfVA4auuznMeyoTz-AhJDQ';
   if (!serverKey) {
     console.log(`[FCM Notice] Notification stored. To enable Firebase push delivery, set FIREBASE_SERVER_KEY in .env`);
     return Promise.resolve({ sent: false, reason: "NO_SERVER_KEY" });
   }
-
-  const sanitizedData = sanitizeFcmData(dataPayload);
 
   return new Promise((resolve) => {
     const payload = JSON.stringify({
@@ -231,7 +401,7 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
     if (!resolvedPhoto) resolvedPhoto = info.photo_url;
   }
 
-  // Find target user FCM token — check all alias forms and both user tables
+  // Find target user FCM token — check all alias forms across withme_users, users, and withme_partners tables
   let fcmToken = null;
   const uIdDigits = uId.replace(/\D/g, '');
   const uIdFormatted = uId.startsWith('usr_') ? uId : (uIdDigits ? `usr_${uIdDigits}` : uId);
@@ -259,7 +429,7 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
   }
 
   if (!fcmToken) {
-    // 3. users table (may have fcm_token column added later)
+    // 3. users table
     try {
       const rows = await query(
         `SELECT fcm_token FROM users WHERE id = ? OR id = ? OR phone_number = ? LIMIT 1`,
@@ -268,7 +438,21 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
       if (rows && rows.length > 0 && rows[0].fcm_token) {
         fcmToken = rows[0].fcm_token;
       }
-    } catch (err) { /* Ignore — column may not exist */ }
+    } catch (err) { /* Ignore */ }
+  }
+
+  if (!fcmToken) {
+    // 4. withme_partners table (crucial for notifications to partners!)
+    try {
+      const pRows = await query(
+        `SELECT fcm_token FROM withme_partners 
+         WHERE partner_id = ? OR partner_id = ? OR id = ? OR user_id = ? OR mobile_number = ? LIMIT 1`,
+        [uId, uIdFormatted, uIdDigits || 0, uId, uId]
+      );
+      if (pRows && pRows.length > 0 && pRows[0].fcm_token) {
+        fcmToken = pRows[0].fcm_token;
+      }
+    } catch (err) { /* Ignore */ }
   }
 
   // Inject user_name and user_photo_url inside data object
@@ -284,7 +468,7 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
   }
 
   const finalName = resolvedName || 'Amit';
-  const finalPhoto = resolvedPhoto || 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg';
+  const finalPhoto = resolvedPhoto || 'https://withmeapi-userapp.onrender.com/uploads/amit_1.jpg';
 
   dataPayloadObj.user_name = finalName;
   dataPayloadObj.username = finalName;
@@ -390,8 +574,8 @@ async function getUserNotifications(userId) {
           name = 'Amit';
         }
 
-        if (!photo) {
-          photo = 'https://withmeapi-userapp.onrender.com/uploads/base64-1792144167755-640219276.jpeg';
+        if (!photo || photo.includes('base64-1792144167755')) {
+          photo = 'https://withmeapi-userapp.onrender.com/uploads/amit_1.jpg';
         }
 
         if (photo && !photo.startsWith('http://') && !photo.startsWith('https://')) {
@@ -742,5 +926,6 @@ module.exports = {
   sendNotification,
   getUserNotifications,
   markNotificationRead,
-  sendEventNotification
+  sendEventNotification,
+  sendFcmPushNotification
 };

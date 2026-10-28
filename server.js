@@ -96,7 +96,8 @@ const fallbackImageBuf = generateFallback400Image();
 const KYC_PREFIXES = ['aadhar_front_', 'aadhar_back_', 'aadhaar_front_', 'aadhaar_back_', 'mock_aadhaar'];
 
 app.use('/uploads', async (req, res) => {
-  const filename = req.path.replace(/^\//, '').split('?')[0];
+  const relPath = req.path.replace(/^\//, '').split('?')[0];
+  const filename = path.basename(relPath);
   if (filename) {
     // Block unauthenticated access to KYC/Aadhaar documents
     const isKycFile = KYC_PREFIXES.some(prefix => filename.startsWith(prefix));
@@ -117,13 +118,18 @@ app.use('/uploads', async (req, res) => {
 
     try {
       const { query } = require('./src/config/db');
-      const rows = await query('SELECT mimetype, data FROM withme_uploaded_files WHERE filename = ? LIMIT 1', [filename]);
+      const rows = await query('SELECT mimetype, data FROM withme_uploaded_files WHERE filename = ? OR filename = ? LIMIT 1', [filename, relPath]);
       if (rows && rows.length > 0) {
         const fileRow = rows[0];
         // Restore to local disk for fast subsequent reads
         try {
-          if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-          fs.writeFileSync(path.join(uploadsDir, filename), fileRow.data);
+          const targetPath = path.join(uploadsDir, relPath);
+          const targetDir = path.dirname(targetPath);
+          if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+          fs.writeFileSync(targetPath, fileRow.data);
+          if (filename !== relPath) {
+            fs.writeFileSync(path.join(uploadsDir, filename), fileRow.data);
+          }
         } catch (e) {}
         res.setHeader('Content-Type', fileRow.mimetype || 'image/jpeg');
         return res.status(200).send(fileRow.data);

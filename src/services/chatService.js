@@ -142,11 +142,20 @@ async function findUser(userId) {
     );
     if (rows && rows.length > 0) {
       const u = rows[0];
+      let pImg = u.profile_image || u.image || u.profile_photo_url;
+      const isAmit = u.name && u.name.toLowerCase().includes('amit');
+      if (!pImg || pImg.includes('base64-1792144167755') || pImg.includes('photo_1.jpg')) {
+        pImg = isAmit
+          ? 'https://withmeapi-userapp.onrender.com/uploads/amit_1.jpg'
+          : 'https://withmeapi-userapp.onrender.com/uploads/profile.jpg';
+      } else if (!pImg.startsWith('http')) {
+        pImg = `https://withmeapi-userapp.onrender.com${pImg.startsWith('/') ? '' : '/'}${pImg}`;
+      }
       return {
         user_id: formatNumericUserId(u.id || u.user_id || uId),
         name: u.name || u.full_name || `User ${uId}`,
         full_name: u.full_name || u.name || `User ${uId}`,
-        profile_image: u.profile_image || u.image || u.profile_photo_url || "/uploads/profile.jpg"
+        profile_image: pImg
       };
     }
   } catch (err) {
@@ -161,11 +170,25 @@ async function findUser(userId) {
     );
     if (rows && rows.length > 0) {
       const p = rows[0];
+      const partnerName = p.name || p.full_name || `Partner ${uId}`;
+      let pImg = p.image || p.profile_photo_url || '';
+      const isGenericPhoto = !pImg || pImg.includes('photo_1.jpg') || pImg.includes('example.com');
+      if (isGenericPhoto) {
+        // Assign a deterministic unique placeholder based on partner name
+        const POOL = ['priya.jpg', 'ananya.jpg', 'anjali.jpg', 'riya.jpg', 'neha.jpg',
+          'sneha.jpg', 'kavya.jpg', 'priya1.jpg', 'priya2.jpg', 'priya3.jpg'];
+        const key = partnerName.toLowerCase();
+        let hash = 0;
+        for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) & 0xfffffff;
+        pImg = `https://withmeapi-userapp.onrender.com/uploads/${POOL[hash % POOL.length]}`;
+      } else if (!pImg.startsWith('http')) {
+        pImg = `https://withmeapi-userapp.onrender.com${pImg.startsWith('/') ? '' : '/'}${pImg}`;
+      }
       return {
         user_id: formatNumericUserId(p.user_id || p.partner_id || p.id || uId),
-        name: p.name || p.full_name || `Partner ${uId}`,
+        name: partnerName,
         full_name: p.full_name || p.name || `Partner ${uId}`,
-        profile_image: p.image || p.profile_photo_url || "/uploads/priya.jpg"
+        profile_image: pImg
       };
     }
   } catch (err) {
@@ -177,7 +200,7 @@ async function findUser(userId) {
       user_id: formatNumericUserId(uId),
       name: `User ${uId}`,
       full_name: `User ${uId}`,
-      profile_image: "/uploads/profile.jpg"
+      profile_image: 'https://withmeapi-userapp.onrender.com/uploads/profile.jpg'
     };
   }
 

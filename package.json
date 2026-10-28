@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node tests/backend_verification.test.js && node tests/category_filter.test.js && node tests/image_persistence.test.js"
+    "test": "node tests/backend_verification.test.js && node tests/category_filter.test.js && node tests/image_persistence.test.js && node tests/user_audit_fixes.test.js"
   },
   "keywords": [
     "witme",
