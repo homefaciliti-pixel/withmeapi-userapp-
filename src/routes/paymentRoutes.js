@@ -80,7 +80,6 @@ const handlePaymentInitiate = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const {
     booking_id = 'BK197860',
-    amount = 999,
     currency = 'INR',
     payment_method = 'UPI',
     partner_id,
@@ -90,10 +89,7 @@ const handlePaymentInitiate = async (req, res) => {
   const razorpayKey = getRazorpayKey(req);
   const razorpaySecret = getRazorpaySecret(req);
 
-  let resolvedAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
-  let resolvedActivity = activity || '';
-
-  // Check if request is accepted by partner before allowing payment & resolve correct price
+  // Check if request is accepted by partner before allowing payment
   try {
     const existingRequests = await query(
       `SELECT status, is_accepted, price, activity FROM withme_partner_requests WHERE booking_id = ? OR id = ? OR request_id = ? ORDER BY id DESC LIMIT 1`,
@@ -102,12 +98,6 @@ const handlePaymentInitiate = async (req, res) => {
 
     if (existingRequests && existingRequests.length > 0) {
       const reqRecord = existingRequests[0];
-      if (!resolvedActivity) resolvedActivity = reqRecord.activity || '';
-      const dbPrice = parseFloat(reqRecord.price || 0);
-      if (dbPrice > 1 && resolvedAmount <= 1) {
-        resolvedAmount = dbPrice;
-      }
-
       const isAccepted = reqRecord.is_accepted === 1 || reqRecord.is_accepted === true || ['accepted', 'approved', 'confirmed'].includes(String(reqRecord.status || '').toLowerCase());
       const isAlreadyPaid = String(reqRecord.status || '').toLowerCase() === 'paid';
 
@@ -121,32 +111,13 @@ const handlePaymentInitiate = async (req, res) => {
         });
       }
     }
-
-    if (resolvedAmount <= 1) {
-      const bRows = await query(
-        `SELECT price, activity FROM withme_partner_bookings WHERE booking_id = ? OR id = ? ORDER BY id DESC LIMIT 1`,
-        [booking_id, booking_id]
-      ).catch(() => []);
-      if (bRows && bRows.length > 0) {
-        if (!resolvedActivity) resolvedActivity = bRows[0].activity || '';
-        const bPrice = parseFloat(bRows[0].price || 0);
-        if (bPrice > 1 && resolvedAmount <= 1) {
-          resolvedAmount = bPrice;
-        }
-      }
-    }
   } catch (chkErr) {
     // Continue if DB check fails
   }
 
-  // Ensure default price is always actual (999 for Coffee, 499 for others)
-  if (resolvedAmount <= 1) {
-    const isCoffee = !resolvedActivity || resolvedActivity.toLowerCase().includes('coffee');
-    resolvedAmount = isCoffee ? 999 : 499;
-  }
-
-  const numericAmount = resolvedAmount;
-  const amountInPaise = Math.round(numericAmount * 100);
+  // Payment amount is strictly ₹1 (100 paise) at payment time as requested by user
+  const numericAmount = 1;
+  const amountInPaise = 100;
 
   // Try creating official order from Razorpay server if live secret is available
   const liveOrder = await createRazorpayLiveOrder(amountInPaise, currency, booking_id, razorpayKey, razorpaySecret);
@@ -413,12 +384,13 @@ router.post('/', authenticateToken, handlePaymentInitiate);
 // 2. Checkout Summary API — POST (/payments/checkout, /checkout)
 const handleCheckout = async (req, res) => {
   const baseUrl = getBaseUrl(req);
-  const { booking_id = 'BK197860', activity = 'Coffee', price = 299, currency = 'INR' } = req.body || {};
+  const { booking_id = 'BK197860', activity = 'Coffee', currency = 'INR' } = req.body || {};
   const razorpayKey = getRazorpayKey(req);
   const razorpaySecret = getRazorpaySecret(req);
 
-  const numericPrice = typeof price === 'number' ? price : parseFloat(price) || 299;
-  const amountInPaise = Math.round(numericPrice * 100);
+  // Payment amount is strictly ₹1 (100 paise) at payment time as requested by user
+  const numericPrice = 1;
+  const amountInPaise = 100;
 
   // Check if partner accepted the request before checkout
   try {
