@@ -13,14 +13,18 @@ const getBaseUrl = (req) => {
 };
 
 // Pools of unique placeholder images for partners without real photos (all served from /uploads/)
+// Amit and Priya photos are strictly reserved for their own profiles and NEVER used here
 const FEMALE_PLACEHOLDER_POOL = [
-  'priya.jpg', 'ananya.jpg', 'anjali.jpg', 'riya.jpg', 'neha.jpg',
-  'sneha.jpg', 'kavya.jpg', 'priya1.jpg', 'priya2.jpg', 'priya3.jpg',
-  'priya4.jpg', 'live1.jpg'
+  'ananya.jpg', 'anjali.jpg', 'riya.jpg', 'neha.jpg', 'sneha.jpg',
+  'kavya.jpg', 'pooja.jpg', 'tanvi.jpg', 'isha.jpg', 'nancy.jpg',
+  'janvi.jpg', 'rashi.jpg', 'ayesha.jpg', 'divya.jpg', 'aarti.jpg',
+  'rita.jpg', 'rachana.jpg', 'payal.jpg', 'simran.jpg', 'sonal.jpg',
+  'megha.jpg', 'shreya.jpg', 'kritika.jpg', 'pallavi.jpg', 'aditi.jpg',
+  'trisha.jpg', 'live1.jpg'
 ];
 
 const MALE_PLACEHOLDER_POOL = [
-  'aarav.jpg', 'rohan.jpg', 'amit_1.jpg', 'amit_2.jpg', 'amit_3.jpg',
+  'aarav.jpg', 'rohan.jpg', 'ajith.jpg', 'kashyap.jpg', 'varsha_m.jpg',
   'user101.jpg', 'user102.jpg', 'profile1.jpg', 'profile2.jpg', 'profile3.jpg'
 ];
 
