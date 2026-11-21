@@ -111,12 +111,49 @@ const handleGetProfile = async (req, res) => {
     }
 
     if (queryConditions.length > 0) {
-      const sql = `SELECT * FROM users WHERE ${queryConditions.join(' OR ')} ORDER BY id DESC LIMIT 1`;
+      // Pick row with actual profile data first, then earliest created id
+      const sql = `SELECT * FROM users WHERE ${queryConditions.join(' OR ')} 
+                   ORDER BY (CASE WHEN (dob IS NOT NULL OR city IS NOT NULL OR profile_image IS NOT NULL OR bio IS NOT NULL) THEN 1 ELSE 0 END) DESC, id ASC LIMIT 1`;
       const dbUsers = await query(sql, queryParams);
 
       if (dbUsers && dbUsers.length > 0) {
-        const u = dbUsers[0];
+        let u = dbUsers[0];
         const dbPhone = (u.phone_number || userPhone || '').replace(/^\+91/, '').replace(/^\+/, '');
+
+        // Self-healing: auto-correct historically swapped columns (gender<->dob, city<->email)
+        let needsDbFix = false;
+        let correctedGender = u.gender;
+        let correctedDob = u.dob || u.date_of_birth;
+        let correctedCity = u.city;
+        let correctedEmail = u.email;
+
+        // If gender contains a date (YYYY-MM-DD) and dob contains a gender name
+        if (correctedGender && /^\d{4}-\d{2}-\d{2}/.test(correctedGender) && (!correctedDob || /^(Male|Female|Other)/i.test(correctedDob))) {
+          const temp = correctedDob;
+          correctedDob = correctedGender;
+          correctedGender = (temp && /^(Male|Female|Other)/i.test(temp)) ? temp : 'Male';
+          needsDbFix = true;
+        }
+
+        // If city contains '@' (email) and email doesn't contain '@'
+        if (correctedCity && correctedCity.includes('@') && (!correctedEmail || !correctedEmail.includes('@'))) {
+          const temp = correctedEmail;
+          correctedEmail = correctedCity;
+          correctedCity = (temp && !temp.includes('@')) ? temp : null;
+          needsDbFix = true;
+        }
+
+        if (needsDbFix && u.id) {
+          query(
+            'UPDATE users SET dob = ?, gender = ?, email = ?, city = ?, updated_at = NOW() WHERE id = ?',
+            [correctedDob, correctedGender, correctedEmail, correctedCity, u.id]
+          ).catch(() => {});
+          u.dob = correctedDob;
+          u.date_of_birth = correctedDob;
+          u.gender = correctedGender;
+          u.email = correctedEmail;
+          u.city = correctedCity;
+        }
 
         // If nickname, bio, city, state, or email are missing in users table, check withme_partners
         if (!u.nickname || !u.bio || !u.city || !u.state || !u.email) {

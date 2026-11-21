@@ -104,14 +104,21 @@ router.post('/photo-upload', authenticateToken, upload.single('photo'), async (r
         } catch (e) {}
       }
 
-      const mergedImages = [...new Set([...existingImages, photoUrl])].slice(0, 5);
-      const mainPhoto = (userRows && userRows[0] && userRows[0].profile_image) ? userRows[0].profile_image : photoUrl;
+      const mergedImages = [photoUrl, ...existingImages.filter(p => p !== photoUrl)].slice(0, 5);
+      const mainPhoto = photoUrl;
 
       await query(
         `UPDATE users SET profile_image = ?, profile_images = ?, updated_at = NOW() 
          WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
         [mainPhoto, JSON.stringify(mergedImages), userId, userFullPhone, userPhone, `%${cleanDigits}`]
       );
+
+      // If user also has a record in withme_partners, sync profile photo
+      await query(
+        `UPDATE withme_partners SET profile_photo_url = ?, image = ?, photos = ?, updated_at = NOW() 
+         WHERE (user_id = ? OR partner_id = ? OR phone_number = ? OR mobile_number = ? OR phone_number LIKE ?) AND id != 391 AND partner_id != 'usr_203'`,
+        [mainPhoto, mainPhoto, JSON.stringify(mergedImages), userId, userId, userFullPhone, userPhone, `%${cleanDigits}`]
+      ).catch(() => {});
     } catch (err) {
       console.warn('MySQL photo-upload update notice:', err.message);
     }

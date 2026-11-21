@@ -157,7 +157,11 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '', userCoords =
     let sql = `
       SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, dob, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, latitude, longitude, status, is_approved, is_verified
       FROM withme_partners
-      WHERE (status IS NULL OR status NOT IN ('DELETED','REJECTED','SUSPENDED','DUPLICATE_DELETED')) AND is_approved = 1 AND is_verified = 1
+      WHERE (status IS NULL OR status NOT IN ('DELETED','REJECTED','SUSPENDED','DUPLICATE_DELETED')) 
+        AND is_approved = 1 
+        AND is_verified = 1
+        AND (name NOT LIKE '%Audit User%' AND name NOT LIKE '%Test%' AND name NOT LIKE '%Dummy%')
+        AND (phone_number NOT LIKE '99999%' AND mobile_number NOT LIKE '99999%')
     `;
     const params = [];
 
@@ -184,6 +188,9 @@ const fetchExploreDbPartners = async (baseUrl, categoryFilter = '', userCoords =
     const uniqueRows = [];
     for (const r of rows) {
       const normName = String(r.name || r.full_name || '').toLowerCase().trim();
+      if (!normName || normName.includes('test') || normName.includes('dummy') || normName.includes('audit user') || normName.includes('sample')) {
+        continue;
+      }
       if (normName && seenNames.has(normName)) {
         continue;
       }

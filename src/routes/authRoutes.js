@@ -183,14 +183,17 @@ router.post('/verify-otp', async (req, res) => {
     name: defaultName
   };
 
+  let matchedUser = null;
+
   // MySQL User Lookup / Registration
   try {
     const existingUsers = await query(
-      `SELECT * FROM users WHERE phone_number = ? OR phone_number = ? OR phone_number LIKE ? LIMIT 1`,
+      `SELECT * FROM users WHERE phone_number = ? OR phone_number = ? OR phone_number LIKE ? ORDER BY id ASC LIMIT 1`,
       [full_phone_number, phone_number, `%${cleanDigits}`]
     );
     if (existingUsers && existingUsers.length > 0) {
       const existing = existingUsers[0];
+      matchedUser = existing;
       const existingPhone = (existing.phone_number || phone_number).replace(/^\+91/, '').replace(/^\+/, '');
       userPayload = {
         user_id: existing.id || userId,
@@ -232,6 +235,41 @@ router.post('/verify-otp', async (req, res) => {
   const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '7d' });
   const istTimestamp = getISTTimestamp();
 
+  // Determine actual profile completeness and kyc status
+  const isProfileComplete = Boolean(
+    matchedUser &&
+    matchedUser.name &&
+    matchedUser.name !== 'User' &&
+    (matchedUser.dob || matchedUser.city || matchedUser.profile_image)
+  );
+  const kycStatus = matchedUser ? (matchedUser.kyc_status || 'NOT_STARTED') : 'NOT_STARTED';
+
+  let parsedProfileImages = [];
+  if (matchedUser && matchedUser.profile_images) {
+    try {
+      parsedProfileImages = typeof matchedUser.profile_images === 'string'
+        ? JSON.parse(matchedUser.profile_images)
+        : matchedUser.profile_images;
+    } catch (e) {}
+  }
+
+  const fullUserProfile = {
+    ...userPayload,
+    nickname: matchedUser ? (matchedUser.nickname || null) : null,
+    nick_name: matchedUser ? (matchedUser.nickname || null) : null,
+    email: matchedUser ? (matchedUser.email || null) : null,
+    gender: matchedUser ? (matchedUser.gender || null) : null,
+    dob: matchedUser ? (matchedUser.dob || null) : null,
+    city: matchedUser ? (matchedUser.city || null) : null,
+    state: matchedUser ? (matchedUser.state || null) : null,
+    bio: matchedUser ? (matchedUser.bio || null) : null,
+    profile_image: matchedUser ? (matchedUser.profile_image || null) : null,
+    profile_images: parsedProfileImages,
+    is_profile_complete: isProfileComplete,
+    kyc_status: kycStatus,
+    fcm_token: fcmToken || null
+  };
+
   return res.status(200).json({
     success: true,
     message: 'OTP verified successfully',
@@ -241,23 +279,13 @@ router.post('/verify-otp', async (req, res) => {
     user_id: userPayload.user_id,
     fcm_token_saved: fcmToken ? true : false,
     verified_at: istTimestamp,
-    user: {
-      ...userPayload,
-      is_profile_complete: false,
-      kyc_status: 'NOT_STARTED',
-      fcm_token: fcmToken || null
-    },
+    user: fullUserProfile,
     data: {
       token,
       access_token: token,
       user_id: userPayload.user_id,
       verified_at: istTimestamp,
-      user: {
-        ...userPayload,
-        is_profile_complete: false,
-        kyc_status: 'NOT_STARTED',
-        fcm_token: fcmToken || null
-      }
+      user: fullUserProfile
     }
   });
 });

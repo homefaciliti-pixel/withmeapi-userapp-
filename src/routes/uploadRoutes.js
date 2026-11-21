@@ -185,15 +185,22 @@ const handleFileUpload = async (req, res) => {
       }
 
       const newUrls = filesList.map(f => f.url).filter(Boolean);
-      // Merge unique URLs, preserving existing secondary photos (up to 5 photos)
-      const mergedImages = [...new Set([...existingImages, ...newUrls])].slice(0, 5);
-      const mainPhoto = (userRows && userRows[0] && userRows[0].profile_image) ? userRows[0].profile_image : primary.url;
+      // Place newly uploaded photo(s) first, then keep existing photos up to 5 total
+      const mergedImages = [...new Set([...newUrls, ...existingImages])].slice(0, 5);
+      const mainPhoto = primary.url;
 
       await query(
         `UPDATE users SET profile_image = ?, profile_images = ?, updated_at = NOW() 
          WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`,
         [mainPhoto, JSON.stringify(mergedImages), userId, userFullPhone, userPhone, `%${cleanDigits}`]
       );
+
+      // If user is also in withme_partners, sync profile photo
+      await query(
+        `UPDATE withme_partners SET profile_photo_url = ?, image = ?, photos = ?, updated_at = NOW() 
+         WHERE (user_id = ? OR partner_id = ? OR phone_number = ? OR mobile_number = ? OR phone_number LIKE ?) AND id != 391 AND partner_id != 'usr_203'`,
+        [mainPhoto, mainPhoto, JSON.stringify(mergedImages), userId, userId, userFullPhone, userPhone, `%${cleanDigits}`]
+      ).catch(() => {});
     } catch (err) {
       console.warn('MySQL upload profile image update notice:', err.message);
     }

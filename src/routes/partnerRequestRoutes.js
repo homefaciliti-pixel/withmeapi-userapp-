@@ -178,7 +178,11 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
     const rows = await query(`
       SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, photos, gender, rating, total_reviews, category, activity, price, currency, status, is_approved, is_verified
       FROM withme_partners
-      WHERE (status IS NULL OR status NOT IN ('DELETED', 'REJECTED', 'SUSPENDED', 'DUPLICATE_DELETED')) AND is_approved = 1 AND is_verified = 1
+      WHERE (status IS NULL OR status NOT IN ('DELETED', 'REJECTED', 'SUSPENDED', 'DUPLICATE_DELETED')) 
+        AND is_approved = 1 
+        AND is_verified = 1
+        AND (name NOT LIKE '%Audit User%' AND name NOT LIKE '%Test%' AND name NOT LIKE '%Dummy%')
+        AND (phone_number NOT LIKE '99999%' AND mobile_number NOT LIKE '99999%')
       ORDER BY id DESC
       LIMIT 100
     `);
@@ -189,6 +193,9 @@ const getApprovedPartnersList = async (baseUrl, requestedBookingId) => {
       const uniqueRows = [];
       for (const r of rows) {
         const norm = String(r.name || r.full_name || '').toLowerCase().trim();
+        if (!norm || norm.includes('test') || norm.includes('dummy') || norm.includes('audit user') || norm.includes('sample')) {
+          continue;
+        }
         if (norm && seenNames.has(norm)) continue;
         if (norm) seenNames.add(norm);
         uniqueRows.push(r);
