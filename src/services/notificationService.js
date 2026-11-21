@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { query } = require('../config/db');
+const { query, ensureColumnExists } = require('../config/db');
 
 // In-memory notifications store
 const memoryNotifications = new Map(); // notification_id -> object
@@ -223,9 +223,9 @@ async function saveUserFcmToken(userId, fcmToken, deviceType = 'android') {
       [fcmToken, uId, digits || '', uId, `%${digits.slice(-8)}`]
     );
   } catch (err) {
-    // users.fcm_token column may not exist — add it silently then retry
+    // users.fcm_token column may not exist — ensure it exists (idempotent) then retry
     try {
-      await query(`ALTER TABLE users ADD COLUMN fcm_token TEXT DEFAULT NULL`);
+      await ensureColumnExists(null, 'users', 'fcm_token', 'TEXT DEFAULT NULL');
       await query(
         `UPDATE users SET fcm_token = ? WHERE id = ? OR id = ? OR phone_number = ? OR phone_number LIKE ?`,
         [fcmToken, uId, digits || '', uId, `%${digits.slice(-8)}`]

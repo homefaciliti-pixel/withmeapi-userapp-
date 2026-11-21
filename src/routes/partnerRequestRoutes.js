@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
-const { query } = require('../config/db');
+const { query, ensureColumnExists } = require('../config/db');
 
 // Helper: extract numeric id from any format e.g. 'usr_2346' -> 2346, '101' -> 101
 const formatNumericUserId = (rawId) => {
@@ -623,9 +623,9 @@ const handleSendRequest = async (req, res) => {
   // 1. Save to MySQL database table `partner_requests`
   try {
     const locationStr = typeof location === 'string' ? location : JSON.stringify(location);
-    // Ensure partner_name column exists
-    query(`ALTER TABLE withme_partner_requests ADD COLUMN partner_name VARCHAR(150)`).catch(() => {});
-    query(`ALTER TABLE withme_partner_requests ADD COLUMN partner_avatar VARCHAR(255)`).catch(() => {});
+    // Ensure partner_name and partner_avatar columns exist (idempotent)
+    ensureColumnExists(null, 'withme_partner_requests', 'partner_name', 'VARCHAR(150)').catch(() => {});
+    ensureColumnExists(null, 'withme_partner_requests', 'partner_avatar', 'VARCHAR(255)').catch(() => {});
 
     await query(
       `INSERT INTO withme_partner_requests (

@@ -22,6 +22,86 @@ console.log(`Connecting to MySQL database '${dbConfig.database}' on host '${dbCo
 
 const pool = mysql.createPool(dbConfig);
 
+/**
+ * Safely ensure a column exists on a table without triggering ER_DUP_FIELDNAME.
+ * Proactively checks column existence via SHOW COLUMNS.
+ */
+const ensureColumnExists = async (executor, tableName, columnName, columnDefinition) => {
+  const runner = executor || pool;
+  try {
+    const cleanTable = String(tableName).replace(/[^a-zA-Z0-9_]/g, '');
+    const cleanCol = String(columnName).replace(/[^a-zA-Z0-9_]/g, '');
+    const [cols] = await runner.query(`SHOW COLUMNS FROM \`${cleanTable}\` LIKE '${cleanCol}'`);
+    if (cols && cols.length > 0) {
+      return false; // Already exists, skipped cleanly
+    }
+
+    await runner.query(`ALTER TABLE \`${cleanTable}\` ADD COLUMN \`${cleanCol}\` ${columnDefinition}`);
+    return true; // Added successfully
+  } catch (err) {
+    if (err.code === 'ER_DUP_FIELDNAME') {
+      return false; // Handled concurrent addition safely
+    }
+    console.error(`[DB Migration Error] Failed to ensure column \`${tableName}\`.\`${columnName}\`:`, err.message);
+    throw err;
+  }
+};
+
+/**
+ * Safely ensure an index exists on a table without triggering ER_DUP_KEYNAME.
+ * Proactively checks index existence via SHOW INDEX.
+ */
+const ensureIndexExists = async (executor, tableName, indexName, columnExpression) => {
+  const runner = executor || pool;
+  try {
+    const cleanTable = String(tableName).replace(/[^a-zA-Z0-9_]/g, '');
+    const cleanIdx = String(indexName).replace(/[^a-zA-Z0-9_]/g, '');
+    const [idxs] = await runner.query(`SHOW INDEX FROM \`${cleanTable}\` WHERE Key_name = '${cleanIdx}'`);
+    if (idxs && idxs.length > 0) {
+      return false; // Already exists, skipped cleanly
+    }
+
+    await runner.query(`ALTER TABLE \`${cleanTable}\` ADD INDEX \`${cleanIdx}\` (${columnExpression})`);
+    return true; // Added successfully
+  } catch (err) {
+    if (err.code === 'ER_DUP_KEYNAME') {
+      return false; // Handled concurrent addition safely
+    }
+    console.error(`[DB Migration Error] Failed to ensure index \`${indexName}\` on \`${tableName}\`:`, err.message);
+    throw err;
+  }
+};
+
+/**
+ * Safely ensure multiple columns exist on a table in a single inspection pass.
+ */
+const ensureTableColumns = async (executor, tableName, columnDefs) => {
+  const runner = executor || pool;
+  try {
+    const [existingColRows] = await runner.query(`SHOW COLUMNS FROM \`${tableName}\``);
+    const existingCols = new Set((existingColRows || []).map(c => c.Field.toLowerCase()));
+
+    for (const col of columnDefs) {
+      if (!existingCols.has(col.name.toLowerCase())) {
+        try {
+          await runner.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${col.name}\` ${col.definition}`);
+          existingCols.add(col.name.toLowerCase());
+        } catch (err) {
+          if (err.code === 'ER_DUP_FIELDNAME') {
+            existingCols.add(col.name.toLowerCase());
+            continue;
+          }
+          console.error(`[DB Migration Error] Failed to add column \`${tableName}\`.\`${col.name}\`:`, err.message);
+          throw err;
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[DB Migration Error] Error inspecting columns for table \`${tableName}\`:`, err.message);
+    throw err;
+  }
+};
+
 // Database initialization & table creation script
 const initializeDatabaseTables = async () => {
   try {
@@ -46,32 +126,30 @@ const initializeDatabaseTables = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // Ensure pre-existing database tables get updated columns if missing
-    const alterStatements = [
-      'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20) DEFAULT NULL',
-      'ALTER TABLE users ADD COLUMN nickname VARCHAR(100) DEFAULT NULL',
-      'ALTER TABLE users ADD COLUMN dob VARCHAR(20) DEFAULT NULL',
-      'ALTER TABLE users ADD COLUMN bio TEXT DEFAULT NULL',
-      'ALTER TABLE users ADD COLUMN city VARCHAR(100) DEFAULT NULL',
-      "ALTER TABLE users ADD COLUMN interested_in_gender VARCHAR(20) DEFAULT NULL",
-      'ALTER TABLE users ADD COLUMN profile_image VARCHAR(255) DEFAULT NULL',
-      "ALTER TABLE users MODIFY COLUMN kyc_status VARCHAR(50) DEFAULT 'NOT_VERIFIED'",
-      "ALTER TABLE users MODIFY COLUMN interested_in_gender VARCHAR(20) DEFAULT NULL",
-      'ALTER TABLE users ADD COLUMN fcm_token TEXT DEFAULT NULL',
-      "ALTER TABLE users ADD COLUMN device_type VARCHAR(20) DEFAULT 'android'",
-      'ALTER TABLE users ADD COLUMN profile_images TEXT DEFAULT NULL',
-      'ALTER TABLE users ADD COLUMN interests TEXT DEFAULT NULL',
-      'ALTER TABLE users ADD COLUMN available_for TEXT DEFAULT NULL',
-      'ALTER TABLE users ADD COLUMN state VARCHAR(100) DEFAULT NULL',
-      "ALTER TABLE users ADD COLUMN country VARCHAR(100) DEFAULT 'India'"
-    ];
+    // Ensure pre-existing database tables get updated columns if missing (idempotent)
+    await ensureTableColumns(connection, 'users', [
+      { name: 'phone_number', definition: 'VARCHAR(20) DEFAULT NULL' },
+      { name: 'nickname', definition: 'VARCHAR(100) DEFAULT NULL' },
+      { name: 'dob', definition: 'VARCHAR(20) DEFAULT NULL' },
+      { name: 'bio', definition: 'TEXT DEFAULT NULL' },
+      { name: 'city', definition: 'VARCHAR(100) DEFAULT NULL' },
+      { name: 'interested_in_gender', definition: 'VARCHAR(20) DEFAULT NULL' },
+      { name: 'profile_image', definition: 'VARCHAR(255) DEFAULT NULL' },
+      { name: 'fcm_token', definition: 'TEXT DEFAULT NULL' },
+      { name: 'device_type', definition: "VARCHAR(20) DEFAULT 'android'" },
+      { name: 'profile_images', definition: 'TEXT DEFAULT NULL' },
+      { name: 'interests', definition: 'TEXT DEFAULT NULL' },
+      { name: 'available_for', definition: 'TEXT DEFAULT NULL' },
+      { name: 'state', definition: 'VARCHAR(100) DEFAULT NULL' },
+      { name: 'country', definition: "VARCHAR(100) DEFAULT 'India'" }
+    ]);
 
-    for (const sql of alterStatements) {
-      try {
-        await connection.query(sql);
-      } catch (err) {
-        // Ignore column already exists warnings
-      }
+    // Safe column modifications (MODIFY COLUMN is idempotent in MySQL)
+    try {
+      await connection.query("ALTER TABLE users MODIFY COLUMN kyc_status VARCHAR(50) DEFAULT 'NOT_VERIFIED'");
+      await connection.query("ALTER TABLE users MODIFY COLUMN interested_in_gender VARCHAR(20) DEFAULT NULL");
+    } catch (err) {
+      console.warn('[DB Migration Notice] Error modifying users column types:', err.message);
     }
 
     // Migration: clear auto-defaulted 'Female' for users who never explicitly set it
@@ -134,32 +212,24 @@ const initializeDatabaseTables = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // Ensure partner_requests columns exist if table was previously created with fewer columns
-    const requestAlterStatements = [
-      'ALTER TABLE partner_requests ADD COLUMN request_id VARCHAR(64) DEFAULT NULL',
-      'ALTER TABLE partner_requests ADD COLUMN booking_id VARCHAR(64) DEFAULT NULL',
-      'ALTER TABLE partner_requests ADD COLUMN sender_name VARCHAR(100) DEFAULT NULL',
-      'ALTER TABLE partner_requests ADD COLUMN sender_phone VARCHAR(20) DEFAULT NULL',
-      'ALTER TABLE partner_requests ADD COLUMN sender_avatar VARCHAR(255) DEFAULT NULL',
-      'ALTER TABLE partner_requests ADD COLUMN partner_id VARCHAR(64) DEFAULT NULL',
-      'ALTER TABLE partner_requests ADD COLUMN partner_name VARCHAR(100) DEFAULT NULL',
-      "ALTER TABLE partner_requests ADD COLUMN activity_name VARCHAR(100) DEFAULT 'Coffee'",
-      'ALTER TABLE partner_requests ADD COLUMN date VARCHAR(50) DEFAULT NULL',
-      'ALTER TABLE partner_requests ADD COLUMN time VARCHAR(50) DEFAULT NULL',
-      'ALTER TABLE partner_requests ADD COLUMN location VARCHAR(255) DEFAULT NULL',
-      'ALTER TABLE partner_requests ADD COLUMN price DECIMAL(10,2) DEFAULT 1.00',
-      "ALTER TABLE partner_requests ADD COLUMN currency VARCHAR(10) DEFAULT 'INR'",
-      "ALTER TABLE partner_requests ADD COLUMN status VARCHAR(20) DEFAULT 'Pending'",
-      'ALTER TABLE partner_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
-    ];
-
-    for (const sql of requestAlterStatements) {
-      try {
-        await connection.query(sql);
-      } catch (err) {
-        // Ignore column already exists
-      }
-    }
+    // Ensure partner_requests columns exist if table was previously created with fewer columns (idempotent)
+    await ensureTableColumns(connection, 'partner_requests', [
+      { name: 'request_id', definition: 'VARCHAR(64) DEFAULT NULL' },
+      { name: 'booking_id', definition: 'VARCHAR(64) DEFAULT NULL' },
+      { name: 'sender_name', definition: 'VARCHAR(100) DEFAULT NULL' },
+      { name: 'sender_phone', definition: 'VARCHAR(20) DEFAULT NULL' },
+      { name: 'sender_avatar', definition: 'VARCHAR(255) DEFAULT NULL' },
+      { name: 'partner_id', definition: 'VARCHAR(64) DEFAULT NULL' },
+      { name: 'partner_name', definition: 'VARCHAR(100) DEFAULT NULL' },
+      { name: 'activity_name', definition: "VARCHAR(100) DEFAULT 'Coffee'" },
+      { name: 'date', definition: 'VARCHAR(50) DEFAULT NULL' },
+      { name: 'time', definition: 'VARCHAR(50) DEFAULT NULL' },
+      { name: 'location', definition: 'VARCHAR(255) DEFAULT NULL' },
+      { name: 'price', definition: 'DECIMAL(10,2) DEFAULT 1.00' },
+      { name: 'currency', definition: "VARCHAR(10) DEFAULT 'INR'" },
+      { name: 'status', definition: "VARCHAR(20) DEFAULT 'Pending'" },
+      { name: 'updated_at', definition: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP' }
+    ]);
 
     // 5. Partner Bookings Table (Shared between User App & Partner App)
     await connection.query(`
@@ -185,31 +255,23 @@ const initializeDatabaseTables = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // Ensure partner_bookings columns exist
-    const bookingAlterStatements = [
-      'ALTER TABLE partner_bookings ADD COLUMN request_id VARCHAR(64) DEFAULT NULL',
-      'ALTER TABLE partner_bookings ADD COLUMN user_name VARCHAR(100) DEFAULT NULL',
-      'ALTER TABLE partner_bookings ADD COLUMN user_image VARCHAR(255) DEFAULT NULL',
-      'ALTER TABLE partner_bookings ADD COLUMN user_phone VARCHAR(20) DEFAULT NULL',
-      'ALTER TABLE partner_bookings ADD COLUMN partner_name VARCHAR(100) DEFAULT NULL',
-      'ALTER TABLE partner_bookings ADD COLUMN partner_image VARCHAR(255) DEFAULT NULL',
-      "ALTER TABLE partner_bookings ADD COLUMN activity VARCHAR(100) DEFAULT 'Coffee'",
-      'ALTER TABLE partner_bookings ADD COLUMN date VARCHAR(50) DEFAULT NULL',
-      'ALTER TABLE partner_bookings ADD COLUMN time VARCHAR(50) DEFAULT NULL',
-      'ALTER TABLE partner_bookings ADD COLUMN location VARCHAR(255) DEFAULT NULL',
-      'ALTER TABLE partner_bookings ADD COLUMN price DECIMAL(10,2) DEFAULT 1.00',
-      "ALTER TABLE partner_bookings ADD COLUMN currency VARCHAR(10) DEFAULT 'INR'",
-      "ALTER TABLE partner_bookings ADD COLUMN status VARCHAR(20) DEFAULT 'Upcoming'",
-      'ALTER TABLE partner_bookings ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
-    ];
-
-    for (const sql of bookingAlterStatements) {
-      try {
-        await connection.query(sql);
-      } catch (err) {
-        // Ignore column already exists
-      }
-    }
+    // Ensure partner_bookings columns exist (idempotent)
+    await ensureTableColumns(connection, 'partner_bookings', [
+      { name: 'request_id', definition: 'VARCHAR(64) DEFAULT NULL' },
+      { name: 'user_name', definition: 'VARCHAR(100) DEFAULT NULL' },
+      { name: 'user_image', definition: 'VARCHAR(255) DEFAULT NULL' },
+      { name: 'user_phone', definition: 'VARCHAR(20) DEFAULT NULL' },
+      { name: 'partner_name', definition: 'VARCHAR(100) DEFAULT NULL' },
+      { name: 'partner_image', definition: 'VARCHAR(255) DEFAULT NULL' },
+      { name: 'activity', definition: "VARCHAR(100) DEFAULT 'Coffee'" },
+      { name: 'date', definition: 'VARCHAR(50) DEFAULT NULL' },
+      { name: 'time', definition: 'VARCHAR(50) DEFAULT NULL' },
+      { name: 'location', definition: 'VARCHAR(255) DEFAULT NULL' },
+      { name: 'price', definition: 'DECIMAL(10,2) DEFAULT 1.00' },
+      { name: 'currency', definition: "VARCHAR(10) DEFAULT 'INR'" },
+      { name: 'status', definition: "VARCHAR(20) DEFAULT 'Upcoming'" },
+      { name: 'updated_at', definition: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP' }
+    ]);
 
     const { initAllWithMeTables } = require('./dbInit');
     await initAllWithMeTables();
@@ -245,7 +307,10 @@ module.exports = {
         }
       }
 
-      console.error(`MySQL Query Note [${err.code || 'ERR'}]:`, err.message);
+      // Do not log expected duplicate errors as query errors
+      if (err.code !== 'ER_DUP_FIELDNAME' && err.code !== 'ER_DUP_KEYNAME') {
+        console.error(`MySQL Query Note [${err.code || 'ERR'}]:`, err.message);
+      }
 
       // Graceful fallback for SELECT queries if database is temporarily unreachable/timed out
       if (isConnectionErr && typeof sql === 'string' && sql.trim().toUpperCase().startsWith('SELECT')) {
@@ -260,5 +325,8 @@ module.exports = {
       throw err;
     }
   },
-  initializeDatabaseTables
+  initializeDatabaseTables,
+  ensureColumnExists,
+  ensureIndexExists,
+  ensureTableColumns
 };

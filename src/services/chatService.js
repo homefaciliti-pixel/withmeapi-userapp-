@@ -1,4 +1,4 @@
-const { query } = require('../config/db');
+const { query, ensureColumnExists, ensureIndexExists } = require('../config/db');
 
 // In-memory fallback stores for Chat
 const memoryConversations = new Map(); // conversationId -> { id, type, created_at, updated_at }
@@ -988,15 +988,19 @@ async function deleteMessage(messageId, authenticatedUserId) {
 
 /**
  * One-time migration: add booking_id column to conversations table.
- * Safe to call multiple times — ALTER fails silently if column already exists.
+ * Fully idempotent — checks existence before ALTER and avoids duplicate column/index errors.
  */
 async function ensureBookingIdColumn() {
   try {
-    await query(`ALTER TABLE conversations ADD COLUMN booking_id VARCHAR(100) DEFAULT NULL`);
-    await query(`ALTER TABLE conversations ADD INDEX idx_booking_id (booking_id)`);
-    console.log('[ChatService] conversations.booking_id column added successfully');
+    const colAdded = await ensureColumnExists(null, 'conversations', 'booking_id', 'VARCHAR(100) DEFAULT NULL');
+    const idxAdded = await ensureIndexExists(null, 'conversations', 'idx_booking_id', 'booking_id');
+    if (colAdded || idxAdded) {
+      console.log('[ChatService] conversations.booking_id column/index added successfully');
+    }
   } catch (e) {
-    // Column already exists — ignore
+    if (e.code !== 'ER_DUP_FIELDNAME' && e.code !== 'ER_DUP_KEYNAME') {
+      console.error('[ChatService] Error ensuring booking_id column/index:', e.message);
+    }
   }
 }
 

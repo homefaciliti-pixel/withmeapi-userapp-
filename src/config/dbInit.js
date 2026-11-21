@@ -1,4 +1,4 @@
-const { query } = require('./db');
+const { query, pool, ensureColumnExists, ensureIndexExists, ensureTableColumns } = require('./db');
 
 async function initAllWithMeTables() {
   console.log('[WithMe DB] Initializing dedicated WithMe tables...');
@@ -127,26 +127,23 @@ async function initAllWithMeTables() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Ensure pre-existing database tables get updated columns if missing
-  const userAlters = [
-    'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20) DEFAULT NULL',
-    'ALTER TABLE users ADD COLUMN nickname VARCHAR(100) DEFAULT NULL',
-    'ALTER TABLE users ADD COLUMN dob VARCHAR(20) DEFAULT NULL',
-    'ALTER TABLE users ADD COLUMN bio TEXT DEFAULT NULL',
-    'ALTER TABLE users ADD COLUMN city VARCHAR(100) DEFAULT NULL',
-    "ALTER TABLE users ADD COLUMN interested_in_gender VARCHAR(20) DEFAULT NULL",
-    'ALTER TABLE users ADD COLUMN profile_image VARCHAR(255) DEFAULT NULL',
-    'ALTER TABLE users ADD COLUMN profile_images TEXT DEFAULT NULL',
-    'ALTER TABLE users ADD COLUMN interests TEXT DEFAULT NULL',
-    'ALTER TABLE users ADD COLUMN available_for TEXT DEFAULT NULL',
-    'ALTER TABLE users ADD COLUMN state VARCHAR(100) DEFAULT NULL',
-    "ALTER TABLE users ADD COLUMN country VARCHAR(100) DEFAULT 'India'",
-    'ALTER TABLE users ADD COLUMN fcm_token TEXT DEFAULT NULL',
-    "ALTER TABLE users ADD COLUMN device_type VARCHAR(20) DEFAULT 'android'"
-  ];
-  for (const sql of userAlters) {
-    try { await query(sql); } catch (e) { /* already exists */ }
-  }
+  // Ensure pre-existing database tables get updated columns if missing (idempotent)
+  await ensureTableColumns(pool, 'users', [
+    { name: 'phone_number', definition: 'VARCHAR(20) DEFAULT NULL' },
+    { name: 'nickname', definition: 'VARCHAR(100) DEFAULT NULL' },
+    { name: 'dob', definition: 'VARCHAR(20) DEFAULT NULL' },
+    { name: 'bio', definition: 'TEXT DEFAULT NULL' },
+    { name: 'city', definition: 'VARCHAR(100) DEFAULT NULL' },
+    { name: 'interested_in_gender', definition: 'VARCHAR(20) DEFAULT NULL' },
+    { name: 'profile_image', definition: 'VARCHAR(255) DEFAULT NULL' },
+    { name: 'profile_images', definition: 'TEXT DEFAULT NULL' },
+    { name: 'interests', definition: 'TEXT DEFAULT NULL' },
+    { name: 'available_for', definition: 'TEXT DEFAULT NULL' },
+    { name: 'state', definition: 'VARCHAR(100) DEFAULT NULL' },
+    { name: 'country', definition: "VARCHAR(100) DEFAULT 'India'" },
+    { name: 'fcm_token', definition: 'TEXT DEFAULT NULL' },
+    { name: 'device_type', definition: "VARCHAR(20) DEFAULT 'android'" }
+  ]);
 
   // 12. withme_uploaded_files (Persistent storage backup for Render ephemeral disk)
   await query(`
@@ -176,9 +173,9 @@ async function initAllWithMeTables() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Ensure booking_id column on pre-existing conversations table
-  try { await query(`ALTER TABLE conversations ADD COLUMN booking_id VARCHAR(100) DEFAULT NULL`); } catch (e) {}
-  try { await query(`ALTER TABLE conversations ADD INDEX idx_booking_id (booking_id)`); } catch (e) {}
+  // Ensure booking_id column on pre-existing conversations table (idempotent)
+  await ensureColumnExists(pool, 'conversations', 'booking_id', 'VARCHAR(100) DEFAULT NULL');
+  await ensureIndexExists(pool, 'conversations', 'idx_booking_id', 'booking_id');
 
   // 7. conversation_members
   await query(`
@@ -238,14 +235,11 @@ async function initAllWithMeTables() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Ensure new columns on pre-existing withme_notifications table
-  const notifAlters = [
-    "ALTER TABLE withme_notifications ADD COLUMN user_name VARCHAR(255) DEFAULT NULL",
-    "ALTER TABLE withme_notifications ADD COLUMN user_photo_url TEXT DEFAULT NULL"
-  ];
-  for (const sql of notifAlters) {
-    try { await query(sql); } catch (e) { /* column already exists */ }
-  }
+  // Ensure new columns on pre-existing withme_notifications table (idempotent)
+  await ensureTableColumns(pool, 'withme_notifications', [
+    { name: 'user_name', definition: 'VARCHAR(255) DEFAULT NULL' },
+    { name: 'user_photo_url', definition: 'TEXT DEFAULT NULL' }
+  ]);
 
   // 11. withme_payments
   await query(`

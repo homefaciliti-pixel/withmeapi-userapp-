@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
-const { query } = require('../config/db');
+const { query, ensureColumnExists } = require('../config/db');
 const chatService = require('../services/chatService');
 
 // Price map by activity name
@@ -154,8 +154,8 @@ const handleCreateBooking = async (req, res) => {
 
   // 1. Save to MySQL table `withme_partner_bookings`
   try {
-    // Ensure partner_name column exists
-    query(`ALTER TABLE withme_partner_bookings ADD COLUMN partner_name VARCHAR(150)`).catch(() => {});
+    // Ensure partner_name column exists (idempotent)
+    ensureColumnExists(null, 'withme_partner_bookings', 'partner_name', 'VARCHAR(150)').catch(() => {});
 
     await query(
       `INSERT INTO withme_partner_bookings (
