@@ -91,6 +91,11 @@ const handleGetProfile = async (req, res) => {
     if (userId && !String(userId).startsWith('usr_guest')) {
       queryConditions.push('id = ?');
       queryParams.push(userId);
+      const numericUserId = String(userId).replace(/^usr_/, '');
+      if (/^\d+$/.test(numericUserId)) {
+        queryConditions.push('id = ?');
+        queryParams.push(numericUserId);
+      }
     }
     if (userFullPhone) {
       queryConditions.push('phone_number = ?');
@@ -112,6 +117,25 @@ const handleGetProfile = async (req, res) => {
       if (dbUsers && dbUsers.length > 0) {
         const u = dbUsers[0];
         const dbPhone = (u.phone_number || userPhone || '').replace(/^\+91/, '').replace(/^\+/, '');
+
+        // If nickname, bio, city, state, or email are missing in users table, check withme_partners
+        if (!u.nickname || !u.bio || !u.city || !u.state || !u.email) {
+          try {
+            const pRows = await query(
+              `SELECT nickname, about, city, state, email FROM withme_partners 
+               WHERE user_id = ? OR partner_id = ? OR phone_number = ? OR mobile_number = ? OR phone_number LIKE ? LIMIT 1`,
+              [userId, String(userId).replace(/^usr_/, ''), userFullPhone, userPhone, `%${cleanDigits}`]
+            );
+            if (pRows && pRows.length > 0) {
+              const p = pRows[0];
+              if (!u.nickname && p.nickname) u.nickname = p.nickname;
+              if (!u.bio && p.about) u.bio = p.about;
+              if (!u.city && p.city) u.city = p.city;
+              if (!u.state && p.state) u.state = p.state;
+              if (!u.email && p.email) u.email = p.email;
+            }
+          } catch (e) {}
+        }
 
         // Fix profile image URL (replace localhost with live URL)
         let dbProfileImage = u.profile_image
@@ -164,8 +188,10 @@ const handleGetProfile = async (req, res) => {
           email: u.email || null,
           gender: u.gender || null,
           interested_in_gender: u.interested_in_gender || null,
-          dob: u.dob || null,
+          dob: u.dob || u.date_of_birth || null,
+          date_of_birth: u.dob || u.date_of_birth || null,
           bio: u.bio || null,
+          about: u.bio || null,
           city: u.city || null,
           state: u.state || null,
           country: u.country || 'India',
@@ -310,6 +336,16 @@ const handleGetProfile = async (req, res) => {
   const combinedData = {
     ...profileData,
     ...detailedData,
+    nickname: profileData.nickname || null,
+    nick_name: profileData.nickname || null,
+    bio: profileData.bio || null,
+    about: profileData.bio || null,
+    city: profileData.city || null,
+    state: profileData.state || null,
+    email: profileData.email || null,
+    dob: profileData.dob || null,
+    date_of_birth: profileData.dob || null,
+    gender: profileData.gender || null,
     kyc_verification: kycVerificationObj,
     kyc_details: kycVerificationObj,
     interest_selection: interestSelectionObj,
@@ -322,6 +358,16 @@ const handleGetProfile = async (req, res) => {
     success: true,
     api_name: 'getProfileCombined',
     message: 'User profile and KYC details fetched successfully',
+    nickname: profileData.nickname || null,
+    nick_name: profileData.nickname || null,
+    bio: profileData.bio || null,
+    about: profileData.bio || null,
+    city: profileData.city || null,
+    state: profileData.state || null,
+    email: profileData.email || null,
+    dob: profileData.dob || null,
+    date_of_birth: profileData.dob || null,
+    gender: profileData.gender || null,
     data: combinedData,
     profile: profileData,
     detailed_profile: {
@@ -329,6 +375,13 @@ const handleGetProfile = async (req, res) => {
       name: profileData.name,
       nickname: profileData.nickname || null,
       nick_name: profileData.nickname || null,
+      email: profileData.email || null,
+      bio: profileData.bio || null,
+      about: profileData.bio || null,
+      city: profileData.city || null,
+      state: profileData.state || null,
+      dob: profileData.dob || null,
+      date_of_birth: profileData.dob || null,
       age: calculatedAge,
       gender: profileData.gender,
       interested_in_gender: interestedGenderVal,
@@ -338,7 +391,6 @@ const handleGetProfile = async (req, res) => {
       total_reviews: detailedData.total_reviews,
       profile_image: profileData.profile_image,
       profile_images: profileData.profile_images,
-      about: detailedData.about,
       interests: detailedData.interests,
       available_for: detailedData.available_for,
       kyc_verification: kycVerificationObj
@@ -368,7 +420,17 @@ const handleDetailedProfileView = async (req, res) => {
 
   // 1. Check MySQL `users` table first so users always see their actual profile data
   try {
-    const userRows = await query(`SELECT * FROM users WHERE id = ? OR phone_number = ? LIMIT 1`, [targetId, rawId]);
+    const authPhone = (req.user ? (req.user.phone_number || '') : '').toString().replace(/^\+91/, '').replace(/^\+/, '');
+    const authFullPhone = (req.user ? (req.user.full_phone_number || req.user.phone_number || '') : '').toString();
+    const authCleanDigits = authPhone.replace(/\D/g, '').slice(-10);
+
+    const uConds = ['id = ?', 'id = ?', 'phone_number = ?', 'phone_number = ?'];
+    const uParams = [targetId, rawId, targetId, rawId];
+    if (authFullPhone) { uConds.push('phone_number = ?'); uParams.push(authFullPhone); }
+    if (authPhone) { uConds.push('phone_number = ?'); uParams.push(authPhone); }
+    if (authCleanDigits && authCleanDigits.length >= 8) { uConds.push('phone_number LIKE ?'); uParams.push(`%${authCleanDigits}`); }
+
+    const userRows = await query(`SELECT * FROM users WHERE ${uConds.join(' OR ')} LIMIT 1`, uParams);
     if (userRows && userRows.length > 0) {
       const u = userRows[0];
       const photoUrl = formatPartnerPhoto(u.profile_image, baseUrl);
@@ -408,6 +470,13 @@ const handleDetailedProfileView = async (req, res) => {
           full_name: u.name || 'User',
           nickname: u.nickname || null,
           nick_name: u.nickname || null,
+          email: u.email || null,
+          bio: u.bio || '',
+          about: u.bio || '',
+          city: u.city || 'Jaipur',
+          state: u.state || 'Rajasthan',
+          dob: u.dob || u.date_of_birth || null,
+          date_of_birth: u.dob || u.date_of_birth || null,
           age: calcAge,
           gender: u.gender || 'Other',
           verified: u.kyc_status === 'APPROVED' || u.kyc_status === 'VERIFIED',
@@ -423,7 +492,6 @@ const handleDetailedProfileView = async (req, res) => {
           profile_images: parsedPhotos,
           photos: parsedPhotos,
           secondary_photos: parsedPhotos.slice(1, 5),
-          about: u.bio || '',
           interests: parsedInterests,
           available_for: []
         }
@@ -465,6 +533,13 @@ const handleDetailedProfileView = async (req, res) => {
           user_id: p.user_id || `usr_${p.id}`,
           name: (p.name || p.full_name || 'Partner').trim(),
           full_name: (p.full_name || p.name || 'Partner').trim(),
+          nickname: p.nickname || null,
+          nick_name: p.nickname || null,
+          email: p.email || null,
+          bio: p.about || `Friendly partner available in ${p.city || 'Jaipur'}.`,
+          about: p.about || `Friendly partner available in ${p.city || 'Jaipur'}.`,
+          city: p.city || 'Jaipur',
+          state: p.state || 'Rajasthan',
           age: p.age || null,
           gender: p.gender || 'Female',
           verified: true,
@@ -480,7 +555,6 @@ const handleDetailedProfileView = async (req, res) => {
           profile_images: parsedPhotos,
           photos: parsedPhotos,
           secondary_photos: parsedPhotos.slice(1, 5),
-          about: p.about || `Friendly partner available in ${p.city || 'Jaipur'}.`,
           interests: parsedInterests,
           available_for: []
         }
@@ -754,6 +828,7 @@ const handleProfileEditCombined = async (req, res) => {
   const dob = body.dob !== undefined ? body.dob : (body.date_of_birth || body.dateOfBirth || body.birth_date || body.birthDate);
   const bio = body.bio !== undefined ? body.bio : (body.about || body.bio_data || body.bioData || body.description);
   const city = body.city !== undefined ? body.city : (body.city_name || body.cityName || body.location || body.area);
+  const state = body.state !== undefined ? body.state : (body.state_name || body.stateName || body.province);
   const document_type = body.document_type || body.documentType || body.doc_type || body.type;
   const document_number = body.document_number || body.documentNumber || body.doc_number || body.number;
   const full_name = body.full_name || body.fullName || body.name;
@@ -794,6 +869,12 @@ const handleProfileEditCombined = async (req, res) => {
     }
   }
 
+  // Declare phone variables BEFORE use (fix variable-hoisting bug)
+  const userFullPhone = (req.user ? (req.user.full_phone_number || req.user.phone_number || '') : '').toString();
+  const userPhone = (req.user ? (req.user.phone_number || '') : '').toString().replace(/^\+91/, '').replace(/^\+/, '');
+  const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
+  const numericUserId = String(userId).replace(/^usr_/, '');
+
   const updatedProfile = {
     ...existingProfile,
     user_id: userId,
@@ -803,8 +884,14 @@ const handleProfileEditCombined = async (req, res) => {
     ...(gender !== undefined && { gender }),
     ...(interested_in_gender !== undefined && { interested_in_gender }),
     ...(dob !== undefined && { dob }),
-    ...(bio !== undefined && { bio }),
+    ...(bio !== undefined && { bio, about: bio }),
     ...(city !== undefined && { city }),
+    ...(state !== undefined && { state }),
+    location: {
+      city: city || existingProfile.city || null,
+      state: state || existingProfile.state || null,
+      country: 'India'
+    },
     ...(profile_image !== undefined ? { profile_image } : (existingProfile.profile_image ? { profile_image: existingProfile.profile_image } : {})),
     ...(profile_images !== undefined ? { profile_images } : (existingProfile.profile_images ? { profile_images: existingProfile.profile_images } : {})),
     ...(kycSubmitted && {
@@ -824,9 +911,6 @@ const handleProfileEditCombined = async (req, res) => {
   if (cleanDigits) userProfilesStore[cleanDigits] = updatedProfile;
 
   // Update MySQL database if available
-  const userFullPhone = (req.user ? (req.user.full_phone_number || req.user.phone_number || '') : '').toString();
-  const userPhone = (req.user ? (req.user.phone_number || '') : '').toString().replace(/^\+91/, '').replace(/^\+/, '');
-  const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
 
   try {
     const setClauses = [];
@@ -839,6 +923,7 @@ const handleProfileEditCombined = async (req, res) => {
     if (interested_in_gender !== undefined) { setClauses.push('interested_in_gender = ?'); setParams.push(interested_in_gender ? String(interested_in_gender).trim() : null); }
     if (dob !== undefined) { setClauses.push('dob = ?'); setParams.push(dob ? String(dob).trim() : null); }
     if (city !== undefined) { setClauses.push('city = ?'); setParams.push(city ? String(city).trim() : null); }
+    if (state !== undefined) { setClauses.push('state = ?'); setParams.push(state ? String(state).trim() : null); }
     if (bio !== undefined) { setClauses.push('bio = ?'); setParams.push(bio ? String(bio).trim() : null); }
     if (profile_image !== undefined) { setClauses.push('profile_image = ?'); setParams.push(profile_image ? String(profile_image).trim() : null); }
     if (profile_images !== undefined) {
@@ -849,14 +934,14 @@ const handleProfileEditCombined = async (req, res) => {
 
     if (setClauses.length > 0) {
       setClauses.push('updated_at = NOW()');
-      const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
-      const updateRes = await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
+      const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
+      const updateRes = await query(sql, [...setParams, userId, numericUserId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
 
       if (!updateRes || updateRes.affectedRows === 0) {
         const photosJson = profile_images !== undefined ? (typeof profile_images === 'string' ? profile_images : JSON.stringify(profile_images)) : (existingProfile.profile_images ? JSON.stringify(existingProfile.profile_images) : null);
         await query(
-          `INSERT INTO users (id, phone_number, name, nickname, email, gender, interested_in_gender, dob, city, bio, profile_image, profile_images, kyc_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO users (id, phone_number, name, nickname, email, gender, interested_in_gender, dob, city, state, bio, profile_image, profile_images, kyc_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE
              name = COALESCE(VALUES(name), users.name),
              nickname = COALESCE(VALUES(nickname), users.nickname),
@@ -865,12 +950,13 @@ const handleProfileEditCombined = async (req, res) => {
              interested_in_gender = COALESCE(VALUES(interested_in_gender), users.interested_in_gender),
              dob = COALESCE(VALUES(dob), users.dob),
              city = COALESCE(VALUES(city), users.city),
+             state = COALESCE(VALUES(state), users.state),
              bio = COALESCE(VALUES(bio), users.bio),
              profile_image = COALESCE(VALUES(profile_image), users.profile_image),
              profile_images = COALESCE(VALUES(profile_images), users.profile_images),
              updated_at = NOW()`,
           [
-            userId,
+            /^\d+$/.test(numericUserId) ? numericUserId : null,
             userFullPhone || userPhone,
             name ? String(name).trim() : 'User',
             nickname ? String(nickname).trim() : null,
@@ -879,12 +965,32 @@ const handleProfileEditCombined = async (req, res) => {
             interested_in_gender ? String(interested_in_gender).trim() : null,
             dob ? String(dob).trim() : null,
             city ? String(city).trim() : null,
+            state ? String(state).trim() : null,
             bio ? String(bio).trim() : null,
             profile_image ? String(profile_image).trim() : (existingProfile.profile_image || null),
             photosJson,
             kycSubmitted ? 'APPROVED' : 'NOT_VERIFIED'
           ]
         );
+      }
+
+      // Also sync to withme_partners if this user is a partner
+      const pClauses = ['updated_at = NOW()'];
+      const pParams = [];
+      if (name !== undefined) { pClauses.push('name = ?', 'full_name = ?'); pParams.push(String(name).trim(), String(name).trim()); }
+      if (nickname !== undefined) { pClauses.push('nickname = ?'); pParams.push(nickname ? String(nickname).trim() : null); }
+      if (email !== undefined) { pClauses.push('email = ?'); pParams.push(email ? String(email).trim() : null); }
+      if (city !== undefined) { pClauses.push('city = ?'); pParams.push(city ? String(city).trim() : null); }
+      if (state !== undefined) { pClauses.push('state = ?'); pParams.push(state ? String(state).trim() : null); }
+      if (bio !== undefined) { pClauses.push('about = ?'); pParams.push(bio ? String(bio).trim() : null); }
+      if (kycSubmitted) { pClauses.push("kyc_status = 'APPROVED'"); }
+
+      if (pClauses.length > 1 && String(userId) !== '2305' && String(userId) !== '391' && String(userId) !== 'usr_203') {
+        await query(
+          `UPDATE withme_partners SET ${pClauses.join(', ')} 
+           WHERE (user_id = ? OR partner_id = ? OR phone_number = ? OR mobile_number = ? OR phone_number LIKE ?) AND partner_id != 'usr_203' AND id != 391`,
+          [...pParams, userId, numericUserId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]
+        ).catch(() => {});
       }
     }
   } catch (err) {
@@ -894,6 +1000,16 @@ const handleProfileEditCombined = async (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Profile details updated successfully',
+    nickname: updatedProfile.nickname || null,
+    nick_name: updatedProfile.nickname || null,
+    bio: updatedProfile.bio || null,
+    about: updatedProfile.bio || null,
+    city: updatedProfile.city || null,
+    state: updatedProfile.state || null,
+    email: updatedProfile.email || null,
+    dob: updatedProfile.dob || null,
+    date_of_birth: updatedProfile.dob || null,
+    gender: updatedProfile.gender || null,
     body: req.body || {},
     request_body: req.body || {},
     received_body: req.body || {},
@@ -923,6 +1039,7 @@ const handleKycSubmit = async (req, res) => {
   const body = (req.method === 'GET' ? req.query : req.body) || {};
 
   const userId = req.user ? (req.user.user_id || req.user.id || 'usr_998877') : 'usr_998877';
+  const numericUserId = String(userId).replace(/^usr_/, '');
   const userPhone = req.user ? (req.user.phone_number || '').toString().replace(/^\+91/, '').replace(/^\+/, '') : '';
   const userFullPhone = req.user ? (req.user.full_phone_number || req.user.phone_number || '').toString() : '';
 
@@ -931,11 +1048,12 @@ const handleKycSubmit = async (req, res) => {
   // Only use values explicitly provided in body — no auto-defaults that overwrite existing DB data
   const name   = body.name || body.full_name || body.fullName || null;
   const nick_name = body.nickname !== undefined ? body.nickname : (body.nick_name !== undefined ? body.nick_name : (body.nickName !== undefined ? body.nickName : null));
-  const email  = body.email || null;                          // NO auto phone@withme.app
-  const gender = body.gender || null;                         // NO auto 'Male' default
+  const email  = body.email || body.email_id || body.emailId || body.emailAddress || null;
+  const gender = body.gender || body.gender_type || body.genderType || null;
   const dob    = body.dob || body.date_of_birth || body.birth_date || null;
-  const city   = body.city || null;
-  const bio    = body.bio || null;
+  const city   = body.city || body.city_name || body.cityName || body.location || body.area || null;
+  const state  = body.state || body.state_name || body.stateName || body.province || null;
+  const bio    = body.bio || body.about || body.bio_data || body.bioData || body.description || null;
 
   const document_type = (
     body.document_type ||
@@ -1019,6 +1137,7 @@ const handleKycSubmit = async (req, res) => {
     ...(gender    && { gender }),
     ...(dob       && { dob }),
     ...(city      && { city }),
+    ...(state     && { state }),
     ...(bio       && { bio }),
     kyc_status: 'APPROVED',
     status: 'APPROVED',
@@ -1038,24 +1157,27 @@ const handleKycSubmit = async (req, res) => {
   try {
     const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
 
-    const setClauses = ["kyc_status = 'APPROVED'", 'updated_at = NOW()'];
+    const setClauses = [];
     const setParams = [];
 
-    if (name)              { setClauses.unshift('name = ?');     setParams.push(name); }
-    if (nick_name !== null) { setClauses.unshift('nickname = ?'); setParams.push(nick_name); }
-    if (email)             { setClauses.unshift('email = ?');    setParams.push(email); }
-    if (gender)            { setClauses.unshift('gender = ?');   setParams.push(gender); }
-    if (dob)               { setClauses.unshift('dob = ?');      setParams.push(dob); }
-    if (city)              { setClauses.unshift('city = ?');     setParams.push(city); }
-    if (bio)               { setClauses.unshift('bio = ?');      setParams.push(bio); }
+    if (name)               { setClauses.push('name = ?');     setParams.push(name); }
+    if (nick_name !== null) { setClauses.push('nickname = ?'); setParams.push(nick_name); }
+    if (email)              { setClauses.push('email = ?');    setParams.push(email); }
+    if (gender)             { setClauses.push('gender = ?');   setParams.push(gender); }
+    if (dob)                { setClauses.push('dob = ?');      setParams.push(dob); }
+    if (city)               { setClauses.push('city = ?');     setParams.push(city); }
+    if (state)              { setClauses.push('state = ?');    setParams.push(state); }
+    if (bio)                { setClauses.push('bio = ?');      setParams.push(bio); }
 
-    const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
-    const updateRes = await query(sql, [...setParams, userId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
+    setClauses.push("kyc_status = 'APPROVED'", 'updated_at = NOW()');
+
+    const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
+    const updateRes = await query(sql, [...setParams, userId, numericUserId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
 
     if (!updateRes || updateRes.affectedRows === 0) {
       await query(
-        `INSERT INTO users (id, phone_number, name, nickname, email, gender, dob, city, bio, kyc_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED')
+        `INSERT INTO users (id, phone_number, name, nickname, email, gender, dob, city, state, bio, kyc_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED')
          ON DUPLICATE KEY UPDATE
            kyc_status = 'APPROVED',
            name = COALESCE(VALUES(name), name),
@@ -1064,10 +1186,27 @@ const handleKycSubmit = async (req, res) => {
            gender = COALESCE(VALUES(gender), gender),
            dob = COALESCE(VALUES(dob), dob),
            city = COALESCE(VALUES(city), city),
+           state = COALESCE(VALUES(state), state),
            bio = COALESCE(VALUES(bio), bio),
            updated_at = NOW()`,
-        [userId, userFullPhone || userPhone, name || 'User', nick_name || null, email || null, gender || null, dob || null, city || null, bio || null]
+        [numericUserId || null, userFullPhone || userPhone, name || 'User', nick_name || null, email || null, gender || null, dob || null, city || null, state || null, bio || null]
       );
+    }
+
+    // Sync non-critical fields to withme_partners for user if partner record exists (never touch Amit 2305 or Priya usr_203 / 391)
+    if (String(userId) !== '2305' && String(userId) !== '391' && String(userId) !== 'usr_203') {
+      const pClauses = [];
+      const pParams = [];
+      if (name) { pClauses.push('name = ?'); pParams.push(name); }
+      if (email) { pClauses.push('email = ?'); pParams.push(email); }
+      if (city) { pClauses.push('city = ?'); pParams.push(city); }
+      if (bio) { pClauses.push('bio = ?'); pParams.push(bio); }
+      if (pClauses.length > 0) {
+        await query(
+          `UPDATE withme_partners SET ${pClauses.join(', ')} WHERE (partner_id = ? OR id = ? OR phone = ? OR phone LIKE ?) AND partner_id != 'usr_203' AND id != 391`,
+          [...pParams, userId, numericUserId, userPhone, `%${cleanDigits.slice(-8)}`]
+        ).catch(() => {});
+      }
     }
 
     await query(
@@ -1098,12 +1237,20 @@ const handleKycSubmit = async (req, res) => {
     otp_status: 'PENDING',
     name,
     full_name: name,
-    nick_name,
+    nickname: nick_name,
+    nick_name: nick_name,
     email,
     gender,
     dob,
     city,
+    state,
     bio,
+    about: bio,
+    location: {
+      city: city || 'New Delhi',
+      state: state || 'Delhi',
+      country: 'India'
+    },
     document_type,
     document_number: rawDocumentNumber,
     aadhaar_number: rawDocumentNumber,

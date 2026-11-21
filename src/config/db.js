@@ -14,7 +14,8 @@ const dbConfig = {
   queueLimit: 0,
   connectTimeout: 5000, // Fast 5s connection timeout to avoid hanging server requests
   enableKeepAlive: true,
-  keepAliveInitialDelay: 10000
+  keepAliveInitialDelay: 10000,
+  timezone: 'Z' // Consistent UTC timestamp handling to prevent timezone mismatch
 };
 
 console.log(`Connecting to MySQL database '${dbConfig.database}' on host '${dbConfig.host}:${dbConfig.port}'...`);

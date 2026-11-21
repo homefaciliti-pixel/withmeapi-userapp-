@@ -83,8 +83,20 @@ const handleAadhaarKycSubmit = async (req, res) => {
 
   try {
     const full_name = body.full_name || body.fullName || body.name || (req.user && req.user.name) || 'User';
-    const nick_name = body.nick_name || body.nickname || 'User';
+    const nick_name = body.nickname !== undefined ? body.nickname : (body.nick_name !== undefined ? body.nick_name : (body.nickName !== undefined ? body.nickName : null));
+    const nickname = nick_name;
+    const email = body.email || body.email_id || body.emailId || body.emailAddress || null;
+    const bio = body.bio || body.about || body.bio_data || body.bioData || body.description || null;
+    const city = body.city || body.city_name || body.cityName || body.location || body.area || null;
+    const state = body.state || body.state_name || body.stateName || body.province || null;
+    const gender = body.gender || body.gender_type || body.genderType || null;
+    const dob = body.dob || body.date_of_birth || body.dateOfBirth || body.birth_date || null;
     const age = body.age;
+
+    const userPhone = (req.user ? (req.user.phone_number || '') : '').toString().replace(/^\+91/, '').replace(/^\+/, '');
+    const userFullPhone = (req.user ? (req.user.full_phone_number || req.user.phone_number || '') : '').toString();
+    const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
+    const numericUserId = String(userId).replace(/^usr_/, '');
 
     const frontFile = req.files && req.files['front_image'] ? req.files['front_image'][0] : null;
     const backFile = req.files && req.files['back_image'] ? req.files['back_image'][0] : null;
@@ -105,10 +117,68 @@ const handleAadhaarKycSubmit = async (req, res) => {
         `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, 'AADHAAR', ?, ?, 'APPROVED')`,
         [userId, cleanAadhaar, full_name]
       );
+
+      const setClauses = ["kyc_status = 'APPROVED'", 'updated_at = NOW()'];
+      const setParams = [];
+
+      if (full_name) { setClauses.push('name = ?'); setParams.push(String(full_name).trim()); }
+      if (nick_name !== null) { setClauses.push('nickname = ?'); setParams.push(String(nick_name).trim()); }
+      if (email) { setClauses.push('email = ?'); setParams.push(String(email).trim()); }
+      if (bio) { setClauses.push('bio = ?'); setParams.push(String(bio).trim()); }
+      if (city) { setClauses.push('city = ?'); setParams.push(String(city).trim()); }
+      if (state) { setClauses.push('state = ?'); setParams.push(String(state).trim()); }
+      if (gender) { setClauses.push('gender = ?'); setParams.push(String(gender).trim()); }
+      if (dob) { setClauses.push('dob = ?'); setParams.push(String(dob).trim()); }
+
+      const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ? OR id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`;
+      const updateRes = await query(sql, [...setParams, userId, numericUserId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
+
+      if (!updateRes || updateRes.affectedRows === 0) {
+        await query(
+          `INSERT INTO users (id, phone_number, name, nickname, email, gender, dob, city, state, bio, kyc_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED')
+           ON DUPLICATE KEY UPDATE
+             kyc_status = 'APPROVED',
+             name = COALESCE(VALUES(name), users.name),
+             nickname = COALESCE(VALUES(nickname), users.nickname),
+             email = COALESCE(VALUES(email), users.email),
+             gender = COALESCE(VALUES(gender), users.gender),
+             dob = COALESCE(VALUES(dob), users.dob),
+             city = COALESCE(VALUES(city), users.city),
+             state = COALESCE(VALUES(state), users.state),
+             bio = COALESCE(VALUES(bio), users.bio),
+             updated_at = NOW()`,
+          [
+            /^\d+$/.test(numericUserId) ? numericUserId : null,
+            userFullPhone || userPhone,
+            full_name || 'User',
+            nick_name || null,
+            email || null,
+            gender || null,
+            dob || null,
+            city || null,
+            state || null,
+            bio || null
+          ]
+        ).catch(() => {});
+      }
+
+      // Also sync to withme_partners if this user is a partner
+      const pClauses = ["kyc_status = 'APPROVED'", 'updated_at = NOW()'];
+      const pParams = [];
+      if (full_name) { pClauses.push('name = ?', 'full_name = ?'); pParams.push(String(full_name).trim(), String(full_name).trim()); }
+      if (nick_name !== null) { pClauses.push('nickname = ?'); pParams.push(String(nick_name).trim()); }
+      if (email) { pClauses.push('email = ?'); pParams.push(String(email).trim()); }
+      if (bio) { pClauses.push('about = ?'); pParams.push(String(bio).trim()); }
+      if (city) { pClauses.push('city = ?'); pParams.push(String(city).trim()); }
+      if (state) { pClauses.push('state = ?'); pParams.push(String(state).trim()); }
+      if (cleanAadhaar) { pClauses.push('aadhar_number = ?'); pParams.push(cleanAadhaar); }
+
       await query(
-        `UPDATE users SET name = COALESCE(?, name), kyc_status = 'APPROVED' WHERE id = ?`,
-        [full_name || null, userId]
-      );
+        `UPDATE withme_partners SET ${pClauses.join(', ')} 
+         WHERE user_id = ? OR partner_id = ? OR phone_number = ? OR mobile_number = ? OR phone_number LIKE ?`,
+        [...pParams, userId, numericUserId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]
+      ).catch(() => {});
     } catch (err) {
       console.warn('MySQL Aadhaar KYC submit notice:', err.message);
     }
@@ -119,7 +189,19 @@ const handleAadhaarKycSubmit = async (req, res) => {
       request_body: body,
       received_body: body,
       full_name,
-      nick_name,
+      name: full_name,
+      nick_name: nick_name || 'User',
+      nickname: nick_name || 'User',
+      email: email || null,
+      bio: bio || null,
+      about: bio || null,
+      city: city || null,
+      state: state || null,
+      location: {
+        city: city || null,
+        state: state || null,
+        country: 'India'
+      },
       aadhaar_number: maskedAadhaar,
       age: age ? parseInt(age) : 25,
       front_url: frontUrl,
@@ -192,11 +274,15 @@ router.post('/otp-verify', authenticateToken, async (req, res) => {
   const { ref_id, otp } = body;
 
   const userId = req.user ? (req.user.id || req.user.user_id || 'usr_998877') : 'usr_998877';
+  const numericUserId = String(userId).replace(/^usr_/, '');
+  const userPhone = req.user ? (req.user.phone_number || '').toString().replace(/^\+91/, '').replace(/^\+/, '') : '';
+  const userFullPhone = req.user ? (req.user.full_phone_number || req.user.phone_number || '').toString() : '';
+  const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
 
   // Update MySQL status
   try {
-    await query(`UPDATE users SET kyc_status = 'VERIFIED' WHERE id = ?`, [userId]);
-    await query(`UPDATE kyc_documents SET status = 'VERIFIED' WHERE user_id = ?`, [userId]);
+    await query(`UPDATE users SET kyc_status = 'VERIFIED', updated_at = NOW() WHERE id = ? OR id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`, [userId, numericUserId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
+    await query(`UPDATE kyc_documents SET status = 'VERIFIED' WHERE user_id = ? OR user_id = ?`, [userId, numericUserId]);
   } catch (err) {
     console.warn('MySQL Aadhaar OTP verify notice:', err.message);
   }

@@ -12,6 +12,58 @@ const getBaseUrl = (req) => {
   return process.env.BASE_URL || 'https://withmeapi-userapp.onrender.com';
 };
 
+/**
+ * Calculate dynamic age from Date of Birth (YYYY-MM-DD or ISO string)
+ */
+function calculateAgeFromDob(dob, fallbackAge = null) {
+  if (dob) {
+    try {
+      const birthDate = new Date(dob);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        if (age >= 18 && age <= 99) {
+          return age;
+        }
+      }
+    } catch (e) {}
+  }
+  if (fallbackAge != null) {
+    const parsed = parseInt(fallbackAge, 10);
+    if (!isNaN(parsed) && parsed >= 18 && parsed <= 99) return parsed;
+  }
+  return null;
+}
+
+/**
+ * Calculate real geographic distance using Haversine formula (km)
+ */
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  const p1Lat = parseFloat(lat1);
+  const p1Lon = parseFloat(lon1);
+  const p2Lat = parseFloat(lat2);
+  const p2Lon = parseFloat(lon2);
+
+  if (isNaN(p1Lat) || isNaN(p1Lon) || isNaN(p2Lat) || isNaN(p2Lon)) {
+    return null;
+  }
+
+  const R = 6371; // Earth radius in km
+  const dLat = (p2Lat - p1Lat) * (Math.PI / 180);
+  const dLon = (p2Lon - p1Lon) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(p1Lat * (Math.PI / 180)) * Math.cos(p2Lat * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  return parseFloat(distance.toFixed(1));
+}
+
 // Pools of unique placeholder images for partners without real photos (all served from /uploads/)
 // Amit and Priya photos are strictly reserved for their own profiles and NEVER used here
 const FEMALE_PLACEHOLDER_POOL = [
@@ -107,10 +159,10 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
 };
 
 // Helper to fetch all registered partners from dedicated MySQL table `withme_partners`
-const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userapp.onrender.com', userCoords = {}) => {
   try {
     const rows = await query(`
-      SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, status, is_approved, is_verified
+      SELECT id, partner_id, user_id, name, full_name, email, mobile_number, phone_number, city, state, locality, address, image, profile_photo_url, gender, dob, age, rating, total_reviews, category, activity, price, currency, about, interests, photos, available_for, latitude, longitude, status, is_approved, is_verified
       FROM withme_partners
       WHERE (status IS NULL OR status NOT IN ('DELETED','REJECTED','SUSPENDED','DUPLICATE_DELETED')) AND is_approved = 1 AND is_verified = 1
       ORDER BY id DESC
@@ -139,6 +191,24 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
       const city = r.city ? r.city.trim() : ''; 
       const locality = r.locality ? r.locality.trim() : ''; 
       const partnerCategory = r.category || r.activity || ''; 
+
+      // Dynamic age calculated from actual date of birth
+      const calculatedAge = calculateAgeFromDob(r.dob, r.age);
+
+      // Dynamic rating from actual database values, no hardcoded fallbacks
+      const rawRating = r.rating != null ? parseFloat(r.rating) : null;
+      const validRating = (rawRating !== null && !isNaN(rawRating) && rawRating > 0) ? rawRating : null;
+      const totalReviews = (r.total_reviews != null && !isNaN(parseInt(r.total_reviews, 10))) ? parseInt(r.total_reviews, 10) : 0;
+
+      // Dynamic distance calculated between user and partner coordinates
+      let distanceStr = null;
+      let distanceKm = null;
+      if (userCoords && userCoords.lat != null && userCoords.lng != null && r.latitude != null && r.longitude != null) {
+        distanceKm = calculateDistanceKm(userCoords.lat, userCoords.lng, r.latitude, r.longitude);
+        if (distanceKm !== null) {
+          distanceStr = `${distanceKm} km away`;
+        }
+      }
 
       let parsedInterests = [];
       try {
@@ -199,7 +269,7 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
         name: (r.name || r.full_name || 'Partner').trim(),
         full_name: (r.full_name || r.name || 'Partner').trim(),
         gender: gender,
-        age: r.age || null,
+        age: calculatedAge,
         city: city,
         location: city,
         address: r.address || `${locality}, ${city}`,
@@ -209,10 +279,11 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
           country: 'India',
           address: r.address || `${locality}, ${city}`
         },
-        rating: parseFloat(r.rating || 4.8),
-        total_reviews: parseInt(r.total_reviews || 120),
+        rating: validRating,
+        total_reviews: totalReviews,
         match_score: '93%',
-        distance: '1.5 km away',
+        distance: distanceStr,
+        distance_km: distanceKm,
         price: partnerPrice,
         currency: 'INR',
         price_type: 'session',
@@ -244,8 +315,16 @@ const getCombinedActivitiesData = async (req) => {
   const baseUrl = getBaseUrl(req);
   const { q = '', location = '', category = '' } = req.query || {};
 
+  // Extract user coordinates for dynamic distance calculation
+  const userLat = (req.query && (req.query.latitude || req.query.lat || req.query.user_lat)) || null;
+  const userLng = (req.query && (req.query.longitude || req.query.lng || req.query.lon || req.query.user_lng)) || null;
+  const userCoords = {
+    lat: userLat !== null && !isNaN(parseFloat(userLat)) ? parseFloat(userLat) : null,
+    lng: userLng !== null && !isNaN(parseFloat(userLng)) ? parseFloat(userLng) : null
+  };
+
   // Fetch real registered partners from MySQL
-  const dbPartners = await fetchRegisteredPartnersFromDb(baseUrl);
+  const dbPartners = await fetchRegisteredPartnersFromDb(baseUrl, userCoords);
 
   const planning_today = [
     { id: 'cat_01', title: 'Coffee', image: `${baseUrl}/uploads/categories/coffee.png` },
@@ -548,7 +627,7 @@ const getCombinedActivitiesData = async (req) => {
 };
 
 // Category Items Data Generator
-const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'https://withmeapi-userapp.onrender.com') => {
+const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'https://withmeapi-userapp.onrender.com', userCoords = {}) => {
   let param = String(categoryIdOrName || 'cat_01').trim().toLowerCase();
   // Popular activity IDs are used by the home screen as well as category IDs.
   // Resolve known activity aliases before querying registered partners.
@@ -563,7 +642,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
     offers: 'cat_07', offer: 'cat_07', 'withme24 offers': 'cat_07'
   };
   param = categoryAliases[param] || param;
-  const dbPartners = await fetchRegisteredPartnersFromDb(baseUrl);
+  const dbPartners = await fetchRegisteredPartnersFromDb(baseUrl, userCoords);
 
   const mapDbPartnersToCategory = (catName, defaultPrice = 499) => {
     const target = catName.toLowerCase().trim();
@@ -1135,7 +1214,16 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
 const handleCategoryDetailsOrList = async (req, res) => {
   const baseUrl = getBaseUrl(req);
   const requestedCat = req.params.id || req.params.category || req.query.category || req.query.id || req.query.category_id || req.query.type || 'cat_01';
-  const data = await getCategoryItemsData(requestedCat, baseUrl);
+
+  // Extract user coordinates for dynamic distance calculation
+  const userLat = (req.query && (req.query.latitude || req.query.lat || req.query.user_lat)) || null;
+  const userLng = (req.query && (req.query.longitude || req.query.lng || req.query.lon || req.query.user_lng)) || null;
+  const userCoords = {
+    lat: userLat !== null && !isNaN(parseFloat(userLat)) ? parseFloat(userLat) : null,
+    lng: userLng !== null && !isNaN(parseFloat(userLng)) ? parseFloat(userLng) : null
+  };
+
+  const data = await getCategoryItemsData(requestedCat, baseUrl, userCoords);
 
   return res.status(200).json({
     success: true,
@@ -1409,7 +1497,7 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
         db_id: r.id,
         name: (r.name || r.full_name || 'Partner').trim(),
         full_name: (r.full_name || r.name || 'Partner').trim(),
-        age: r.age || null,
+        age: calculateAgeFromDob(r.dob, r.age),
         gender: gender,
         verified: true,
         price: partnerPrice,
@@ -1421,8 +1509,8 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
           country: 'India',
           address: r.address || `${locality}, ${city}`
         },
-        rating: parseFloat(r.rating || 4.8),
-        total_reviews: parseInt(r.total_reviews || 120),
+        rating: (r.rating != null && !isNaN(parseFloat(r.rating)) && parseFloat(r.rating) > 0) ? parseFloat(r.rating) : null,
+        total_reviews: (r.total_reviews != null && !isNaN(parseInt(r.total_reviews, 10))) ? parseInt(r.total_reviews, 10) : 0,
         about: r.about || `Friendly partner available in ${city}. Passionate about cafes, meetups, and activities.`,
         profile_image: photoUrl,
         image: photoUrl,

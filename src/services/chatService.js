@@ -42,8 +42,8 @@ function formatISTDateTime(dateInput) {
   } else if (typeof dateInput === 'string') {
     const s = dateInput.trim();
     if (!s.includes('Z') && !s.includes('+') && !s.match(/-\d{2}:\d{2}$/)) {
-      // MySQL datetime string from IST server: 'YYYY-MM-DD HH:mm:ss' is already in IST (+05:30)
-      dateObj = new Date(s.replace(' ', 'T') + '+05:30');
+      // Treat naive DB datetime string as UTC
+      dateObj = new Date(s.replace(' ', 'T') + 'Z');
     } else {
       dateObj = new Date(s);
     }
@@ -350,7 +350,7 @@ async function createOrGetConversation(authenticatedUserId, targetUserId, bookin
     // 2. Create a new conversation scoped to this booking
     try {
       const resConv = await query(
-        `INSERT INTO conversations (type, booking_id, created_at, updated_at) VALUES ('private', ?, NOW(), NOW())`,
+        `INSERT INTO conversations (type, booking_id, created_at, updated_at) VALUES ('private', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
         [bId]
       );
       const dbConvId = Number(resConv.insertId);
@@ -371,7 +371,7 @@ async function createOrGetConversation(authenticatedUserId, targetUserId, bookin
       await ensureBookingIdColumn();
       try {
         const resConv = await query(
-          `INSERT INTO conversations (type, booking_id, created_at, updated_at) VALUES ('private', ?, NOW(), NOW())`,
+          `INSERT INTO conversations (type, booking_id, created_at, updated_at) VALUES ('private', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
           [bId]
         );
         const dbConvId = Number(resConv.insertId);
@@ -453,7 +453,7 @@ async function createOrGetConversation(authenticatedUserId, targetUserId, bookin
 
   try {
     const resConv = await query(
-      `INSERT INTO conversations (type, created_at, updated_at) VALUES ('private', NOW(), NOW())`
+      `INSERT INTO conversations (type, created_at, updated_at) VALUES ('private', UTC_TIMESTAMP(), UTC_TIMESTAMP())`
     );
     const dbConvId = resConv.insertId || newConvId;
 
@@ -830,13 +830,14 @@ async function saveMessage({ conversationId, senderId, receiverId, message, mess
   try {
     const res = await query(
       `INSERT INTO messages (conversation_id, sender_id, receiver_id, message_type, message, is_delivered, is_read, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, 0, UTC_TIMESTAMP())`,
       [convId, sId, rId, messageType, String(message), isDelivered ? 1 : 0]
     );
     if (res.insertId) {
       insertedId = Number(res.insertId);
       msgObj.id = insertedId;
     }
+    await query(`UPDATE conversations SET updated_at = UTC_TIMESTAMP() WHERE id = ?`, [convId]).catch(() => {});
   } catch (err) {
     // Ignore MySQL error
   }

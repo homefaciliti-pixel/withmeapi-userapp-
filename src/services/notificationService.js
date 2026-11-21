@@ -1,4 +1,4 @@
-const https = require('https');
+  const https = require('https');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -219,18 +219,29 @@ async function saveUserFcmToken(userId, fcmToken, deviceType = 'android') {
   // 2. Also update the users table if a matching record exists (belt-and-suspenders)
   try {
     await query(
-      `UPDATE users SET fcm_token = ? WHERE id = ? OR id = ? OR phone_number = ?`,
-      [fcmToken, uId, digits || '', uId]
+      `UPDATE users SET fcm_token = ? WHERE id = ? OR id = ? OR phone_number = ? OR phone_number LIKE ?`,
+      [fcmToken, uId, digits || '', uId, `%${digits.slice(-8)}`]
     );
   } catch (err) {
     // users.fcm_token column may not exist — add it silently then retry
     try {
       await query(`ALTER TABLE users ADD COLUMN fcm_token TEXT DEFAULT NULL`);
       await query(
-        `UPDATE users SET fcm_token = ? WHERE id = ? OR id = ? OR phone_number = ?`,
-        [fcmToken, uId, digits || '', uId]
+        `UPDATE users SET fcm_token = ? WHERE id = ? OR id = ? OR phone_number = ? OR phone_number LIKE ?`,
+        [fcmToken, uId, digits || '', uId, `%${digits.slice(-8)}`]
       );
     } catch (e) { /* Ignore */ }
+  }
+
+  // 3. Also update withme_partners table if a matching partner exists
+  try {
+    await query(
+      `UPDATE withme_partners SET fcm_token = ?, updated_at = NOW()
+       WHERE partner_id = ? OR partner_id = ? OR id = ? OR user_id = ? OR mobile_number = ? OR phone_number = ? OR phone_number LIKE ?`,
+      [fcmToken, uId, formattedId, digits || 0, uId, uId, uId, `%${digits.slice(-8)}`]
+    );
+  } catch (err) {
+    console.warn('[FCM] withme_partners token update notice:', err.message);
   }
 
   return {
@@ -263,11 +274,29 @@ function sanitizeFcmData(data) {
 }
 
 /**
+ * Clear expired or invalid FCM token from database & memory
+ */
+async function clearInvalidFcmToken(token) {
+  if (!token) return;
+  try {
+    await query(`UPDATE users SET fcm_token = NULL WHERE fcm_token = ?`, [token]).catch(() => {});
+    await query(`UPDATE withme_users SET fcm_token = NULL WHERE fcm_token = ?`, [token]).catch(() => {});
+    await query(`UPDATE withme_partners SET fcm_token = NULL WHERE fcm_token = ?`, [token]).catch(() => {});
+    for (const [k, v] of memoryUserTokens.entries()) {
+      if (v && v.fcmToken === token) memoryUserTokens.delete(k);
+    }
+  } catch (e) {}
+}
+
+/**
  * Send push notification via modern Firebase Cloud Messaging HTTP v1 API
  * Falls back to legacy HTTP API if service account is unavailable.
  */
 async function sendFcmPushNotification(fcmToken, title, body, dataPayload = {}) {
   const sanitizedData = sanitizeFcmData(dataPayload);
+  if (!sanitizedData.click_action) {
+    sanitizedData.click_action = 'FLUTTER_NOTIFICATION_CLICK';
+  }
 
   // Try modern FCM HTTP v1 using Service Account JSON
   try {
@@ -282,10 +311,19 @@ async function sendFcmPushNotification(fcmToken, title, body, dataPayload = {}) 
           },
           data: sanitizedData,
           android: {
-            priority: 'high',
+            priority: 'HIGH',
             notification: {
               channel_id: 'chat_messages',
-              sound: 'default'
+              sound: 'default',
+              click_action: 'FLUTTER_NOTIFICATION_CLICK'
+            }
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: 'default',
+                badge: 1
+              }
             }
           }
         }
@@ -307,6 +345,9 @@ async function sendFcmPushNotification(fcmToken, title, body, dataPayload = {}) 
           res.on('end', () => {
             try {
               const parsed = JSON.parse(data);
+              if (res.statusCode === 404 || (parsed && parsed.error && (parsed.error.code === 404 || parsed.error.status === 'NOT_FOUND' || (parsed.error.message && parsed.error.message.includes('UNREGISTERED'))))) {
+                clearInvalidFcmToken(fcmToken);
+              }
               resolve({ sent: res.statusCode === 200, status: res.statusCode, response: parsed });
             } catch (e) {
               resolve({ sent: res.statusCode === 200, status: res.statusCode, raw: data });
@@ -432,8 +473,8 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
     // 3. users table
     try {
       const rows = await query(
-        `SELECT fcm_token FROM users WHERE id = ? OR id = ? OR phone_number = ? LIMIT 1`,
-        [uId, uIdDigits || '', uId]
+        `SELECT fcm_token FROM users WHERE (id = ? OR id = ? OR phone_number = ? OR phone_number LIKE ?) AND fcm_token IS NOT NULL AND fcm_token != '' LIMIT 1`,
+        [uId, uIdDigits || '', uId, `%${uIdDigits.slice(-8)}`]
       );
       if (rows && rows.length > 0 && rows[0].fcm_token) {
         fcmToken = rows[0].fcm_token;
@@ -446,8 +487,8 @@ async function sendNotification({ userId, title, body, data = {}, senderUserId =
     try {
       const pRows = await query(
         `SELECT fcm_token FROM withme_partners 
-         WHERE partner_id = ? OR partner_id = ? OR id = ? OR user_id = ? OR mobile_number = ? LIMIT 1`,
-        [uId, uIdFormatted, uIdDigits || 0, uId, uId]
+         WHERE (partner_id = ? OR partner_id = ? OR id = ? OR user_id = ? OR mobile_number = ? OR phone_number = ? OR phone_number LIKE ?) AND fcm_token IS NOT NULL AND fcm_token != '' LIMIT 1`,
+        [uId, uIdFormatted, uIdDigits || 0, uId, uId, uId, `%${uIdDigits.slice(-8)}`]
       );
       if (pRows && pRows.length > 0 && pRows[0].fcm_token) {
         fcmToken = pRows[0].fcm_token;
@@ -688,6 +729,11 @@ async function sendEventNotification(eventType, params = {}) {
 
     // Resolve sender info for user_name and user_photo_url
     const senderUserId = params.sender_id || params.senderId || params.from_user_id || null;
+
+    // Sender exclusion: sender must NEVER receive notification for their own message or action
+    if (senderUserId && String(senderUserId).trim() === String(recipientId).trim()) {
+      return { sent: false, reason: "SENDER_EXCLUDED" };
+    }
     let resolvedName = params.name || params.customer_name || params.sender_name || null;
     let resolvedPhoto = params.user_photo_url || params.photo_url || params.profile_image || null;
 
