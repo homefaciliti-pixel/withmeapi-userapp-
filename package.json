@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node tests/backend_verification.test.js && node tests/category_filter.test.js && node tests/image_persistence.test.js && node tests/user_audit_fixes.test.js && node tests/audit_five_issues.test.js && node tests/profile_and_partner_fixes.test.js"
+    "test": "node tests/backend_verification.test.js && node tests/category_filter.test.js && node tests/image_persistence.test.js && node tests/user_audit_fixes.test.js && node tests/audit_five_issues.test.js && node tests/profile_and_partner_fixes.test.js && node tests/idfy_aadhaar_verification.test.js"
   },
   "keywords": [
     "witme",

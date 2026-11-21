@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 const { query } = require('../config/db');
+const idfyAadhaarService = require('../services/idfyAadhaarService');
 
 const getBaseUrl = (req) => {
   if (req) {
@@ -98,8 +101,11 @@ const handleAadhaarKycSubmit = async (req, res) => {
     const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
     const numericUserId = String(userId).replace(/^usr_/, '');
 
-    const frontFile = req.files && req.files['front_image'] ? req.files['front_image'][0] : null;
-    const backFile = req.files && req.files['back_image'] ? req.files['back_image'][0] : null;
+    const frontFile = req.files && (req.files['front_image']?.[0] || req.files['aadhaar_front']?.[0] || req.files['document1']?.[0] || req.files['front']?.[0]) || null;
+    const backFile = req.files && (req.files['back_image']?.[0] || req.files['aadhaar_back']?.[0] || req.files['document2']?.[0] || req.files['back']?.[0]) || null;
+
+    if (frontFile) persistUploadedFile(frontFile);
+    if (backFile) persistUploadedFile(backFile);
 
     const frontUrl = frontFile
       ? `${baseUrl}/uploads/${frontFile.filename}`
@@ -183,6 +189,30 @@ const handleAadhaarKycSubmit = async (req, res) => {
       console.warn('MySQL Aadhaar KYC submit notice:', err.message);
     }
 
+    // Submit async task to IDfy for OCR extraction if real image provided
+    let idfyTask = null;
+    try {
+      const docFront = frontFile ? `${baseUrl}/uploads/${frontFile.filename}` : (body.front_url || body.aadhaar_front_url || body.document1);
+      const docBack = backFile ? `${baseUrl}/uploads/${backFile.filename}` : (body.back_url || body.aadhaar_back_url || body.document2);
+      if (docFront && !docFront.includes('mock_aadhaar')) {
+        const idfyRes = await idfyAadhaarService.submitAadhaarOcrTask({
+          frontDocument: docFront,
+          backDocument: docBack,
+          taskId: `adh_${cleanAadhaar}_${Date.now()}`
+        });
+        if (idfyRes && idfyRes.request_id) {
+          idfyTask = {
+            request_id: idfyRes.request_id,
+            status: idfyRes.status || 'queued',
+            provider: 'IDFY',
+            endpoint: `${idfyAadhaarService.IDFY_BASE_URL}/v3/tasks/async/extract/ind_aadhaar`
+          };
+        }
+      }
+    } catch (idfyErr) {
+      console.warn('IDfy Aadhaar submit notice:', idfyErr.message);
+    }
+
     const resultData = {
       ...body,
       body: body,
@@ -206,6 +236,7 @@ const handleAadhaarKycSubmit = async (req, res) => {
       age: age ? parseInt(age) : 25,
       front_url: frontUrl,
       back_url: backUrl,
+      idfy_task: idfyTask,
       status: 'APPROVED',
       kyc_status: 'APPROVED',
       approval_status: 'APPROVED',
@@ -249,6 +280,33 @@ const handleAadhaarKycSubmit = async (req, res) => {
     activeLocks.delete(lockKey);
   }
 };
+
+const persistUploadedFile = async (file) => {
+  if (!file || !file.path) return;
+  try {
+    if (fs.existsSync(file.path)) {
+      const buf = fs.readFileSync(file.path);
+      await query(
+        `INSERT INTO withme_uploaded_files (filename, mimetype, data, size) VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE data = VALUES(data), size = VALUES(size), mimetype = VALUES(mimetype)`,
+        [file.filename, file.mimetype || 'image/jpeg', buf, buf.length]
+      );
+    }
+  } catch (err) {
+    console.warn('File persistence notice:', err.message);
+  }
+};
+
+const uploadFields = upload.fields([
+  { name: 'front_image', maxCount: 1 },
+  { name: 'back_image', maxCount: 1 },
+  { name: 'aadhaar_front', maxCount: 1 },
+  { name: 'aadhaar_back', maxCount: 1 },
+  { name: 'document1', maxCount: 1 },
+  { name: 'document2', maxCount: 1 },
+  { name: 'front', maxCount: 1 },
+  { name: 'back', maxCount: 1 }
+]);
 
 const safeUploadFields = (req, res, next) => {
   const contentType = (req.headers['content-type'] || '').toLowerCase();
@@ -311,5 +369,143 @@ router.post('/otp-verify', authenticateToken, async (req, res) => {
     data: detailsData
   });
 });
+
+// 3. IDfy Aadhaar OCR Extraction (Synchronous / Full extraction with auto DB update)
+const handleAadhaarExtract = async (req, res) => {
+  const baseUrl = getBaseUrl(req);
+  const body = req.body || {};
+  const frontFile = req.files && (req.files['front_image']?.[0] || req.files['aadhaar_front']?.[0] || req.files['document1']?.[0] || req.files['front']?.[0]);
+  const backFile = req.files && (req.files['back_image']?.[0] || req.files['aadhaar_back']?.[0] || req.files['document2']?.[0] || req.files['back']?.[0]);
+
+  if (frontFile) persistUploadedFile(frontFile);
+  if (backFile) persistUploadedFile(backFile);
+
+  const frontDoc = frontFile
+    ? `${baseUrl}/uploads/${frontFile.filename}`
+    : (body.front_url || body.aadhaar_front_url || body.document1 || body.front_image || body.front);
+  const backDoc = backFile
+    ? `${baseUrl}/uploads/${backFile.filename}`
+    : (body.back_url || body.aadhaar_back_url || body.document2 || body.back_image || body.back);
+
+  if (!frontDoc) {
+    return res.status(400).json({
+      success: false,
+      message: 'Front image of Aadhaar card is required (document1 / front_url / front_image / file)'
+    });
+  }
+
+  try {
+    const ocrResult = await idfyAadhaarService.extractAadhaarDetails({
+      frontDocument: frontDoc,
+      backDocument: backDoc,
+      maxAttempts: 4,
+      delayMs: 2000
+    });
+
+    const userId = req.user ? (req.user.id || req.user.user_id || 'usr_998877') : 'usr_998877';
+    const numericUserId = String(userId).replace(/^usr_/, '');
+
+    if (ocrResult && ocrResult.success && ocrResult.data) {
+      const d = ocrResult.data;
+      if (d.aadhaar_number) {
+        await query(
+          `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, 'AADHAAR', ?, ?, 'APPROVED')`,
+          [userId, d.aadhaar_number, d.name || 'User']
+        ).catch(() => {});
+      }
+      const uClauses = ["kyc_status = 'APPROVED'", 'updated_at = NOW()'];
+      const uParams = [];
+      if (d.name) { uClauses.push('name = ?'); uParams.push(d.name); }
+      if (d.dob) { uClauses.push('dob = ?'); uParams.push(d.dob); }
+      if (d.gender) { uClauses.push('gender = ?'); uParams.push(d.gender); }
+      await query(`UPDATE users SET ${uClauses.join(', ')} WHERE id = ? OR id = ?`, [...uParams, userId, numericUserId]).catch(() => {});
+    }
+
+    return res.status(200).json({
+      success: true,
+      provider: 'IDFY',
+      endpoint: `${idfyAadhaarService.IDFY_BASE_URL}/v3/tasks/async/extract/ind_aadhaar`,
+      ...ocrResult
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: 'IDfy Aadhaar OCR extraction failed',
+      error: err.message
+    });
+  }
+};
+
+router.post('/extract', authenticateToken, safeUploadFields, handleAadhaarExtract);
+router.post('/idfy/extract', authenticateToken, safeUploadFields, handleAadhaarExtract);
+router.post('/ocr', authenticateToken, safeUploadFields, handleAadhaarExtract);
+router.post('/idfy/ocr', authenticateToken, safeUploadFields, handleAadhaarExtract);
+
+// 4. Submit Async Task to IDfy (Returns request_id immediately for asynchronous polling)
+const handleCreateTask = async (req, res) => {
+  const baseUrl = getBaseUrl(req);
+  const body = req.body || {};
+  const frontFile = req.files && (req.files['front_image']?.[0] || req.files['aadhaar_front']?.[0] || req.files['document1']?.[0] || req.files['front']?.[0]);
+  const backFile = req.files && (req.files['back_image']?.[0] || req.files['aadhaar_back']?.[0] || req.files['document2']?.[0] || req.files['back']?.[0]);
+
+  if (frontFile) persistUploadedFile(frontFile);
+  if (backFile) persistUploadedFile(backFile);
+
+  const frontDoc = frontFile
+    ? `${baseUrl}/uploads/${frontFile.filename}`
+    : (body.front_url || body.aadhaar_front_url || body.document1 || body.front_image || body.front);
+  const backDoc = backFile
+    ? `${baseUrl}/uploads/${backFile.filename}`
+    : (body.back_url || body.aadhaar_back_url || body.document2 || body.back_image || body.back);
+
+  if (!frontDoc) {
+    return res.status(400).json({
+      success: false,
+      message: 'document1 or front_image is required'
+    });
+  }
+
+  const result = await idfyAadhaarService.submitAadhaarOcrTask({
+    frontDocument: frontDoc,
+    backDocument: backDoc,
+    taskId: body.task_id,
+    groupId: body.group_id
+  });
+
+  return res.status(result.success ? 202 : 400).json({
+    provider: 'IDFY',
+    endpoint: `${idfyAadhaarService.IDFY_BASE_URL}/v3/tasks/async/extract/ind_aadhaar`,
+    ...result
+  });
+};
+
+router.post('/task', authenticateToken, safeUploadFields, handleCreateTask);
+router.post('/tasks', authenticateToken, safeUploadFields, handleCreateTask);
+router.post('/idfy/task', authenticateToken, safeUploadFields, handleCreateTask);
+router.post('/idfy/tasks', authenticateToken, safeUploadFields, handleCreateTask);
+
+// 5. Query IDfy Task Status
+const handleGetTaskStatus = async (req, res) => {
+  const requestId = req.query.request_id || req.query.requestId || req.query.task_id || req.params.id;
+  if (!requestId) {
+    return res.status(400).json({
+      success: false,
+      message: 'request_id is required'
+    });
+  }
+
+  const result = await idfyAadhaarService.getTaskStatus(requestId);
+  return res.status(result.success ? 200 : 400).json({
+    provider: 'IDFY',
+    ...result
+  });
+};
+
+router.get('/task-status', authenticateToken, handleGetTaskStatus);
+router.get('/tasks', authenticateToken, handleGetTaskStatus);
+router.get('/tasks/:id', authenticateToken, handleGetTaskStatus);
+router.get('/status', authenticateToken, handleGetTaskStatus);
+router.get('/idfy/task-status', authenticateToken, handleGetTaskStatus);
+router.get('/idfy/tasks/:id', authenticateToken, handleGetTaskStatus);
 
 module.exports = router;

@@ -182,6 +182,7 @@ app.use('/api/v1/kyc', profileKycRoutes);
 app.use('/api/kyc', profileKycRoutes);
 app.use('/kyc', profileKycRoutes);
 app.use('/api/v1/aadhaar', aadhaarRoutes);
+app.use('/api/aadhaar', aadhaarRoutes);
 app.use('/aadhaar', aadhaarRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/uploads', uploadRoutes);
