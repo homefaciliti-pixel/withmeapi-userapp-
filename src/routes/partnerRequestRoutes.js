@@ -2,6 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { query, ensureColumnExists } = require('../config/db');
+let _notifService = null;
+const getNotifService = () => {
+  if (!_notifService) {
+    try { _notifService = require('../services/notificationService'); } catch (e) {}
+  }
+  return _notifService;
+};
 
 // Helper: extract numeric id from any format e.g. 'usr_2346' -> 2346, '101' -> 101
 const formatNumericUserId = (rawId) => {
@@ -586,6 +593,9 @@ const handleSendRequest = async (req, res) => {
   } catch (e) {}
   if (!partnerName || partnerName === senderName) partnerName = 'Partner';
 
+  // Generate unique request ID for this send-request call
+  const requestId = req.body.request_id || `REQ${Date.now()}${Math.floor(Math.random() * 9000) + 1000}`;
+
   const newRequest = {
     id: requestId,
     request_id: requestId,
@@ -624,8 +634,10 @@ const handleSendRequest = async (req, res) => {
   try {
     const locationStr = typeof location === 'string' ? location : JSON.stringify(location);
     // Ensure partner_name and partner_avatar columns exist (idempotent)
-    ensureColumnExists(null, 'withme_partner_requests', 'partner_name', 'VARCHAR(150)').catch(() => {});
-    ensureColumnExists(null, 'withme_partner_requests', 'partner_avatar', 'VARCHAR(255)').catch(() => {});
+    try {
+      await ensureColumnExists(null, 'withme_partner_requests', 'partner_name', 'VARCHAR(150)');
+      await ensureColumnExists(null, 'withme_partner_requests', 'partner_avatar', 'VARCHAR(255)');
+    } catch (e) {}
 
     await query(
       `INSERT INTO withme_partner_requests (
@@ -698,6 +710,38 @@ const handleSendRequest = async (req, res) => {
       description: message
     }
   }).catch(() => {});
+
+  // 3. Direct FCM Push Notification to Partner's device
+  try {
+    const notifService = getNotifService();
+    if (notifService && notifService.sendNotification) {
+      notifService.sendNotification({
+        userId: effectivePartnerId,
+        title: `New Request from ${senderName}`,
+        body: `${senderName} wants to connect for ${actName}!`,
+        data: {
+          type: 'partner_request',
+          request_id: requestId,
+          booking_id: generatedBookingId,
+          sender_id: senderId,
+          sender_name: senderName,
+          partner_id: String(effectivePartnerId),
+          activity: actName,
+          date: date,
+          time: time,
+          location: typeof location === 'string' ? location : (location.address || 'Jaipur'),
+          message: message
+        },
+        senderUserId: senderId,
+        userName: senderName,
+        userPhotoUrl: senderAvatar
+      }).catch((notifErr) => {
+        console.warn('[FCM] Partner request notification notice:', notifErr.message);
+      });
+    }
+  } catch (err) {
+    console.warn('[FCM] Partner notification dispatch notice:', err.message);
+  }
 
   return res.status(200).json({
     success: true,
