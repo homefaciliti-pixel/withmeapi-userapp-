@@ -141,7 +141,8 @@ const initializeDatabaseTables = async () => {
       { name: 'interests', definition: 'TEXT DEFAULT NULL' },
       { name: 'available_for', definition: 'TEXT DEFAULT NULL' },
       { name: 'state', definition: 'VARCHAR(100) DEFAULT NULL' },
-      { name: 'country', definition: "VARCHAR(100) DEFAULT 'India'" }
+      { name: 'country', definition: "VARCHAR(100) DEFAULT 'India'" },
+      { name: 'age', definition: 'INT DEFAULT NULL' }
     ]);
 
     // Safe column modifications (MODIFY COLUMN is idempotent in MySQL)

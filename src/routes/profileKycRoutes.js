@@ -1,7 +1,124 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const upload = require('../middleware/uploadMiddleware');
 const { authenticateToken } = require('../middleware/authMiddleware');
-const { query } = require('../config/db');
+const { query, ensureColumnExists } = require('../config/db');
+
+const uploadsDir = path.join(__dirname, '../../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Safe Multipart Upload Middleware for Profile Edit
+const safeUploadAny = (req, res, next) => {
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+  if (contentType.includes('multipart/form-data')) {
+    upload.any()(req, res, (err) => {
+      if (err) {
+        console.warn('Multer upload error:', err.message);
+        return res.status(400).json({
+          success: false,
+          message: `File upload error: ${err.message}`
+        });
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+};
+
+// Accurate age calculation from DOB helper
+const calculateAge = (dobStr) => {
+  if (!dobStr) return null;
+  try {
+    const clean = String(dobStr).trim();
+    let birthDate;
+    if (/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(clean)) {
+      const parts = clean.split(/[-/]/);
+      birthDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    } else if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(clean)) {
+      const parts = clean.split(/[-/]/);
+      birthDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else {
+      birthDate = new Date(clean);
+    }
+    if (isNaN(birthDate.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return (age >= 0 && age <= 120) ? age : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+// Base64 image decoding and persistent storage
+const saveBase64Image = async (rawBase64, baseUrl) => {
+  if (!rawBase64 || typeof rawBase64 !== 'string') return null;
+  if (!rawBase64.startsWith('data:image') && !rawBase64.includes(';base64,')) return null;
+
+  try {
+    const matches = rawBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    let ext = '.jpg';
+    let mime = 'image/jpeg';
+    let buffer;
+
+    if (matches && matches.length === 3) {
+      mime = matches[1];
+      if (mime.includes('png')) ext = '.png';
+      else if (mime.includes('webp')) ext = '.webp';
+      else ext = '.jpg';
+      buffer = Buffer.from(matches[2], 'base64');
+    } else {
+      buffer = Buffer.from(rawBase64, 'base64');
+    }
+
+    const filename = `profile-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    try {
+      await query(
+        `INSERT INTO withme_uploaded_files (filename, mimetype, data, size) VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE data = VALUES(data), size = VALUES(size), mimetype = VALUES(mimetype)`,
+        [filename, mime, buffer, buffer.length]
+      );
+    } catch (e) {
+      console.warn('MySQL upload persistence notice:', e.message);
+    }
+
+    return `${baseUrl}/uploads/${filename}`;
+  } catch (err) {
+    console.warn('saveBase64Image notice:', err.message);
+    return null;
+  }
+};
+
+// Persist uploaded file to MySQL for container restarts
+const persistUploadedFile = async (fileObj, baseUrl) => {
+  if (!fileObj || !fileObj.filename) return null;
+  const filename = fileObj.filename;
+  const filePath = path.join(uploadsDir, filename);
+  try {
+    if (fs.existsSync(filePath)) {
+      const buf = fs.readFileSync(filePath);
+      await query(
+        `INSERT INTO withme_uploaded_files (filename, mimetype, data, size) VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE data = VALUES(data), size = VALUES(size), mimetype = VALUES(mimetype)`,
+        [filename, fileObj.mimetype || 'image/jpeg', buf, buf.length]
+      );
+    }
+  } catch (e) {
+    console.warn('MySQL upload persistence notice:', e.message);
+  }
+  return `${baseUrl}/uploads/${filename}`;
+};
 
 const getBaseUrl = (req) => {
   if (req) {
@@ -60,19 +177,39 @@ const handleGetProfile = async (req, res) => {
   let profileData = {
     user_id: userId,
     name: 'User',
+    full_name: 'User',
+    fullName: 'User',
+    nickname: null,
+    nick_name: null,
     country_code: userCountryCode,
     phone_number: userPhone,
+    mobile_number: userPhone,
+    mobile: userPhone,
+    phone: userPhone,
     full_phone_number: userFullPhone,
+    is_mobile_editable: false,
+    is_phone_editable: false,
+    mobile_number_uneditable: true,
+    phone_uneditable: true,
     email: null,
     gender: null,
     interested_in_gender: null,
     dob: null,
+    date_of_birth: null,
+    age: null,
     bio: null,
+    about: null,
     city: null,
     state: null,
     country: 'India',
     profile_image: null,
+    image: null,
+    avatar: null,
+    photo_url: null,
     profile_images: [],
+    profileImages: [],
+    photos: [],
+    images: [],
     is_photo_verified: false,
     photo_verification_status: 'NOT_VERIFIED',
     is_kyc_completed: false,
@@ -211,28 +348,46 @@ const handleGetProfile = async (req, res) => {
 
         const isKycApproved = u.kyc_status === 'APPROVED' || u.kyc_status === 'VERIFIED';
 
+        let dbAge = u.age ? parseInt(u.age, 10) : null;
+        if (!dbAge && (u.dob || u.date_of_birth)) {
+          dbAge = calculateAge(u.dob || u.date_of_birth);
+        }
+
         // Build profile ONLY from DB data — no hardcoded fallbacks for user-specific fields
         profileData = {
           user_id: u.id || userId,
           name: u.name || 'User',
+          full_name: u.name || 'User',
+          fullName: u.name || 'User',
           nickname: u.nickname || null,
           nick_name: u.nickname || null,
           country_code: userCountryCode,
           phone_number: dbPhone || userPhone,
+          mobile_number: dbPhone || userPhone,
+          mobile: dbPhone || userPhone,
+          phone: dbPhone || userPhone,
           full_phone_number: u.phone_number
             ? (u.phone_number.startsWith('+') ? u.phone_number : `${userCountryCode}${dbPhone}`)
             : userFullPhone,
+          is_mobile_editable: false,
+          is_phone_editable: false,
+          mobile_number_uneditable: true,
+          phone_uneditable: true,
           email: u.email || null,
           gender: u.gender || null,
           interested_in_gender: u.interested_in_gender || null,
           dob: u.dob || u.date_of_birth || null,
           date_of_birth: u.dob || u.date_of_birth || null,
+          age: dbAge,
           bio: u.bio || null,
           about: u.bio || null,
           city: u.city || null,
           state: u.state || null,
           country: u.country || 'India',
           profile_image: dbProfileImage,
+          image: dbProfileImage,
+          avatar: dbProfileImage,
+          photo_url: dbProfileImage,
           profile_images: dbProfileImages,
           profileImages: dbProfileImages,
           photos: dbProfileImages,
@@ -280,7 +435,14 @@ const handleGetProfile = async (req, res) => {
                           (cleanDigits ? userProfilesStore[cleanDigits] : null) || {};
 
   if (inMemoryProfile && Object.keys(inMemoryProfile).length > 0) {
-    if (inMemoryProfile.name) profileData.name = inMemoryProfile.name;
+    if (inMemoryProfile.name) {
+      profileData.name = inMemoryProfile.name;
+      profileData.full_name = inMemoryProfile.name;
+      profileData.fullName = inMemoryProfile.name;
+    }
+    if (inMemoryProfile.age !== undefined && inMemoryProfile.age !== null) {
+      profileData.age = inMemoryProfile.age;
+    }
     if (inMemoryProfile.nickname) {
       profileData.nickname = inMemoryProfile.nickname;
       profileData.nick_name = inMemoryProfile.nickname;
@@ -291,11 +453,30 @@ const handleGetProfile = async (req, res) => {
     if (inMemoryProfile.email) profileData.email = inMemoryProfile.email;
     if (inMemoryProfile.gender) profileData.gender = inMemoryProfile.gender;
     if (inMemoryProfile.interested_in_gender) profileData.interested_in_gender = inMemoryProfile.interested_in_gender;
-    if (inMemoryProfile.dob) profileData.dob = inMemoryProfile.dob;
-    if (inMemoryProfile.bio) profileData.bio = inMemoryProfile.bio;
+    if (inMemoryProfile.dob) {
+      profileData.dob = inMemoryProfile.dob;
+      profileData.date_of_birth = inMemoryProfile.dob;
+    }
+    if (inMemoryProfile.bio) {
+      profileData.bio = inMemoryProfile.bio;
+      profileData.about = inMemoryProfile.bio;
+    } else if (inMemoryProfile.about) {
+      profileData.bio = inMemoryProfile.about;
+      profileData.about = inMemoryProfile.about;
+    }
     if (inMemoryProfile.city) profileData.city = inMemoryProfile.city;
-    if (inMemoryProfile.profile_image) profileData.profile_image = inMemoryProfile.profile_image;
-    if (inMemoryProfile.profile_images && inMemoryProfile.profile_images.length > 0) profileData.profile_images = inMemoryProfile.profile_images;
+    if (inMemoryProfile.profile_image) {
+      profileData.profile_image = inMemoryProfile.profile_image;
+      profileData.image = inMemoryProfile.profile_image;
+      profileData.avatar = inMemoryProfile.profile_image;
+      profileData.photo_url = inMemoryProfile.profile_image;
+    }
+    if (inMemoryProfile.profile_images && inMemoryProfile.profile_images.length > 0) {
+      profileData.profile_images = inMemoryProfile.profile_images;
+      profileData.profileImages = inMemoryProfile.profile_images;
+      profileData.photos = inMemoryProfile.profile_images;
+      profileData.images = inMemoryProfile.profile_images;
+    }
     if (inMemoryProfile.kyc_status && inMemoryProfile.kyc_status !== 'NOT_VERIFIED') {
       profileData.kyc_status = inMemoryProfile.kyc_status;
       profileData.is_kyc_completed = true;
@@ -345,17 +526,12 @@ const handleGetProfile = async (req, res) => {
     interest: interestedGenderVal
   };
 
-  // Calculate dynamic age from DOB if available
-  let calculatedAge = null;
-  if (profileData.dob) {
-    const parts = profileData.dob.split('-');
-    if (parts.length === 3) {
-      const birthYear = parseInt(parts[0]);
-      if (!isNaN(birthYear) && birthYear > 1940 && birthYear < 2015) {
-        calculatedAge = new Date().getFullYear() - birthYear;
-      }
-    }
+  // Calculate dynamic age from DOB if available, or fallback to DB age
+  let calculatedAge = profileData.age;
+  if (!calculatedAge && profileData.dob) {
+    calculatedAge = calculateAge(profileData.dob);
   }
+  profileData.age = calculatedAge;
 
   const detailedData = {
     location: {
@@ -373,16 +549,33 @@ const handleGetProfile = async (req, res) => {
   const combinedData = {
     ...profileData,
     ...detailedData,
+    name: profileData.name || 'User',
+    full_name: profileData.name || 'User',
+    fullName: profileData.name || 'User',
+    age: calculatedAge,
+    mobile_number: profileData.phone_number,
+    phone_number: profileData.phone_number,
+    mobile: profileData.phone_number,
+    phone: profileData.phone_number,
+    is_mobile_editable: false,
+    is_phone_editable: false,
+    mobile_number_uneditable: true,
+    phone_uneditable: true,
+    email: profileData.email || null,
+    city: profileData.city || null,
+    gender: profileData.gender || null,
+    about: profileData.bio || null,
+    bio: profileData.bio || null,
     nickname: profileData.nickname || null,
     nick_name: profileData.nickname || null,
-    bio: profileData.bio || null,
-    about: profileData.bio || null,
-    city: profileData.city || null,
-    state: profileData.state || null,
-    email: profileData.email || null,
     dob: profileData.dob || null,
     date_of_birth: profileData.dob || null,
-    gender: profileData.gender || null,
+    profile_image: profileData.profile_image || null,
+    image: profileData.profile_image || null,
+    avatar: profileData.profile_image || null,
+    photo_url: profileData.profile_image || null,
+    profile_images: profileData.profile_images || [],
+    photos: profileData.profile_images || [],
     kyc_verification: kycVerificationObj,
     kyc_details: kycVerificationObj,
     interest_selection: interestSelectionObj,
@@ -395,31 +588,57 @@ const handleGetProfile = async (req, res) => {
     success: true,
     api_name: 'getProfileCombined',
     message: 'User profile and KYC details fetched successfully',
+    name: profileData.name || 'User',
+    full_name: profileData.name || 'User',
+    fullName: profileData.name || 'User',
+    age: calculatedAge,
+    mobile_number: profileData.phone_number,
+    phone_number: profileData.phone_number,
+    mobile: profileData.phone_number,
+    phone: profileData.phone_number,
+    full_phone_number: profileData.full_phone_number,
+    is_mobile_editable: false,
+    is_phone_editable: false,
+    mobile_number_uneditable: true,
+    phone_uneditable: true,
+    email: profileData.email || null,
+    city: profileData.city || null,
+    gender: profileData.gender || null,
+    about: profileData.bio || null,
+    bio: profileData.bio || null,
     nickname: profileData.nickname || null,
     nick_name: profileData.nickname || null,
-    bio: profileData.bio || null,
-    about: profileData.bio || null,
-    city: profileData.city || null,
-    state: profileData.state || null,
-    email: profileData.email || null,
     dob: profileData.dob || null,
     date_of_birth: profileData.dob || null,
-    gender: profileData.gender || null,
+    profile_image: profileData.profile_image || null,
+    image: profileData.profile_image || null,
+    avatar: profileData.profile_image || null,
+    photo_url: profileData.profile_image || null,
+    profile_images: profileData.profile_images || [],
+    photos: profileData.profile_images || [],
     data: combinedData,
     profile: profileData,
     detailed_profile: {
       id: profileData.user_id,
       name: profileData.name,
+      full_name: profileData.name,
+      fullName: profileData.name,
+      age: calculatedAge,
+      mobile_number: profileData.phone_number,
+      phone_number: profileData.phone_number,
+      is_mobile_editable: false,
+      is_phone_editable: false,
+      mobile_number_uneditable: true,
+      phone_uneditable: true,
+      email: profileData.email || null,
       nickname: profileData.nickname || null,
       nick_name: profileData.nickname || null,
-      email: profileData.email || null,
       bio: profileData.bio || null,
       about: profileData.bio || null,
       city: profileData.city || null,
       state: profileData.state || null,
       dob: profileData.dob || null,
       date_of_birth: profileData.dob || null,
-      age: calculatedAge,
       gender: profileData.gender,
       interested_in_gender: interestedGenderVal,
       verified: profileData.is_photo_verified,
@@ -427,7 +646,11 @@ const handleGetProfile = async (req, res) => {
       rating: detailedData.rating,
       total_reviews: detailedData.total_reviews,
       profile_image: profileData.profile_image,
+      image: profileData.profile_image,
+      avatar: profileData.profile_image,
+      photo_url: profileData.profile_image,
       profile_images: profileData.profile_images,
+      photos: profileData.profile_images,
       interests: detailedData.interests,
       available_for: detailedData.available_for,
       kyc_verification: kycVerificationObj
@@ -447,6 +670,7 @@ router.get('/profile/full-details', authenticateToken, handleGetProfile);
 // 1. getProfile API — GET (/getProfile and /profile)
 router.get('/getProfile', authenticateToken, handleGetProfile);
 router.get('/profile', authenticateToken, handleGetProfile);
+router.get('/', authenticateToken, handleGetProfile);
 
 // 2. Profile Details API (With Profile Image List array & available_for) — GET
 const handleDetailedProfileView = async (req, res) => {
@@ -842,15 +1066,26 @@ router.post('/interest-selection', authenticateToken, handleInterestSelection);
 
 // 4. Combined Profile Edit / Update API (Handles Profile Fields, Interest Selection & KYC Submit in 1 Call) — POST / PUT / PATCH
 const handleProfileEditCombined = async (req, res) => {
+  const baseUrl = getBaseUrl(req);
   const userId = req.user ? (req.user.user_id || req.user.id || 'usr_998877') : 'usr_998877';
   const existingProfile = userProfilesStore[userId] || {};
   const body = req.body || {};
 
-  // Extract all possible field name aliases
-  const name = body.name !== undefined ? body.name : (body.full_name || body.fullName);
+  // Extract all 10 fields and aliases
+  // 1- Full Name
+  const name = body.name !== undefined ? body.name : (body.full_name !== undefined ? body.full_name : body.fullName);
+  const full_name = body.full_name !== undefined ? body.full_name : (body.fullName !== undefined ? body.fullName : name);
+  const finalName = full_name !== undefined ? full_name : name;
+
+  // 8- Nick Name
   const nickname = body.nickname !== undefined ? body.nickname : (body.nick_name !== undefined ? body.nick_name : body.nickName);
+
+  // 4- Email
   const email = body.email !== undefined ? body.email : (body.email_id || body.emailId || body.emailAddress);
+
+  // 6- Gender
   const gender = body.gender !== undefined ? body.gender : (body.gender_type || body.genderType);
+
   const interested_in_gender = body.interested_in_gender !== undefined
     ? body.interested_in_gender
     : (body.interestedInGender !== undefined
@@ -862,20 +1097,63 @@ const handleProfileEditCombined = async (req, res) => {
           : (body.interest_selection !== undefined
             ? body.interest_selection
             : body.interest))));
-  const dob = body.dob !== undefined ? body.dob : (body.date_of_birth || body.dateOfBirth || body.birth_date || body.birthDate);
-  const bio = body.bio !== undefined ? body.bio : (body.about || body.bio_data || body.bioData || body.description);
+
+  // 9- Dob
+  const dob = body.dob !== undefined ? body.dob : (body.date_of_birth !== undefined ? body.date_of_birth : (body.dateOfBirth || body.birth_date || body.birthDate));
+
+  // 2- Age (direct age or calculated from Dob)
+  let age = (body.age !== undefined && body.age !== null && body.age !== '') ? parseInt(body.age, 10) : undefined;
+  if ((age === undefined || isNaN(age)) && dob) {
+    const calc = calculateAge(dob);
+    if (calc !== null) age = calc;
+  }
+  if (age !== undefined && isNaN(age)) age = null;
+
+  // 7- About
+  const bio = body.about !== undefined ? body.about : (body.bio !== undefined ? body.bio : (body.bio_data || body.bioData || body.description));
+
+  // 5- City
   const city = body.city !== undefined ? body.city : (body.city_name || body.cityName || body.location || body.area);
   const state = body.state !== undefined ? body.state : (body.state_name || body.stateName || body.province);
+
+  // KYC fields if passed
   const document_type = body.document_type || body.documentType || body.doc_type || body.type;
   const document_number = body.document_number || body.documentNumber || body.doc_number || body.number;
-  const full_name = body.full_name || body.fullName || body.name;
 
-  const profile_image = body.profile_image !== undefined
-    ? body.profile_image
-    : (body.profileImage || body.image || body.profile_photo_url || body.profilePhotoUrl || body.profile_photo || body.profilePhoto || body.avatar || body.photo);
-  const profile_images = body.profile_images !== undefined
+  // 10- Upload Image handling (multipart file OR base64 OR direct URL)
+  let resolvedProfileImage = null;
+
+  // A. Multipart file upload check
+  if (req.file) {
+    resolvedProfileImage = await persistUploadedFile(req.file, baseUrl);
+  } else if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+    const imgFile = req.files.find(f => ['profile_image', 'image', 'photo', 'avatar', 'upload_image', 'file'].includes(f.fieldname)) || req.files[0];
+    resolvedProfileImage = await persistUploadedFile(imgFile, baseUrl);
+  }
+
+  // B. Base64 upload check
+  const rawImageCandidate = body.profile_image || body.upload_image || body.image || body.photo || body.avatar || body.profile_photo || body.base64 || body.image_base64;
+  if (!resolvedProfileImage && rawImageCandidate && typeof rawImageCandidate === 'string' && (rawImageCandidate.startsWith('data:image') || rawImageCandidate.includes(';base64,'))) {
+    resolvedProfileImage = await saveBase64Image(rawImageCandidate, baseUrl);
+  } else if (!resolvedProfileImage && rawImageCandidate && typeof rawImageCandidate === 'string' && rawImageCandidate.trim()) {
+    resolvedProfileImage = rawImageCandidate.trim();
+  }
+
+  const profile_image = resolvedProfileImage !== null ? resolvedProfileImage : (body.profile_image !== undefined ? body.profile_image : undefined);
+  let profile_images = body.profile_images !== undefined
     ? body.profile_images
     : (body.profileImages || body.photos || body.images);
+
+  // If a new profile image is uploaded, prepend it to profile_images list
+  if (profile_image) {
+    let existingList = [];
+    if (profile_images) {
+      existingList = typeof profile_images === 'string' ? JSON.parse(profile_images || '[]') : profile_images;
+    } else if (existingProfile.profile_images) {
+      existingList = Array.isArray(existingProfile.profile_images) ? existingProfile.profile_images : [];
+    }
+    profile_images = [...new Set([profile_image, ...existingList])].slice(0, 5);
+  }
 
   let kycSubmitted = false;
   let kycDetails = null;
@@ -885,7 +1163,7 @@ const handleProfileEditCombined = async (req, res) => {
     kycDetails = {
       document_type,
       document_number_masked: String(document_number).slice(-4).padStart(String(document_number).length, '*'),
-      full_name: full_name || name || existingProfile.name || 'User',
+      full_name: finalName || existingProfile.name || 'User',
       status: 'APPROVED',
       kyc_status: 'APPROVED',
       approval_status: 'APPROVED',
@@ -899,14 +1177,15 @@ const handleProfileEditCombined = async (req, res) => {
       await query(`UPDATE users SET kyc_status = 'APPROVED' WHERE id = ? OR phone_number = ? OR phone_number LIKE ?`, [userId, userPhoneStr, `%${userPhoneStr.replace(/\D/g, '').slice(-8)}`]);
       await query(
         `INSERT INTO kyc_documents (user_id, document_type, document_number, full_name, status) VALUES (?, ?, ?, ?, 'APPROVED')`,
-        [userId, document_type, document_number, full_name || name || 'User']
+        [userId, document_type, document_number, finalName || 'User']
       );
     } catch (err) {
       console.warn('MySQL Combined KYC notice:', err.message);
     }
   }
 
-  // Declare phone variables BEFORE use (fix variable-hoisting bug)
+  // 3- Mobile Number - UNEDITABLE
+  // Strictly preserve verified registered phone number. Any mobile_number passed in body is IGNORED for editing!
   const userFullPhone = (req.user ? (req.user.full_phone_number || req.user.phone_number || '') : '').toString();
   const userPhone = (req.user ? (req.user.phone_number || '') : '').toString().replace(/^\+91/, '').replace(/^\+/, '');
   const cleanDigits = userPhone.replace(/\D/g, '').slice(-10);
@@ -915,13 +1194,23 @@ const handleProfileEditCombined = async (req, res) => {
   const updatedProfile = {
     ...existingProfile,
     user_id: userId,
-    ...(name !== undefined && { name }),
-    ...(nickname !== undefined && { nickname, nick_name: nickname }),
+    // 1- Full Name
+    ...(finalName !== undefined && { name: finalName, full_name: finalName, fullName: finalName }),
+    // 2- Age
+    ...(age !== undefined && { age }),
+    // 3- Mobile Number - uneditable
+    phone_number: userPhone,
+    mobile_number: userPhone,
+    mobile: userPhone,
+    phone: userPhone,
+    full_phone_number: userFullPhone || (userPhone ? `+91${userPhone}` : ''),
+    is_mobile_editable: false,
+    is_phone_editable: false,
+    mobile_number_uneditable: true,
+    phone_uneditable: true,
+    // 4- Email
     ...(email !== undefined && { email }),
-    ...(gender !== undefined && { gender }),
-    ...(interested_in_gender !== undefined && { interested_in_gender }),
-    ...(dob !== undefined && { dob }),
-    ...(bio !== undefined && { bio, about: bio }),
+    // 5- City
     ...(city !== undefined && { city }),
     ...(state !== undefined && { state }),
     location: {
@@ -929,8 +1218,18 @@ const handleProfileEditCombined = async (req, res) => {
       state: state || existingProfile.state || null,
       country: 'India'
     },
-    ...(profile_image !== undefined ? { profile_image } : (existingProfile.profile_image ? { profile_image: existingProfile.profile_image } : {})),
-    ...(profile_images !== undefined ? { profile_images } : (existingProfile.profile_images ? { profile_images: existingProfile.profile_images } : {})),
+    // 6- Gender
+    ...(gender !== undefined && { gender }),
+    ...(interested_in_gender !== undefined && { interested_in_gender }),
+    // 7- About
+    ...(bio !== undefined && { bio, about: bio }),
+    // 8- Nick Name
+    ...(nickname !== undefined && { nickname, nick_name: nickname }),
+    // 9- Dob
+    ...(dob !== undefined && { dob, date_of_birth: dob }),
+    // 10- Upload Image
+    ...(profile_image !== undefined ? { profile_image, image: profile_image, avatar: profile_image, photo_url: profile_image } : (existingProfile.profile_image ? { profile_image: existingProfile.profile_image, image: existingProfile.profile_image, avatar: existingProfile.profile_image, photo_url: existingProfile.profile_image } : {})),
+    ...(profile_images !== undefined ? { profile_images, photos: profile_images, images: profile_images } : (existingProfile.profile_images ? { profile_images: existingProfile.profile_images, photos: existingProfile.profile_images, images: existingProfile.profile_images } : {})),
     ...(kycSubmitted && {
       kyc_status: 'APPROVED',
       status: 'APPROVED',
@@ -948,17 +1247,21 @@ const handleProfileEditCombined = async (req, res) => {
   if (cleanDigits) userProfilesStore[cleanDigits] = updatedProfile;
 
   // Update MySQL database if available
-
   try {
     const setClauses = [];
     const setParams = [];
 
-    if (name !== undefined) { setClauses.push('name = ?'); setParams.push(name ? String(name).trim() : 'User'); }
+    if (finalName !== undefined) { setClauses.push('name = ?'); setParams.push(finalName ? String(finalName).trim() : 'User'); }
     if (nickname !== undefined) { setClauses.push('nickname = ?'); setParams.push(nickname ? String(nickname).trim() : null); }
     if (email !== undefined) { setClauses.push('email = ?'); setParams.push(email ? String(email).trim() : null); }
     if (gender !== undefined) { setClauses.push('gender = ?'); setParams.push(gender ? String(gender).trim() : null); }
     if (interested_in_gender !== undefined) { setClauses.push('interested_in_gender = ?'); setParams.push(interested_in_gender ? String(interested_in_gender).trim() : null); }
-    if (dob !== undefined) { setClauses.push('dob = ?'); setParams.push(dob ? String(dob).trim() : null); }
+    if (dob !== undefined) {
+      setClauses.push('dob = ?', 'date_of_birth = ?');
+      const dVal = dob ? String(dob).trim() : null;
+      setParams.push(dVal, dVal);
+    }
+    if (age !== undefined && age !== null) { setClauses.push('age = ?'); setParams.push(Number(age)); }
     if (city !== undefined) { setClauses.push('city = ?'); setParams.push(city ? String(city).trim() : null); }
     if (state !== undefined) { setClauses.push('state = ?'); setParams.push(state ? String(state).trim() : null); }
     if (bio !== undefined) { setClauses.push('bio = ?'); setParams.push(bio ? String(bio).trim() : null); }
@@ -977,8 +1280,8 @@ const handleProfileEditCombined = async (req, res) => {
       if (!updateRes || updateRes.affectedRows === 0) {
         const photosJson = profile_images !== undefined ? (typeof profile_images === 'string' ? profile_images : JSON.stringify(profile_images)) : (existingProfile.profile_images ? JSON.stringify(existingProfile.profile_images) : null);
         await query(
-          `INSERT INTO users (id, phone_number, name, nickname, email, gender, interested_in_gender, dob, city, state, bio, profile_image, profile_images, kyc_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO users (id, phone_number, name, nickname, email, gender, interested_in_gender, dob, date_of_birth, age, city, state, bio, profile_image, profile_images, kyc_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE
              name = COALESCE(VALUES(name), users.name),
              nickname = COALESCE(VALUES(nickname), users.nickname),
@@ -986,6 +1289,8 @@ const handleProfileEditCombined = async (req, res) => {
              gender = COALESCE(VALUES(gender), users.gender),
              interested_in_gender = COALESCE(VALUES(interested_in_gender), users.interested_in_gender),
              dob = COALESCE(VALUES(dob), users.dob),
+             date_of_birth = COALESCE(VALUES(date_of_birth), users.date_of_birth),
+             age = COALESCE(VALUES(age), users.age),
              city = COALESCE(VALUES(city), users.city),
              state = COALESCE(VALUES(state), users.state),
              bio = COALESCE(VALUES(bio), users.bio),
@@ -995,12 +1300,14 @@ const handleProfileEditCombined = async (req, res) => {
           [
             /^\d+$/.test(numericUserId) ? numericUserId : null,
             userFullPhone || userPhone,
-            name ? String(name).trim() : 'User',
+            finalName ? String(finalName).trim() : 'User',
             nickname ? String(nickname).trim() : null,
             email ? String(email).trim() : null,
             gender ? String(gender).trim() : null,
             interested_in_gender ? String(interested_in_gender).trim() : null,
             dob ? String(dob).trim() : null,
+            dob ? String(dob).trim() : null,
+            age !== undefined ? age : null,
             city ? String(city).trim() : null,
             state ? String(state).trim() : null,
             bio ? String(bio).trim() : null,
@@ -1011,15 +1318,43 @@ const handleProfileEditCombined = async (req, res) => {
         );
       }
 
+      // Also sync to withme_users
+      try {
+        await query(
+          `UPDATE withme_users SET
+             name = COALESCE(?, name),
+             email = COALESCE(?, email),
+             gender = COALESCE(?, gender),
+             city = COALESCE(?, city),
+             age = COALESCE(?, age),
+             profile_image = COALESCE(?, profile_image),
+             updated_at = NOW()
+           WHERE user_id = ? OR phone_number = ? OR phone_number LIKE ?`,
+          [
+            finalName ? String(finalName).trim() : null,
+            email ? String(email).trim() : null,
+            gender ? String(gender).trim() : null,
+            city ? String(city).trim() : null,
+            age !== undefined ? age : null,
+            profile_image ? String(profile_image).trim() : null,
+            userId,
+            userFullPhone || userPhone,
+            `%${cleanDigits.slice(-8)}`
+          ]
+        ).catch(() => {});
+      } catch (e) {}
+
       // Also sync to withme_partners if this user is a partner
       const pClauses = ['updated_at = NOW()'];
       const pParams = [];
-      if (name !== undefined) { pClauses.push('name = ?', 'full_name = ?'); pParams.push(String(name).trim(), String(name).trim()); }
+      if (finalName !== undefined) { pClauses.push('name = ?', 'full_name = ?'); pParams.push(String(finalName).trim(), String(finalName).trim()); }
       if (nickname !== undefined) { pClauses.push('nickname = ?'); pParams.push(nickname ? String(nickname).trim() : null); }
       if (email !== undefined) { pClauses.push('email = ?'); pParams.push(email ? String(email).trim() : null); }
       if (city !== undefined) { pClauses.push('city = ?'); pParams.push(city ? String(city).trim() : null); }
       if (state !== undefined) { pClauses.push('state = ?'); pParams.push(state ? String(state).trim() : null); }
       if (bio !== undefined) { pClauses.push('about = ?'); pParams.push(bio ? String(bio).trim() : null); }
+      if (age !== undefined && age !== null) { pClauses.push('age = ?'); pParams.push(Number(age)); }
+      if (profile_image !== undefined) { pClauses.push('profile_photo_url = ?', 'image = ?'); pParams.push(profile_image, profile_image); }
       if (kycSubmitted) { pClauses.push("kyc_status = 'APPROVED'"); }
 
       if (pClauses.length > 1 && String(userId) !== '2305' && String(userId) !== '391' && String(userId) !== 'usr_203') {
@@ -1037,38 +1372,107 @@ const handleProfileEditCombined = async (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Profile details updated successfully',
-    nickname: updatedProfile.nickname || null,
-    nick_name: updatedProfile.nickname || null,
-    bio: updatedProfile.bio || null,
-    about: updatedProfile.bio || null,
+    // 1- Full Name
+    name: updatedProfile.name || 'User',
+    full_name: updatedProfile.name || 'User',
+    fullName: updatedProfile.name || 'User',
+    // 2- Age
+    age: updatedProfile.age !== undefined ? updatedProfile.age : null,
+    // 3- Mobile Number - uneditable
+    mobile_number: userPhone,
+    phone_number: userPhone,
+    mobile: userPhone,
+    phone: userPhone,
+    full_phone_number: userFullPhone || (userPhone ? `+91${userPhone}` : ''),
+    is_mobile_editable: false,
+    is_phone_editable: false,
+    mobile_number_uneditable: true,
+    phone_uneditable: true,
+    // 4- Email
+    email: updatedProfile.email || null,
+    // 5- City
     city: updatedProfile.city || null,
     state: updatedProfile.state || null,
-    email: updatedProfile.email || null,
+    // 6- Gender
+    gender: updatedProfile.gender || null,
+    // 7- About
+    about: updatedProfile.bio || null,
+    bio: updatedProfile.bio || null,
+    // 8- Nick Name
+    nickname: updatedProfile.nickname || null,
+    nick_name: updatedProfile.nickname || null,
+    // 9- Dob
     dob: updatedProfile.dob || null,
     date_of_birth: updatedProfile.dob || null,
-    gender: updatedProfile.gender || null,
+    // 10- Upload Image
+    profile_image: updatedProfile.profile_image || null,
+    image: updatedProfile.profile_image || null,
+    avatar: updatedProfile.profile_image || null,
+    photo_url: updatedProfile.profile_image || null,
+    profile_images: updatedProfile.profile_images || [],
+    photos: updatedProfile.profile_images || [],
     body: req.body || {},
     request_body: req.body || {},
     received_body: req.body || {},
     data: {
       ...(req.body || {}),
-      ...updatedProfile
+      ...updatedProfile,
+      name: updatedProfile.name || 'User',
+      full_name: updatedProfile.name || 'User',
+      fullName: updatedProfile.name || 'User',
+      age: updatedProfile.age !== undefined ? updatedProfile.age : null,
+      mobile_number: userPhone,
+      phone_number: userPhone,
+      mobile: userPhone,
+      phone: userPhone,
+      is_mobile_editable: false,
+      is_phone_editable: false,
+      mobile_number_uneditable: true,
+      phone_uneditable: true,
+      email: updatedProfile.email || null,
+      city: updatedProfile.city || null,
+      gender: updatedProfile.gender || null,
+      about: updatedProfile.bio || null,
+      bio: updatedProfile.bio || null,
+      nickname: updatedProfile.nickname || null,
+      nick_name: updatedProfile.nickname || null,
+      dob: updatedProfile.dob || null,
+      date_of_birth: updatedProfile.dob || null,
+      profile_image: updatedProfile.profile_image || null,
+      image: updatedProfile.profile_image || null,
+      avatar: updatedProfile.profile_image || null,
+      photo_url: updatedProfile.profile_image || null,
+      profile_images: updatedProfile.profile_images || [],
+      photos: updatedProfile.profile_images || []
     },
     ...(kycSubmitted && { kyc_submission: kycDetails })
   });
 };
 
-router.post('/profile/edit', authenticateToken, handleProfileEditCombined);
-router.put('/profile/edit', authenticateToken, handleProfileEditCombined);
-router.patch('/profile/edit', authenticateToken, handleProfileEditCombined);
-router.post('/profile/update', authenticateToken, handleProfileEditCombined);
-router.put('/profile/update', authenticateToken, handleProfileEditCombined);
-router.patch('/profile/update', authenticateToken, handleProfileEditCombined);
-router.post('/profile', authenticateToken, handleProfileEditCombined);
-router.put('/profile', authenticateToken, handleProfileEditCombined);
-router.patch('/profile', authenticateToken, handleProfileEditCombined);
-router.post('/profile/combined-update', authenticateToken, handleProfileEditCombined);
-router.post('/profile/update-all', authenticateToken, handleProfileEditCombined);
+router.post('/profile/edit', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.put('/profile/edit', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.patch('/profile/edit', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.post('/profile/update', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.put('/profile/update', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.patch('/profile/update', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.post('/profile', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.put('/profile', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.patch('/profile', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.post('/profile/combined-update', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.post('/profile/update-all', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.post('/edit-profile', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.put('/edit-profile', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.post('/update-profile', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.put('/update-profile', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.post('/edit', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.put('/edit', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.patch('/edit', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.post('/update', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.put('/update', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.patch('/update', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.post('/', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.put('/', authenticateToken, safeUploadAny, handleProfileEditCombined);
+router.patch('/', authenticateToken, safeUploadAny, handleProfileEditCombined);
 
 // 5. KYC Verification & Submit API — POST / GET (/kyc/verify, /kyc/status, /kyc/submit, /kyc/post, /kyc)
 const handleKycSubmit = async (req, res) => {
@@ -1325,8 +1729,6 @@ const handleKycSubmit = async (req, res) => {
     kyc_details: kycData
   });
 };
-
-const upload = require('../middleware/uploadMiddleware');
 
 const safeUpload = (req, res, next) => {
   const contentType = (req.headers['content-type'] || '').toLowerCase();
