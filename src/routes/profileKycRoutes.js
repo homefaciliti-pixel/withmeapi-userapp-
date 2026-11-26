@@ -1355,7 +1355,7 @@ const handleProfileEditCombined = async (req, res) => {
       if (bio !== undefined) { pClauses.push('about = ?'); pParams.push(bio ? String(bio).trim() : null); }
       if (age !== undefined && age !== null) { pClauses.push('age = ?'); pParams.push(Number(age)); }
       if (profile_image !== undefined) { pClauses.push('profile_photo_url = ?', 'image = ?'); pParams.push(profile_image, profile_image); }
-      if (kycSubmitted) { pClauses.push("kyc_status = 'APPROVED'"); }
+      if (kycSubmitted) { pClauses.push("kyc_status = 'APPROVED'", 'is_approved = 1', 'is_verified = 1'); }
 
       if (pClauses.length > 1 && String(userId) !== '2305' && String(userId) !== '391' && String(userId) !== 'usr_203') {
         await query(
@@ -1636,18 +1636,16 @@ const handleKycSubmit = async (req, res) => {
 
     // Sync non-critical fields to withme_partners for user if partner record exists (never touch Amit 2305 or Priya usr_203 / 391)
     if (String(userId) !== '2305' && String(userId) !== '391' && String(userId) !== 'usr_203') {
-      const pClauses = [];
+      const pClauses = ["kyc_status = 'APPROVED'", 'is_approved = 1', 'is_verified = 1', 'updated_at = NOW()'];
       const pParams = [];
-      if (name) { pClauses.push('name = ?'); pParams.push(name); }
+      if (name) { pClauses.push('name = ?', 'full_name = ?'); pParams.push(name, name); }
       if (email) { pClauses.push('email = ?'); pParams.push(email); }
       if (city) { pClauses.push('city = ?'); pParams.push(city); }
-      if (bio) { pClauses.push('bio = ?'); pParams.push(bio); }
-      if (pClauses.length > 0) {
-        await query(
-          `UPDATE withme_partners SET ${pClauses.join(', ')} WHERE (partner_id = ? OR id = ? OR phone = ? OR phone LIKE ?) AND partner_id != 'usr_203' AND id != 391`,
-          [...pParams, userId, numericUserId, userPhone, `%${cleanDigits.slice(-8)}`]
-        ).catch(() => {});
-      }
+      if (bio) { pClauses.push('about = ?'); pParams.push(bio); }
+      await query(
+        `UPDATE withme_partners SET ${pClauses.join(', ')} WHERE (partner_id = ? OR user_id = ? OR id = ? OR phone_number = ? OR mobile_number = ? OR phone_number LIKE ?) AND partner_id != 'usr_203' AND id != 391`,
+        [...pParams, userId, userId, numericUserId, userPhone, userPhone, `%${cleanDigits.slice(-8)}`]
+      ).catch(() => {});
     }
 
     await query(

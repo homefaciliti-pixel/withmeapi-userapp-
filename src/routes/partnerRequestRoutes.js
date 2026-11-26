@@ -2133,7 +2133,9 @@ const handleRegisterPartner = async (req, res) => {
     total_reviews: 120,
     price: priceVal,
     currency: 'INR',
+    kyc_status: pData.kyc_status || 'APPROVED',
     is_approved: 1,
+    is_verified: 1,
     status: 'ACTIVE',
     created_at: new Date().toISOString()
   };
@@ -2146,16 +2148,18 @@ const handleRegisterPartner = async (req, res) => {
       INSERT INTO withme_partners (
         partner_id, user_id, name, full_name, email, mobile_number, phone_number,
         gender, dob, city, state, locality, address, profile_photo_url, image, photos,
-        category, activity, rating, price, is_approved, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE')
+        category, activity, rating, price, kyc_status, is_approved, is_verified, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 'ACTIVE')
       ON DUPLICATE KEY UPDATE
         name = VALUES(name), full_name = VALUES(full_name), email = VALUES(email),
         profile_photo_url = VALUES(profile_photo_url), image = VALUES(image), photos = VALUES(photos),
-        city = VALUES(city), locality = VALUES(locality), status = 'ACTIVE', updated_at = NOW()
+        city = VALUES(city), locality = VALUES(locality),
+        kyc_status = COALESCE(VALUES(kyc_status), kyc_status),
+        is_approved = 1, is_verified = 1, status = 'ACTIVE', updated_at = NOW()
     `, [
       String(cleanId), String(cleanId), name, name, email, mobile, mobile,
       gender, dob, city, state, locality, address, photoUrl, photoUrl, photosJson,
-      categoryVal, categoryVal, partnerRecord.rating, priceVal
+      categoryVal, categoryVal, partnerRecord.rating, priceVal, partnerRecord.kyc_status
     ]);
     console.log(`[User App API] Synced new partner ${name} (${cleanId}) to withme_partners table with photo ${photoUrl}`);
   } catch (err) {

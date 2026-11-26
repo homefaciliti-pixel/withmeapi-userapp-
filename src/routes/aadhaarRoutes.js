@@ -170,7 +170,7 @@ const handleAadhaarKycSubmit = async (req, res) => {
       }
 
       // Also sync to withme_partners if this user is a partner
-      const pClauses = ["kyc_status = 'APPROVED'", 'updated_at = NOW()'];
+      const pClauses = ["kyc_status = 'APPROVED'", 'is_approved = 1', 'is_verified = 1', 'updated_at = NOW()'];
       const pParams = [];
       if (full_name) { pClauses.push('name = ?', 'full_name = ?'); pParams.push(String(full_name).trim(), String(full_name).trim()); }
       if (nick_name !== null) { pClauses.push('nickname = ?'); pParams.push(String(nick_name).trim()); }
@@ -341,6 +341,11 @@ router.post('/otp-verify', authenticateToken, async (req, res) => {
   try {
     await query(`UPDATE users SET kyc_status = 'VERIFIED', updated_at = NOW() WHERE id = ? OR id = ? OR phone_number = ? OR phone_number = ? OR phone_number LIKE ?`, [userId, numericUserId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]);
     await query(`UPDATE kyc_documents SET status = 'VERIFIED' WHERE user_id = ? OR user_id = ?`, [userId, numericUserId]);
+    await query(
+      `UPDATE withme_partners SET kyc_status = 'APPROVED', is_approved = 1, is_verified = 1, updated_at = NOW()
+       WHERE user_id = ? OR partner_id = ? OR phone_number = ? OR mobile_number = ? OR phone_number LIKE ?`,
+      [userId, numericUserId, userFullPhone, userPhone, `%${cleanDigits.slice(-8)}`]
+    ).catch(() => {});
   } catch (err) {
     console.warn('MySQL Aadhaar OTP verify notice:', err.message);
   }
@@ -419,6 +424,11 @@ const handleAadhaarExtract = async (req, res) => {
       if (d.dob) { uClauses.push('dob = ?'); uParams.push(d.dob); }
       if (d.gender) { uClauses.push('gender = ?'); uParams.push(d.gender); }
       await query(`UPDATE users SET ${uClauses.join(', ')} WHERE id = ? OR id = ?`, [...uParams, userId, numericUserId]).catch(() => {});
+      await query(
+        `UPDATE withme_partners SET kyc_status = 'APPROVED', is_approved = 1, is_verified = 1, updated_at = NOW()
+         WHERE user_id = ? OR partner_id = ?`,
+        [userId, numericUserId]
+      ).catch(() => {});
     }
 
     return res.status(200).json({
