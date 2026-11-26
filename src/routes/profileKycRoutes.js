@@ -31,6 +31,20 @@ const safeUploadAny = (req, res, next) => {
 };
 
 // Accurate age calculation from DOB helper
+const parseAbout = (raw) => {
+  if (!raw || typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return (parsed.description || parsed.about || parsed.bio || parsed.text || '').trim();
+      }
+    } catch (e) {}
+  }
+  return trimmed;
+};
+
 const calculateAge = (dobStr) => {
   if (!dobStr) return null;
   try {
@@ -303,7 +317,7 @@ const handleGetProfile = async (req, res) => {
             if (pRows && pRows.length > 0) {
               const p = pRows[0];
               if (!u.nickname && p.nickname) u.nickname = p.nickname;
-              if (!u.bio && p.about) u.bio = p.about;
+              if (!u.bio && p.about) u.bio = parseAbout(p.about) || null;
               if (!u.city && p.city) u.city = p.city;
               if (!u.state && p.state) u.state = p.state;
               if (!u.email && p.email) u.email = p.email;
@@ -797,8 +811,8 @@ const handleDetailedProfileView = async (req, res) => {
           nickname: p.nickname || null,
           nick_name: p.nickname || null,
           email: p.email || null,
-          bio: p.about || `Friendly partner available in ${p.city || 'Jaipur'}.`,
-          about: p.about || `Friendly partner available in ${p.city || 'Jaipur'}.`,
+          bio: parseAbout(p.about) || `Friendly partner available in ${p.city || 'Jaipur'}.`,
+          about: parseAbout(p.about) || `Friendly partner available in ${p.city || 'Jaipur'}.`,
           city: p.city || 'Jaipur',
           state: p.state || 'Rajasthan',
           age: p.age || null,

@@ -159,6 +159,27 @@ const formatPartnerPhoto = (photo, baseUrl = 'https://withmeapi-userapp.onrender
 };
 
 // Helper to fetch all registered partners from dedicated MySQL table `withme_partners`
+
+/**
+ * Parse the `about` field — it may be a plain string OR a JSON object like
+ * {"description":"...", "interests":["Coffee","Books"]}.
+ * Always returns a plain string with just the description text.
+ */
+function parseAbout(raw) {
+  if (!raw) return '';
+  if (typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return (parsed.description || parsed.about || parsed.bio || parsed.text || '').trim();
+      }
+    } catch (e) {}
+  }
+  return trimmed;
+}
+
 const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userapp.onrender.com', userCoords = {}) => {
   try {
     const rows = await query(`
@@ -308,7 +329,7 @@ const fetchRegisteredPartnersFromDb = async (baseUrl = 'https://withmeapi-userap
         avatar: photoUrl,
         profile_images: parsedPhotos,
         photos: parsedPhotos,
-        about: r.about || ''
+        about: parseAbout(r.about) || ''
       };
     });
   } catch (err) {
@@ -684,7 +705,7 @@ const getCategoryItemsData = async (categoryIdOrName = 'cat_01', baseUrl = 'http
         distance: p.distance,
         price: p.price || defaultPrice,
         currency: 'INR',
-        about: p.about || '',
+        about: parseAbout(p.about) || '',
         interests: p.interests,
         category: catName,
         is_verified: Boolean(p.is_verified),
@@ -1518,7 +1539,7 @@ const getPartnerProfileById = async (targetId = '101', baseUrl = 'https://withme
         },
         rating: (r.rating != null && !isNaN(parseFloat(r.rating)) && parseFloat(r.rating) > 0) ? parseFloat(r.rating) : null,
         total_reviews: (r.total_reviews != null && !isNaN(parseInt(r.total_reviews, 10))) ? parseInt(r.total_reviews, 10) : 0,
-        about: r.about || `Friendly partner available in ${city}. Passionate about cafes, meetups, and activities.`,
+        about: parseAbout(r.about) || `Friendly partner available in ${city}. Passionate about cafes, meetups, and activities.`,
         profile_image: photoUrl,
         image: photoUrl,
         avatar: photoUrl,
@@ -1920,7 +1941,7 @@ const handleProductDetails = async (req, res) => {
     profile_image: partnerProfile.profile_image,
     profile_images: partnerProfile.profile_images,
     photos: partnerProfile.photos,
-    about: partnerProfile.about,
+    about: parseAbout(partnerProfile.about),
     interests: partnerProfile.interests
   });
 };

@@ -2,6 +2,26 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { query, ensureColumnExists } = require('../config/db');
+
+/**
+ * Parse the `about` field — it may be a plain string OR a JSON object like
+ * {"description":"...", "interests":["Coffee","Books"]}.
+ * Always returns a plain string with just the description text.
+ */
+function parseAbout(raw) {
+  if (!raw) return '';
+  if (typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return (parsed.description || parsed.about || parsed.bio || parsed.text || '').trim();
+      }
+    } catch (e) {}
+  }
+  return trimmed;
+}
 let _notifService = null;
 const getNotifService = () => {
   if (!_notifService) {
@@ -1170,7 +1190,7 @@ const getPartnerRequestDetails = async (targetId = '101', baseUrl = 'https://wit
         date: currentDateStr,
         booking_date: currentDateStr,
         date_time: `${currentDateStr} 06:00 PM`,
-        about: r.about || `Friendly partner available in ${city}. Loves social meetups and cafe conversations.`,
+        about: parseAbout(r.about) || `Friendly partner available in ${city}. Loves social meetups and cafe conversations.`,
         is_verified: true,
         is_approved: true,
         approval_status: 'approved',
@@ -1543,7 +1563,7 @@ const handlePartnerRequestDetails = async (req, res) => {
     photos: details.photos,
     interests: details.interests,
     available_for: details.available_for,
-    about: details.about,
+    about: parseAbout(details.about),
     sender: details.sender,
     data: {
       ...details,
